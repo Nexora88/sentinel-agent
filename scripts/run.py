@@ -35,49 +35,45 @@ def main():
     )
     sub = parser.add_subparsers(dest="command")
 
-    # review
     p_review = sub.add_parser("review", help="Review a local file")
     p_review.add_argument("file", type=str)
 
-    # repo
     p_repo = sub.add_parser("repo", help="Full pipeline on a git repository")
     p_repo.add_argument("url", type=str)
     p_repo.add_argument("--branch", default="main")
 
-    # debug
     p_debug = sub.add_parser("debug", help="Debug an error message")
-    p_debug.add_argument("error", type=str, help="Error message or stack trace")
-    p_debug.add_argument("--code", type=str, default="", help="Related code (optional)")
-    p_debug.add_argument("--file", type=str, default="", help="File path (optional)")
+    p_debug.add_argument("error", type=str)
+    p_debug.add_argument("--code", type=str, default="")
+    p_debug.add_argument("--file", type=str, default="")
 
-    # website
     p_web = sub.add_parser("website", help="Defensive scan of a website")
     p_web.add_argument("url", type=str)
 
-    # fix
-    p_fix = sub.add_parser("fix", help="Propose / apply a fix to a file (permission controlled)")
+    p_fix = sub.add_parser("fix", help="Propose / apply a fix (permission controlled)")
     p_fix.add_argument("file", type=str)
-    p_fix.add_argument("issue", type=str, help="Description of the issue to fix")
+    p_fix.add_argument("issue", type=str)
 
-    # expand knowledge once
-    p_expand = sub.add_parser("expand", help="Expand knowledge universe once (internet digestion)")
-    p_expand.add_argument("--topic", type=str, default=None, help="Optional topic to focus on")
+    p_expand = sub.add_parser("expand", help="Expand knowledge universe once")
+    p_expand.add_argument("--topic", type=str, default=None)
 
-    # schedule (nightly code + continuous knowledge)
-    sub.add_parser("schedule", help="Start scheduler (nightly review + slow knowledge expansion)")
+    p_secrets = sub.add_parser("secrets", help="Scan project for hardcoded secrets")
+    p_secrets.add_argument("--path", type=str, default=".")
 
-    # permissions
+    p_ingest = sub.add_parser("ingest", help="Ingest local PDF/MD/TXT into knowledge base")
+    p_ingest.add_argument("file", type=str)
+
+    sub.add_parser("night", help="Run one safe night research cycle (proposals only)")
+
+    sub.add_parser("schedule", help="Scheduler: nightly review + knowledge + night research")
+
     sub.add_parser("permissions", help="Show permission status")
-
-    # test
     sub.add_parser("test", help="Health check")
 
-    # chat (CLI interactive)
-    p_chat = sub.add_parser("chat", help="Talk to Sentinel interactively (terminal)")
-    p_chat.add_argument("message", nargs="?", default=None, help="Optional single message")
+    p_chat = sub.add_parser("chat", help="Interactive terminal chat")
+    p_chat.add_argument("message", nargs="?", default=None)
 
-    # web UI (main interface)
-    p_webui = sub.add_parser("web", help="Start self-hosted web interface (recommended)")
+    p_webui = sub.add_parser("web", help="Start web UI (recommended)")
     p_webui.add_argument("--port", type=int, default=8000)
     p_webui.add_argument("--host", type=str, default="0.0.0.0")
 
@@ -105,8 +101,17 @@ def main():
         print(f"Konu          : {result.get('topic')}")
         print(f"Yeni sayfa    : {result.get('pages_ingested')}")
         print(f"Toplam bilgi  : {result.get('total_knowledge_pages')}")
-        for d in result.get("details", []):
-            print(f"  • {d.get('title', '')[:70]}")
+
+    elif args.command == "secrets":
+        print(pipeline.scan_secrets(args.path))
+
+    elif args.command == "ingest":
+        print(pipeline.ingest_document(args.file))
+
+    elif args.command == "night":
+        print("🌙 Gece araştırma döngüsü başlıyor (sadece öneri, yazma yok)...")
+        result = pipeline.run_night_research()
+        print(result.get("summary", str(result)))
 
     elif args.command == "schedule":
         scheduler = SentinelScheduler()
@@ -125,23 +130,31 @@ def main():
         def knowledge_job():
             try:
                 result = pipeline.expand_knowledge()
-                logger.info(
-                    f"Knowledge expanded: +{result.get('pages_ingested', 0)} "
-                    f"(total {result.get('total_knowledge_pages', 0)})"
-                )
+                logger.info(f"Knowledge +{result.get('pages_ingested', 0)}")
             except Exception as e:
-                logger.error(f"Knowledge expansion failed: {e}")
+                logger.error(f"Knowledge failed: {e}")
 
-        # Nightly code review
+        def night_job():
+            try:
+                r = pipeline.run_night_research()
+                logger.info("Night research cycle completed")
+                # Optionally notify summary via WhatsApp
+                summary = r.get("summary", "")[:800]
+                if summary:
+                    pipeline.notifier.notify(f"🌙 Night Report\n{summary}", whatsapp=True)
+            except Exception as e:
+                logger.error(f"Night research failed: {e}")
+
         scheduler.add_cron_job("nightly_review", nightly_job, settings.schedule_code_review)
-
-        # Slow continuous knowledge growth (every 90 minutes)
         scheduler.add_cron_job("universe_expand", knowledge_job, "*/90 * * * *")
+        # Night research around 03:30
+        scheduler.add_cron_job("night_research", night_job, "30 3 * * *")
 
         scheduler.start()
-        print("Scheduler started.")
+        print("Scheduler started:")
         print("  • Nightly code review")
-        print("  • Knowledge universe expands every ~90 minutes")
+        print("  • Knowledge expand every ~90 min")
+        print("  • Night research ~03:30 (proposals only)")
         print("Ctrl+C to stop.")
         try:
             import time
@@ -163,7 +176,7 @@ def main():
         print(f"Ollama     : {settings.ollama_base_url}")
         print(f"Approval   : {settings.require_approval}")
         print(f"WhatsApp   : {'configured' if os.getenv('WHATSAPP_PHONE') else 'not configured'}")
-        print(f"Watch list : {settings.watch_repos or '(empty)'}")
+        print(f"GitHub     : {'configured' if os.getenv('GITHUB_TOKEN') else 'not configured'}")
         print()
         print(pipeline.status())
 
@@ -171,7 +184,7 @@ def main():
         if args.message:
             print(pipeline.chat(args.message))
         else:
-            print("🛡️  Sentinel Chat (Ctrl+C to exit)")
+            print("🛡️  Sentinel Chat (Ctrl+C / exit)")
             print(pipeline.status())
             print("-" * 40)
             while True:
@@ -181,8 +194,7 @@ def main():
                         continue
                     if user_input.lower() in ("exit", "quit", "çık"):
                         break
-                    reply = pipeline.chat(user_input)
-                    print(f"\nSentinel: {reply}\n")
+                    print(f"\nSentinel: {pipeline.chat(user_input)}\n")
                 except (KeyboardInterrupt, EOFError):
                     print("\nGörüşürüz.")
                     break
@@ -190,14 +202,7 @@ def main():
     elif args.command == "web":
         import uvicorn
         print(f"🌐 Sentinel Web UI → http://{args.host}:{args.port}")
-        print("Tarayıcıdan aç. Emirlerini oradan ver.")
-        uvicorn.run(
-            "web.app:app",
-            host=args.host,
-            port=args.port,
-            reload=False,
-            log_level="info",
-        )
+        uvicorn.run("web.app:app", host=args.host, port=args.port, reload=False, log_level="info")
 
     else:
         parser.print_help()
