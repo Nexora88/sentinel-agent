@@ -59,8 +59,12 @@ def main():
     p_fix.add_argument("file", type=str)
     p_fix.add_argument("issue", type=str, help="Description of the issue to fix")
 
-    # schedule
-    sub.add_parser("schedule", help="Start nightly scheduler")
+    # expand knowledge once
+    p_expand = sub.add_parser("expand", help="Expand knowledge universe once (internet digestion)")
+    p_expand.add_argument("--topic", type=str, default=None, help="Optional topic to focus on")
+
+    # schedule (nightly code + continuous knowledge)
+    sub.add_parser("schedule", help="Start scheduler (nightly review + slow knowledge expansion)")
 
     # permissions
     sub.add_parser("permissions", help="Show permission status")
@@ -69,11 +73,13 @@ def main():
     sub.add_parser("test", help="Health check")
 
     # chat (CLI interactive)
-    p_chat = sub.add_parser("chat", help="Talk to Sentinel interactively (PC)")
+    p_chat = sub.add_parser("chat", help="Talk to Sentinel interactively (terminal)")
     p_chat.add_argument("message", nargs="?", default=None, help="Optional single message")
 
-    # telegram
-    sub.add_parser("telegram", help="Start Telegram bot (phone + PC)")
+    # web UI (main interface)
+    p_webui = sub.add_parser("web", help="Start self-hosted web interface (recommended)")
+    p_webui.add_argument("--port", type=int, default=8000)
+    p_webui.add_argument("--host", type=str, default="0.0.0.0")
 
     args = parser.parse_args()
     pipeline = SentinelPipeline()
@@ -93,6 +99,15 @@ def main():
     elif args.command == "fix":
         print(pipeline.fix_file(args.file, args.issue))
 
+    elif args.command == "expand":
+        print("🌌 Bilgi evreni genişliyor...")
+        result = pipeline.expand_knowledge(topic=args.topic)
+        print(f"Konu          : {result.get('topic')}")
+        print(f"Yeni sayfa    : {result.get('pages_ingested')}")
+        print(f"Toplam bilgi  : {result.get('total_knowledge_pages')}")
+        for d in result.get("details", []):
+            print(f"  • {d.get('title', '')[:70]}")
+
     elif args.command == "schedule":
         scheduler = SentinelScheduler()
 
@@ -107,9 +122,27 @@ def main():
                 except Exception as e:
                     logger.error(f"Failed on {repo}: {e}")
 
-        scheduler.add_cron_job("nightly", nightly_job, settings.schedule_code_review)
+        def knowledge_job():
+            try:
+                result = pipeline.expand_knowledge()
+                logger.info(
+                    f"Knowledge expanded: +{result.get('pages_ingested', 0)} "
+                    f"(total {result.get('total_knowledge_pages', 0)})"
+                )
+            except Exception as e:
+                logger.error(f"Knowledge expansion failed: {e}")
+
+        # Nightly code review
+        scheduler.add_cron_job("nightly_review", nightly_job, settings.schedule_code_review)
+
+        # Slow continuous knowledge growth (every 90 minutes)
+        scheduler.add_cron_job("universe_expand", knowledge_job, "*/90 * * * *")
+
         scheduler.start()
-        print("Scheduler started. Ctrl+C to stop.")
+        print("Scheduler started.")
+        print("  • Nightly code review")
+        print("  • Knowledge universe expands every ~90 minutes")
+        print("Ctrl+C to stop.")
         try:
             import time
             while True:
@@ -130,7 +163,6 @@ def main():
         print(f"Ollama     : {settings.ollama_base_url}")
         print(f"Approval   : {settings.require_approval}")
         print(f"WhatsApp   : {'configured' if os.getenv('WHATSAPP_PHONE') else 'not configured'}")
-        print(f"Telegram   : {'configured' if os.getenv('TELEGRAM_BOT_TOKEN') else 'not configured'}")
         print(f"Watch list : {settings.watch_repos or '(empty)'}")
         print()
         print(pipeline.status())
@@ -155,17 +187,17 @@ def main():
                     print("\nGörüşürüz.")
                     break
 
-    elif args.command == "telegram":
-        from tools.telegram_interface import TelegramInterface
-
-        def handler(msg: str) -> str:
-            return pipeline.chat(msg)
-
-        bot = TelegramInterface(
-            chat_handler=handler,
-            status_handler=pipeline.status,
+    elif args.command == "web":
+        import uvicorn
+        print(f"🌐 Sentinel Web UI → http://{args.host}:{args.port}")
+        print("Tarayıcıdan aç. Emirlerini oradan ver.")
+        uvicorn.run(
+            "web.app:app",
+            host=args.host,
+            port=args.port,
+            reload=False,
+            log_level="info",
         )
-        bot.run()
 
     else:
         parser.print_help()
