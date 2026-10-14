@@ -28,7 +28,6 @@
     </aside>
 
     <main class="main">
-      <!-- Chat -->
       <section id="panel-chat" class="panel active">
         <header class="panel-header">
           <h1>Kişisel Ajan</h1>
@@ -37,25 +36,24 @@
         <div id="chat-messages" class="chat-messages"></div>
         <div class="chat-input-area">
           <button id="voice-btn" title="Sesli komut" class="icon-btn">🎤</button>
-          <textarea id="chat-input" placeholder="Mesaj veya komut yaz... (Enter gönder)" rows="2"></textarea>
+          <textarea id="chat-input" placeholder="Mesaj veya komut yaz..." rows="2"></textarea>
           <button id="send-btn">Gönder</button>
         </div>
       </section>
 
-      <!-- Universe -->
       <section id="panel-universe" class="panel">
         <header class="panel-header">
           <h1>Bilgi Evreni</h1>
-          <p>İnternetten yavaş yavaş besleniyor, sürekli büyüyor.</p>
+          <p>Kara delik gibi büyüyor — haber, araştırma, kripto, kitap özetleri.</p>
         </header>
-        <div class="universe-stats" id="universe-stats">
+        <div class="universe-stats">
           <div class="stat-card"><span class="stat-value" id="u-pages">—</span><span class="stat-label">Toplam Bilgi</span></div>
           <div class="stat-card"><span class="stat-value" id="u-runs">—</span><span class="stat-label">Tur</span></div>
           <div class="stat-card"><span class="stat-value" id="u-seeds">—</span><span class="stat-label">Tohum</span></div>
           <div class="stat-card"><span class="stat-value" id="u-visited">—</span><span class="stat-label">Ziyaret</span></div>
         </div>
         <div class="universe-actions">
-          <input type="text" id="new-topic" placeholder="Yeni konu (ör: quantum computing)" />
+          <input type="text" id="new-topic" placeholder="Yeni konu" />
           <button id="add-seed-btn">Tohum Ekle</button>
           <button id="expand-btn" class="primary">Şimdi Genişlet</button>
         </div>
@@ -65,54 +63,63 @@
         </div>
       </section>
 
-      <!-- Finance -->
       <section id="panel-finance" class="panel">
         <header class="panel-header">
-          <h1>Finans Motoru</h1>
-          <p>Hisse, kripto, piyasa analizi — ücretsiz veriler.</p>
+          <h1>Finans (Paper Trading)</h1>
+          <p>Sanal para ile otonom işlem. Gerçek para yok. Risk kuralları kilitli.</p>
         </header>
-        <div class="finance-box">
-          <input type="text" id="finance-query" placeholder="Örn: Bitcoin fiyatı, AAPL analizi, piyasa özeti" />
-          <button id="finance-btn" class="primary">Analiz Et</button>
+        <div class="universe-stats" id="fin-stats">
+          <div class="stat-card"><span class="stat-value" id="f-equity">—</span><span class="stat-label">Portföy $</span></div>
+          <div class="stat-card"><span class="stat-value" id="f-pnl">—</span><span class="stat-label">Toplam PnL %</span></div>
+          <div class="stat-card"><span class="stat-value" id="f-cash">—</span><span class="stat-label">Nakit $</span></div>
+          <div class="stat-card"><span class="stat-value" id="f-open">—</span><span class="stat-label">Açık Pozisyon</span></div>
         </div>
-        <pre id="finance-result" class="status-box">Sonuç burada görünecek...</pre>
+        <div class="universe-actions">
+          <button id="fin-cycle-btn" class="primary">Bir Döngü Çalıştır</button>
+          <button id="fin-refresh-btn">Yenile</button>
+          <span id="fin-mode" class="stat-label" style="align-self:center"></span>
+        </div>
+        <h3 style="margin:16px 0 8px;color:var(--text-muted)">Açık Pozisyonlar</h3>
+        <div id="fin-positions" class="approvals-list"></div>
+        <h3 style="margin:20px 0 8px;color:var(--text-muted)">Ajan Düşünce Günlüğü</h3>
+        <pre id="fin-thoughts" class="status-box" style="max-height:240px">—</pre>
+        <div class="finance-box" style="margin-top:16px">
+          <input type="text" id="finance-query" placeholder="Analiz sorusu: Bitcoin, piyasa özeti..." />
+          <button id="finance-btn">Analiz</button>
+        </div>
+        <pre id="finance-result" class="status-box">—</pre>
       </section>
 
-      <!-- Image -->
       <section id="panel-image" class="panel">
         <header class="panel-header">
           <h1>Görsel Üretimi</h1>
-          <p>Local SD veya ücretsiz Pollinations ile görsel oluştur.</p>
+          <p>Local SD veya ücretsiz Pollinations.</p>
         </header>
         <div class="universe-actions">
-          <input type="text" id="image-prompt" placeholder="Görsel tarifi yaz..." />
+          <input type="text" id="image-prompt" placeholder="Görsel tarifi..." />
           <button id="image-btn" class="primary">Üret</button>
         </div>
         <div id="image-result" class="image-result"></div>
       </section>
 
-      <!-- GitHub -->
       <section id="panel-github" class="panel">
         <header class="panel-header">
           <h1>GitHub</h1>
-          <p>Repolarını gör, kod yaz / push et (onaylı).</p>
+          <p>Repolar — yazma/push onaylı.</p>
         </header>
         <button id="gh-refresh" class="primary">Repoları Yenile</button>
         <div id="gh-repos" class="gh-repos"></div>
       </section>
 
-      <!-- Approvals -->
       <section id="panel-approvals" class="panel">
         <header class="panel-header">
           <h1>Bekleyen Onaylar</h1>
-          <p>Yazma / push / PR işlemleri senin onayını bekler.</p>
         </header>
         <div id="approvals-list" class="approvals-list">
           <p class="empty">Bekleyen onay yok.</p>
         </div>
       </section>
 
-      <!-- Status -->
       <section id="panel-status" class="panel">
         <header class="panel-header">
           <h1>Sistem Durumu</h1>
