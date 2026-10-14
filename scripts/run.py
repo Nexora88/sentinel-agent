@@ -1,6 +1,6 @@
-\"\"\"
+"""
 Sentinel Agent - Main CLI
-\"\"\"
+"""
 
 from __future__ import annotations
 
@@ -68,6 +68,13 @@ def main():
     # test
     sub.add_parser("test", help="Health check")
 
+    # chat (CLI interactive)
+    p_chat = sub.add_parser("chat", help="Talk to Sentinel interactively (PC)")
+    p_chat.add_argument("message", nargs="?", default=None, help="Optional single message")
+
+    # telegram
+    sub.add_parser("telegram", help="Start Telegram bot (phone + PC)")
+
     args = parser.parse_args()
     pipeline = SentinelPipeline()
 
@@ -123,7 +130,42 @@ def main():
         print(f"Ollama     : {settings.ollama_base_url}")
         print(f"Approval   : {settings.require_approval}")
         print(f"WhatsApp   : {'configured' if os.getenv('WHATSAPP_PHONE') else 'not configured'}")
+        print(f"Telegram   : {'configured' if os.getenv('TELEGRAM_BOT_TOKEN') else 'not configured'}")
         print(f"Watch list : {settings.watch_repos or '(empty)'}")
+        print()
+        print(pipeline.status())
+
+    elif args.command == "chat":
+        if args.message:
+            print(pipeline.chat(args.message))
+        else:
+            print("🛡️  Sentinel Chat (Ctrl+C to exit)")
+            print(pipeline.status())
+            print("-" * 40)
+            while True:
+                try:
+                    user_input = input("Sen: ").strip()
+                    if not user_input:
+                        continue
+                    if user_input.lower() in ("exit", "quit", "çık"):
+                        break
+                    reply = pipeline.chat(user_input)
+                    print(f"\nSentinel: {reply}\n")
+                except (KeyboardInterrupt, EOFError):
+                    print("\nGörüşürüz.")
+                    break
+
+    elif args.command == "telegram":
+        from tools.telegram_interface import TelegramInterface
+
+        def handler(msg: str) -> str:
+            return pipeline.chat(msg)
+
+        bot = TelegramInterface(
+            chat_handler=handler,
+            status_handler=pipeline.status,
+        )
+        bot.run()
 
     else:
         parser.print_help()
