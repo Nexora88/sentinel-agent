@@ -1,5 +1,5 @@
 """
-Main orchestration pipeline — full power.
+Main orchestration pipeline — full power + safety.
 """
 
 from __future__ import annotations
@@ -19,6 +19,8 @@ from tools.website_scanner import WebsiteScanner
 from tools.github_client import GitHubClient
 from tools.finance_engine import FinanceEngine
 from tools.image_gen import ImageGenerator
+from tools.secret_scanner import SecretScanner
+from tools.document_ingester import DocumentIngester
 from agents.code_reviewer import CodeReviewerAgent
 from agents.security_scanner import SecurityScannerAgent
 from agents.learner import LearnerAgent
@@ -26,6 +28,7 @@ from agents.reporter import ReporterAgent
 from agents.debugger import DebuggerAgent
 from agents.personal_assistant import PersonalAssistant
 from agents.knowledge_expander import KnowledgeExpander
+from agents.night_researcher import NightResearcher
 
 logger = logging.getLogger("sentinel.pipeline")
 
@@ -41,10 +44,11 @@ class SentinelPipeline:
         self.code_writer = CodeWriter(ollama=self.ollama, permissions=self.permissions)
         self.website_scanner = WebsiteScanner()
 
-        # New major engines
         self.github = GitHubClient(permissions=self.permissions)
         self.finance = FinanceEngine(ollama=self.ollama)
         self.image_gen = ImageGenerator()
+        self.secret_scanner = SecretScanner()
+        self.doc_ingester = DocumentIngester(ollama=self.ollama, memory=self.memory)
 
         self.reviewer = CodeReviewerAgent(ollama=self.ollama, memory=self.memory)
         self.security = SecurityScannerAgent(ollama=self.ollama, memory=self.memory)
@@ -53,6 +57,11 @@ class SentinelPipeline:
         self.debugger = DebuggerAgent(ollama=self.ollama, memory=self.memory)
 
         self.expander = KnowledgeExpander(ollama=self.ollama, memory=self.memory)
+        self.night = NightResearcher(
+            ollama=self.ollama,
+            expander=self.expander,
+            permissions=self.permissions,
+        )
 
         self.assistant = PersonalAssistant(
             ollama=self.ollama,
@@ -72,14 +81,27 @@ class SentinelPipeline:
             f"{base}\n\n"
             f"🌌 Bilgi Evreni: {uni.get('total_pages', 0)} parça | {uni.get('total_runs', 0)} tur\n"
             f"🐙 GitHub: {gh}\n"
-            f"📈 Finans motoru: aktif\n"
-            f"🖼️ Görsel motoru: aktif"
+            f"📈 Finans / 🖼️ Görsel / 🔐 Secret scan: aktif"
         )
 
     def expand_knowledge(self, topic: Optional[str] = None) -> dict:
         if topic:
             self.expander.add_seed_topic(topic)
         return self.expander.expand_once(extra_topics=[topic] if topic else None)
+
+    def run_night_research(self) -> dict:
+        """Safe night cycle: knowledge + secrets + proposals. No auto-write."""
+        return self.night.run_cycle()
+
+    def scan_secrets(self, path: str = ".") -> str:
+        findings = self.secret_scanner.scan_directory(path)
+        report = self.secret_scanner.format_report(findings)
+        self.notifier.notify(report, whatsapp=True)
+        return report
+
+    def ingest_document(self, file_path: str) -> str:
+        result = self.doc_ingester.ingest_file(file_path)
+        return result.get("message") or result.get("error", "Bilinmeyen hata")
 
     def run_on_repo(self, repo_url: str, branch: str = "main", max_files: int = 8) -> str:
         logger.info(f"Starting pipeline on {repo_url}")
