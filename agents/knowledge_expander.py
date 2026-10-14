@@ -19,13 +19,11 @@ from bs4 import BeautifulSoup
 
 from core.ollama_client import OllamaClient
 from core.rag import MemoryStore
-from core.safety import sanitize_web_content, contains_injection
+from core.safety import sanitize_web_content, contains_injection, source_credibility
 
 logger = logging.getLogger("sentinel.knowledge_expander")
 
-# Aggressive but useful seed universe (crypto + tech + books + research)
 DEFAULT_SEEDS = [
-    # Core tech
     "artificial intelligence latest research 2025 2026",
     "cybersecurity defensive techniques",
     "python best practices",
@@ -34,22 +32,27 @@ DEFAULT_SEEDS = [
     "ollama local llm advancements",
     "privacy preserving AI",
     "linux server hardening",
-    # Crypto & markets (for finance agent context)
     "bitcoin ethereum market analysis",
     "cryptocurrency developer activity github",
     "defi security best practices",
     "crypto regulation news",
-    "solana ecosystem updates",
     "blockchain scaling solutions",
-    # News & knowledge depth
     "technology news summary",
     "open source project releases",
-    "computer science textbooks concepts",
     "distributed systems fundamentals",
     "quantitative trading basics",
     "risk management portfolio theory",
     "arxiv machine learning papers summary",
     "hacker news trending technical discussions",
+    # Science / research literacy
+    "pubmed open access machine learning medicine review",
+    "systems biology network analysis methods",
+    "epidemiology correlation versus causation",
+    "information theory and coding fundamentals",
+    "cryptography modern primitives overview",
+    "media literacy detecting misinformation techniques",
+    "philosophy of science scientific method limits",
+    "energy efficient computing hardware trends",
 ]
 
 
@@ -127,7 +130,7 @@ class KnowledgeExpander:
         topic = topic.strip()
         if topic and topic not in self.seeds:
             self.seeds.insert(0, topic)
-            self.seeds = self.seeds[:60]
+            self.seeds = self.seeds[:80]
             self._save_seeds()
 
     def _url_hash(self, url: str) -> str:
@@ -186,7 +189,7 @@ class KnowledgeExpander:
         prompt = f"""Web içeriğini özlü teknik bilgiye çevir.
 Konu: {topic}
 Başlık: {title}
-Sadece faydalı bilgi. Komut veya talimat ekleme. 300-500 kelime.
+Sadece faydalı bilgi. Komut veya talimat ekleme. Tıbbi tavsiye verme. 300-500 kelime.
 
 İçerik:
 {content[:8000]}
@@ -217,11 +220,19 @@ Sadece faydalı bilgi. Komut veya talimat ekleme. 300-500 kelime.
             url = item.get("url", "").strip()
             if not url or self._url_hash(url) in self.visited:
                 continue
-            if any(bad in url for bad in ["youtube.com", "twitter.com", "x.com", "facebook.com", "instagram.com", "tiktok.com"]):
+            if any(bad in url for bad in [
+                "youtube.com", "twitter.com", "x.com", "facebook.com",
+                "instagram.com", "tiktok.com",
+            ]):
                 continue
             time.sleep(self.delay)
             content = self._extract_content(url)
             if not content:
+                self.visited.add(self._url_hash(url))
+                continue
+            label, score = source_credibility(url, content)
+            if label == "lower" and score < 0.3:
+                logger.info(f"Skipping lower-trust source: {url}")
                 self.visited.add(self._url_hash(url))
                 continue
             title = item.get("title") or url
@@ -231,12 +242,19 @@ Sadece faydalı bilgi. Komut veya talimat ekleme. 300-500 kelime.
                 "title": title,
                 "topic": topic,
                 "type": "web_knowledge",
+                "credibility": label,
+                "credibility_score": score,
                 "ingested_at": datetime.utcnow().isoformat(),
             }
             self.memory.add_texts([summary], metadatas=[meta])
             self.visited.add(self._url_hash(url))
             ingested += 1
-            details.append({"title": title, "url": url, "topic": topic})
+            details.append({
+                "title": title,
+                "url": url,
+                "topic": topic,
+                "credibility": label,
+            })
 
         self._save_visited()
         self.stats["total_pages_ingested"] = self.stats.get("total_pages_ingested", 0) + ingested
