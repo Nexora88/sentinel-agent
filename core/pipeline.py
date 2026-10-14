@@ -1,5 +1,5 @@
 """
-Main orchestration pipeline — full power + safety.
+Main orchestration pipeline — full power + safety + paper trading.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from tools.code_writer import CodeWriter
 from tools.website_scanner import WebsiteScanner
 from tools.github_client import GitHubClient
 from tools.finance_engine import FinanceEngine
+from tools.autonomous_finance import AutonomousFinance
 from tools.image_gen import ImageGenerator
 from tools.secret_scanner import SecretScanner
 from tools.document_ingester import DocumentIngester
@@ -45,7 +46,8 @@ class SentinelPipeline:
         self.website_scanner = WebsiteScanner()
 
         self.github = GitHubClient(permissions=self.permissions)
-        self.finance = FinanceEngine(ollama=self.ollama)
+        self.finance = FinanceEngine(ollama=self.ollama)  # read-only analysis
+        self.auto_finance = AutonomousFinance(ollama=self.ollama)  # paper trading
         self.image_gen = ImageGenerator()
         self.secret_scanner = SecretScanner()
         self.doc_ingester = DocumentIngester(ollama=self.ollama, memory=self.memory)
@@ -76,12 +78,15 @@ class SentinelPipeline:
     def status(self) -> str:
         base = self.assistant.get_status()
         uni = self.expander.get_status()
+        fin = self.auto_finance.get_status()
         gh = "bağlı" if self.github.enabled else "token yok"
         return (
             f"{base}\n\n"
-            f"🌌 Bilgi Evreni: {uni.get('total_pages', 0)} parça | {uni.get('total_runs', 0)} tur\n"
+            f"🌌 Bilgi Evreni: {uni.get('total_pages', 0)} parça\n"
             f"🐙 GitHub: {gh}\n"
-            f"📈 Finans / 🖼️ Görsel / 🔐 Secret scan: aktif"
+            f"💰 Paper Portfolio: ${fin.get('equity', 0):.2f} "
+            f"(PnL {fin.get('pnl_total_pct', 0):+.1f}%) | "
+            f"Açık: {len(fin.get('open_positions', []))}"
         )
 
     def expand_knowledge(self, topic: Optional[str] = None) -> dict:
@@ -90,8 +95,20 @@ class SentinelPipeline:
         return self.expander.expand_once(extra_topics=[topic] if topic else None)
 
     def run_night_research(self) -> dict:
-        """Safe night cycle: knowledge + secrets + proposals. No auto-write."""
         return self.night.run_cycle()
+
+    def run_finance_cycle(self, context: str = "") -> dict:
+        """One paper-trading cycle."""
+        # Pull a bit of knowledge context for better decisions
+        if not context:
+            try:
+                context = self.expander.search_knowledge("cryptocurrency market news trends", k=4)
+            except Exception:
+                context = ""
+        return self.auto_finance.run_cycle(context=context)
+
+    def finance_status(self) -> dict:
+        return self.auto_finance.get_status()
 
     def scan_secrets(self, path: str = ".") -> str:
         findings = self.secret_scanner.scan_directory(path)
@@ -107,21 +124,16 @@ class SentinelPipeline:
         logger.info(f"Starting pipeline on {repo_url}")
         repo_path = self.git.clone_or_update(repo_url, branch=branch)
         repo_name = repo_path.name
-
         changed = self.git.get_changed_files(repo_path)
         if not changed:
             changed = self.git.list_python_files(repo_path, limit=max_files)
         changed = changed[:max_files]
-
-        code_reviews = []
-        security_findings = []
-
+        code_reviews, security_findings = [], []
         for file_path in changed:
             content = self.git.get_file_content(repo_path, file_path)
             if not content or len(content) < 20:
                 continue
             language = Path(file_path).suffix.lstrip(".") or "text"
-            print(f"\n→ Reviewing {file_path} ...")
             try:
                 review = self.reviewer.review_file(file_path, content, language=language)
                 code_reviews.append(f"### {file_path}\n{review}")
@@ -137,11 +149,8 @@ class SentinelPipeline:
                 self.learner.learn_from_code(file_path, content, repo=repo_name)
             except Exception as e:
                 logger.error(f"Learn failed: {e}")
-
         report = self.reporter.create_report(
-            code_reviews=code_reviews,
-            security_findings=security_findings,
-            repo=repo_name,
+            code_reviews=code_reviews, security_findings=security_findings, repo=repo_name
         )
         self.notifier.notify(report, whatsapp=True)
         return report
