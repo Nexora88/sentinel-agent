@@ -1,5 +1,5 @@
 """
-Sentinel Web Interface — full control panel.
+Sentinel Web Interface — full control panel + paper trading.
 """
 
 from __future__ import annotations
@@ -24,12 +24,11 @@ load_dotenv()
 
 from core.pipeline import SentinelPipeline
 from core.auth import AuthManager
-from agents.knowledge_expander import KnowledgeExpander
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sentinel.web")
 
-app = FastAPI(title="Sentinel Agent", version="3.0")
+app = FastAPI(title="Sentinel Agent", version="3.1")
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -52,9 +51,7 @@ def get_pipeline() -> SentinelPipeline:
 
 
 def get_user(authorization: Optional[str] = Header(None)):
-    """Optional auth — if no users configured strictly, allow."""
     if not authorization:
-        # For single-user ease: allow if only owner exists and AUTH_REQUIRED!=true
         if os.getenv("AUTH_REQUIRED", "false").lower() != "true":
             return {"username": "owner", "role": "owner", "display_name": "Owner"}
         raise HTTPException(401, "Authorization required")
@@ -87,7 +84,7 @@ class FinanceRequest(BaseModel):
 
 @app.on_event("startup")
 async def startup():
-    logger.info("Sentinel Web UI v3 starting...")
+    logger.info("Sentinel Web UI v3.1 starting...")
     get_pipeline()
 
 
@@ -110,10 +107,18 @@ async def api_status(authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
     p = get_pipeline()
     uni = p.expander.get_status()
+    fin = p.finance_status()
     return {
         "user": user,
         "assistant": p.status(),
         "universe": uni,
+        "finance": {
+            "equity": fin.get("equity"),
+            "pnl_total_pct": fin.get("pnl_total_pct"),
+            "open_count": len(fin.get("open_positions", [])),
+            "mode": fin.get("mode"),
+            "circuit_breaker": fin.get("circuit_breaker"),
+        },
         "pending_approvals": len(p.permissions.list_pending()),
         "github_enabled": p.github.enabled,
         "chat_turns": len(chat_history),
@@ -127,18 +132,15 @@ async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)
     message = req.message.strip()
     if not message:
         return {"reply": "Boş mesaj."}
-
     lower = message.lower()
     if lower in ("/status", "durum", "status"):
         reply = p.status()
     else:
         reply = p.chat(message)
-
     chat_history.append({"role": "user", "content": message})
     chat_history.append({"role": "assistant", "content": reply})
     if len(chat_history) > 300:
         chat_history[:] = chat_history[-300:]
-
     return {"reply": reply}
 
 
@@ -166,8 +168,7 @@ async def api_expand(req: ExpandRequest, background_tasks: BackgroundTasks, auth
 @app.post("/api/seed")
 async def api_seed(req: SeedRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
-    p = get_pipeline()
-    p.expander.add_seed_topic(req.topic)
+    get_pipeline().expander.add_seed_topic(req.topic)
     return {"status": "ok"}
 
 
@@ -188,8 +189,7 @@ async def api_approve(index: int, authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
     if user.get("role") not in ("owner", "admin"):
         raise HTTPException(403, "Sadece owner/admin onaylayabilir")
-    ok = get_pipeline().permissions.approve(index)
-    return {"success": ok}
+    return {"success": get_pipeline().permissions.approve(index)}
 
 
 @app.post("/api/approvals/{index}/reject")
@@ -197,8 +197,7 @@ async def api_reject(index: int, authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
     if user.get("role") not in ("owner", "admin"):
         raise HTTPException(403, "Sadece owner/admin reddedebilir")
-    ok = get_pipeline().permissions.reject(index)
-    return {"success": ok}
+    return {"success": get_pipeline().permissions.reject(index)}
 
 
 @app.get("/api/github/repos")
@@ -216,11 +215,31 @@ async def api_finance(req: FinanceRequest, authorization: Optional[str] = Header
     return {"result": get_pipeline().finance.analyze(req.query)}
 
 
+@app.get("/api/finance/portfolio")
+async def api_finance_portfolio(authorization: Optional[str] = Header(None)):
+    """Paper trading portfolio + thought log."""
+    get_user(authorization)
+    return get_pipeline().finance_status()
+
+
+@app.post("/api/finance/cycle")
+async def api_finance_cycle(background_tasks: BackgroundTasks, authorization: Optional[str] = Header(None)):
+    """Run one paper-trading decision cycle."""
+    get_user(authorization)
+    p = get_pipeline()
+
+    def run():
+        result = p.run_finance_cycle()
+        logger.info(f"Finance cycle: {result.get('decision')}")
+
+    background_tasks.add_task(run)
+    return {"status": "started", "message": "Paper trading döngüsü başladı (sanal para)."}
+
+
 @app.post("/api/image")
 async def api_image(req: ImageRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
-    result = get_pipeline().image_gen.generate(req.prompt)
-    return result
+    return get_pipeline().image_gen.generate(req.prompt)
 
 
 @app.get("/api/images/{filename}")
