@@ -1,7 +1,6 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
-// Navigation
 $$(".nav-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     $$(".nav-btn").forEach((b) => b.classList.remove("active"));
@@ -12,10 +11,10 @@ $$(".nav-btn").forEach((btn) => {
     if (btn.dataset.panel === "approvals") loadApprovals();
     if (btn.dataset.panel === "status") loadStatus();
     if (btn.dataset.panel === "github") loadGithub();
+    if (btn.dataset.panel === "finance") loadPortfolio();
   });
 });
 
-// Chat
 const chatBox = $("#chat-messages");
 const chatInput = $("#chat-input");
 const sendBtn = $("#send-btn");
@@ -59,21 +58,18 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-// Voice (Web Speech API)
+// Voice
 const voiceBtn = $("#voice-btn");
 let recognizing = false;
 let recognition = null;
-
 if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   recognition = new SR();
   recognition.lang = "tr-TR";
   recognition.continuous = false;
   recognition.interimResults = false;
-
   recognition.onresult = (e) => {
-    const text = e.results[0][0].transcript;
-    chatInput.value = text;
+    chatInput.value = e.results[0][0].transcript;
     sendMessage();
   };
   recognition.onend = () => {
@@ -85,7 +81,6 @@ if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
     recognizing = false;
     voiceBtn.classList.remove("recording");
   };
-
   voiceBtn.addEventListener("click", () => {
     if (recognizing) {
       recognition.stop();
@@ -148,7 +143,63 @@ $("#add-seed-btn").addEventListener("click", async () => {
   loadUniverse();
 });
 
-// Finance
+// Paper Trading Portfolio
+async function loadPortfolio() {
+  try {
+    const res = await fetch("/api/finance/portfolio");
+    const d = await res.json();
+    $("#f-equity").textContent = (d.equity ?? 0).toFixed(2);
+    $("#f-pnl").textContent = (d.pnl_total_pct ?? 0).toFixed(2) + "%";
+    $("#f-cash").textContent = (d.cash ?? 0).toFixed(2);
+    $("#f-open").textContent = (d.open_positions || []).length;
+    $("#fin-mode").textContent = d.mode || "paper";
+    if (d.circuit_breaker) {
+      $("#fin-mode").textContent += " | CIRCUIT BREAKER";
+    }
+
+    const box = $("#fin-positions");
+    const positions = d.open_positions || [];
+    if (!positions.length) {
+      box.innerHTML = '<p class="empty">Açık pozisyon yok</p>';
+    } else {
+      box.innerHTML = "";
+      positions.forEach((p) => {
+        const div = document.createElement("div");
+        div.className = "approval-card";
+        const pnlCls = p.pnl >= 0 ? "var(--success)" : "var(--danger)";
+        div.innerHTML = `
+          <div class="details">
+            <div class="action-name">${p.symbol}</div>
+            <div>Entry $${p.entry?.toFixed(4)} → Mark $${p.mark?.toFixed(4)}</div>
+            <div style="color:${pnlCls}">PnL $${p.pnl?.toFixed(2)} | SL $${p.stop?.toFixed(4)} TP $${p.take?.toFixed(4)}</div>
+            <div style="font-size:0.8rem;color:var(--text-muted)">${(p.reasoning || "").slice(0, 120)}</div>
+          </div>`;
+        box.appendChild(div);
+      });
+    }
+
+    const thoughts = d.recent_thoughts || [];
+    $("#fin-thoughts").textContent = thoughts
+      .map((t) => `[${(t.ts || "").slice(11, 19)}] ${t.action}: ${t.thought}`)
+      .join("\n") || "Henüz düşünce yok. Döngü çalıştır.";
+  } catch (e) {
+    $("#fin-thoughts").textContent = "Yüklenemedi: " + e.message;
+  }
+}
+
+$("#fin-refresh-btn")?.addEventListener("click", loadPortfolio);
+$("#fin-cycle-btn")?.addEventListener("click", async () => {
+  $("#fin-cycle-btn").disabled = true;
+  $("#fin-cycle-btn").textContent = "Çalışıyor...";
+  try {
+    await fetch("/api/finance/cycle", { method: "POST" });
+    setTimeout(loadPortfolio, 5000);
+  } finally {
+    $("#fin-cycle-btn").disabled = false;
+    $("#fin-cycle-btn").textContent = "Bir Döngü Çalıştır";
+  }
+});
+
 $("#finance-btn").addEventListener("click", async () => {
   const q = $("#finance-query").value.trim();
   if (!q) return;
@@ -199,7 +250,7 @@ async function loadGithub() {
     const res = await fetch("/api/github/repos");
     const data = await res.json();
     if (data.error) {
-      box.innerHTML = `<p class="empty">${data.error}<br>GITHUB_TOKEN .env'e ekle.</p>`;
+      box.innerHTML = `<p class="empty">${data.error}</p>`;
       return;
     }
     box.innerHTML = "";
@@ -211,8 +262,7 @@ async function loadGithub() {
           <div class="action-name">${r.private ? "🔒" : "🌐"} ${r.full_name}</div>
           <div>${r.description || ""} · ${r.language || "?"}</div>
         </div>
-        <a href="${r.url}" target="_blank" style="color:var(--accent)">Aç</a>
-      `;
+        <a href="${r.url}" target="_blank" style="color:var(--accent)">Aç</a>`;
       box.appendChild(div);
     });
   } catch (e) {
@@ -244,8 +294,7 @@ async function loadApprovals() {
         <div class="approval-actions">
           <button class="approve" data-idx="${idx}">Onayla</button>
           <button class="reject" data-idx="${idx}">Reddet</button>
-        </div>
-      `;
+        </div>`;
       box.appendChild(card);
     });
     box.querySelectorAll(".approve").forEach((btn) => {
@@ -265,18 +314,18 @@ async function loadApprovals() {
   }
 }
 
-// Status
 async function loadStatus() {
   try {
     const res = await fetch("/api/status");
     const data = await res.json();
     $("#status-text").textContent = JSON.stringify(data, null, 2);
     const u = data.universe || {};
+    const f = data.finance || {};
     $("#quick-status").innerHTML = `
       Bilgi: ${u.total_pages || 0}<br>
-      Tur: ${u.total_runs || 0}<br>
-      Onay: ${data.pending_approvals || 0}<br>
-      GH: ${data.github_enabled ? "✓" : "—"}
+      Paper $: ${f.equity ?? "—"}<br>
+      PnL: ${f.pnl_total_pct ?? 0}%<br>
+      Onay: ${data.pending_approvals || 0}
     `;
   } catch (e) {
     $("#status-text").textContent = "Durum alınamadı";
@@ -285,4 +334,7 @@ async function loadStatus() {
 
 loadStatus();
 setInterval(loadStatus, 30000);
-addMessage("assistant", "Merhaba. Ben Sentinel v3.\n• Sesli komut için 🎤\n• Finans, görsel, GitHub panelleri hazır\n• Bilgi evrenim sürekli büyüyor.\nEmirlerini yaz veya söyle.");
+addMessage(
+  "assistant",
+  "Sentinel v3.1 hazır.\n• Paper trading: Finans panelinden döngü çalıştır (sanal $1000)\n• Bilgi evreni daha agresif öğreniyor\n• Gerçek para işlemleri kapalı\nEmirlerini yaz veya 🎤 ile söyle."
+);
