@@ -1,5 +1,5 @@
 """
-Main orchestration pipeline — full power + safety + paper trading.
+Main orchestration pipeline — full power + safety + paper trading + org modules.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from core.ollama_client import OllamaClient
 from core.rag import MemoryStore
 from core.personal_memory import PersonalMemory
 from core.permission_manager import PermissionManager, Action
+from core.energy_policy import should_run_heavy_job, policy_status
 from tools.git_tools import GitTools
 from tools.notifier import Notifier
 from tools.code_writer import CodeWriter
@@ -22,6 +23,10 @@ from tools.autonomous_finance import AutonomousFinance
 from tools.image_gen import ImageGenerator
 from tools.secret_scanner import SecretScanner
 from tools.document_ingester import DocumentIngester
+from tools.license_checker import LicenseChecker
+from tools.local_discovery import LocalDiscovery
+from tools.document_assistant import DocumentAssistant
+from tools.legacy_backup import LegacyBackup
 from agents.code_reviewer import CodeReviewerAgent
 from agents.security_scanner import SecurityScannerAgent
 from agents.learner import LearnerAgent
@@ -30,6 +35,7 @@ from agents.debugger import DebuggerAgent
 from agents.personal_assistant import PersonalAssistant
 from agents.knowledge_expander import KnowledgeExpander
 from agents.night_researcher import NightResearcher
+from agents.curiosity import CuriosityEngine
 
 logger = logging.getLogger("sentinel.pipeline")
 
@@ -46,11 +52,15 @@ class SentinelPipeline:
         self.website_scanner = WebsiteScanner()
 
         self.github = GitHubClient(permissions=self.permissions)
-        self.finance = FinanceEngine(ollama=self.ollama)  # read-only analysis
-        self.auto_finance = AutonomousFinance(ollama=self.ollama)  # paper trading
+        self.finance = FinanceEngine(ollama=self.ollama)
+        self.auto_finance = AutonomousFinance(ollama=self.ollama)
         self.image_gen = ImageGenerator()
         self.secret_scanner = SecretScanner()
         self.doc_ingester = DocumentIngester(ollama=self.ollama, memory=self.memory)
+        self.license_checker = LicenseChecker()
+        self.local_discovery = LocalDiscovery()
+        self.doc_assistant = DocumentAssistant(ollama=self.ollama)
+        self.legacy = LegacyBackup()
 
         self.reviewer = CodeReviewerAgent(ollama=self.ollama, memory=self.memory)
         self.security = SecurityScannerAgent(ollama=self.ollama, memory=self.memory)
@@ -64,6 +74,7 @@ class SentinelPipeline:
             expander=self.expander,
             permissions=self.permissions,
         )
+        self.curiosity = CuriosityEngine(ollama=self.ollama, expander=self.expander)
 
         self.assistant = PersonalAssistant(
             ollama=self.ollama,
@@ -79,10 +90,14 @@ class SentinelPipeline:
         base = self.assistant.get_status()
         uni = self.expander.get_status()
         fin = self.auto_finance.get_status()
+        cur = self.curiosity.get_status()
+        energy = policy_status()
         gh = "bağlı" if self.github.enabled else "token yok"
         return (
             f"{base}\n\n"
             f"🌌 Bilgi Evreni: {uni.get('total_pages', 0)} parça\n"
+            f"🔭 Merak: son={cur.get('last_run') or '—'} | keşfedilen={cur.get('explored_count', 0)}\n"
+            f"⚡ Enerji: off-peak={energy.get('off_peak_now')} ({energy.get('off_peak_window')})\n"
             f"🐙 GitHub: {gh}\n"
             f"💰 Paper Portfolio: ${fin.get('equity', 0):.2f} "
             f"(PnL {fin.get('pnl_total_pct', 0):+.1f}%) | "
@@ -90,19 +105,31 @@ class SentinelPipeline:
         )
 
     def expand_knowledge(self, topic: Optional[str] = None) -> dict:
+        advice = should_run_heavy_job("universe_expand")
+        if advice.get("prefer_defer") and not advice.get("off_peak"):
+            return {
+                "topic": topic or "(deferred)",
+                "pages_ingested": 0,
+                "deferred": True,
+                "reason": advice.get("reason"),
+                "total_knowledge_pages": self.expander.get_status().get("total_pages", 0),
+            }
         if topic:
             self.expander.add_seed_topic(topic)
         return self.expander.expand_once(extra_topics=[topic] if topic else None)
+
+    def run_curiosity(self) -> dict:
+        return self.curiosity.run_once()
 
     def run_night_research(self) -> dict:
         return self.night.run_cycle()
 
     def run_finance_cycle(self, context: str = "") -> dict:
-        """One paper-trading cycle."""
-        # Pull a bit of knowledge context for better decisions
         if not context:
             try:
-                context = self.expander.search_knowledge("cryptocurrency market news trends", k=4)
+                context = self.expander.search_knowledge(
+                    "cryptocurrency market news trends", k=4
+                )
             except Exception:
                 context = ""
         return self.auto_finance.run_cycle(context=context)
@@ -115,6 +142,22 @@ class SentinelPipeline:
         report = self.secret_scanner.format_report(findings)
         self.notifier.notify(report, whatsapp=True)
         return report
+
+    def check_licenses(self, path: str = ".") -> str:
+        result = self.license_checker.scan_tree(path)
+        return self.license_checker.format_report(result)
+
+    def discover_local(self) -> str:
+        result = self.local_discovery.scan_localhost()
+        return self.local_discovery.format_report(result)
+
+    def analyze_document_text(self, text: str) -> str:
+        result = self.doc_assistant.analyze_text(text)
+        return self.doc_assistant.format_report(result)
+
+    def legacy_export(self, passphrase: str, out_path: str = "./memory/legacy_backup.bin") -> str:
+        path = self.legacy.export(passphrase, out_path=out_path)
+        return f"Legacy backup written: {path}"
 
     def ingest_document(self, file_path: str) -> str:
         result = self.doc_ingester.ingest_file(file_path)
