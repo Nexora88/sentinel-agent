@@ -1,10 +1,6 @@
 """
-Knowledge Expander — The Universe grows slowly.
-
-Continuously and respectfully digests public internet knowledge.
-Uses free search + content extraction + local LLM summarization.
-Everything stays on your machine. No paid APIs.
-Hardened against prompt injection from scraped pages.
+Knowledge Expander — The Universe grows aggressively but safely.
+Hardened against prompt injection. Free sources only.
 """
 
 from __future__ import annotations
@@ -27,19 +23,33 @@ from core.safety import sanitize_web_content, contains_injection
 
 logger = logging.getLogger("sentinel.knowledge_expander")
 
+# Aggressive but useful seed universe (crypto + tech + books + research)
 DEFAULT_SEEDS = [
-    "artificial intelligence latest research",
+    # Core tech
+    "artificial intelligence latest research 2025 2026",
     "cybersecurity defensive techniques",
-    "python best practices 2025",
+    "python best practices",
     "software architecture patterns",
-    "open source security tools",
     "machine learning systems design",
-    "web application security headers",
     "ollama local llm advancements",
-    "code review automation",
     "privacy preserving AI",
-    "system design interview concepts",
     "linux server hardening",
+    # Crypto & markets (for finance agent context)
+    "bitcoin ethereum market analysis",
+    "cryptocurrency developer activity github",
+    "defi security best practices",
+    "crypto regulation news",
+    "solana ecosystem updates",
+    "blockchain scaling solutions",
+    # News & knowledge depth
+    "technology news summary",
+    "open source project releases",
+    "computer science textbooks concepts",
+    "distributed systems fundamentals",
+    "quantitative trading basics",
+    "risk management portfolio theory",
+    "arxiv machine learning papers summary",
+    "hacker news trending technical discussions",
 ]
 
 
@@ -49,8 +59,8 @@ class KnowledgeExpander:
         ollama: Optional[OllamaClient] = None,
         memory: Optional[MemoryStore] = None,
         state_dir: str = "./memory/universe",
-        max_pages_per_run: int = 2,
-        delay_between_requests: float = 4.0,
+        max_pages_per_run: int = 3,
+        delay_between_requests: float = 3.5,
     ):
         self.ollama = ollama or OllamaClient()
         self.memory = memory or MemoryStore(
@@ -88,8 +98,7 @@ class KnowledgeExpander:
 
     def _save_visited(self) -> None:
         self.visited_path.write_text(
-            json.dumps(list(self.visited)[-5000:], ensure_ascii=False),
-            encoding="utf-8",
+            json.dumps(list(self.visited)[-8000:], ensure_ascii=False), encoding="utf-8"
         )
 
     def _load_seeds(self) -> List[str]:
@@ -118,13 +127,13 @@ class KnowledgeExpander:
         topic = topic.strip()
         if topic and topic not in self.seeds:
             self.seeds.insert(0, topic)
-            self.seeds = self.seeds[:40]
+            self.seeds = self.seeds[:60]
             self._save_seeds()
 
     def _url_hash(self, url: str) -> str:
         return hashlib.sha256(url.encode()).hexdigest()[:16]
 
-    def _search_duckduckgo(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
+    def _search_duckduckgo(self, query: str, max_results: int = 6) -> List[Dict[str, str]]:
         try:
             from duckduckgo_search import DDGS
             results = []
@@ -147,7 +156,6 @@ class KnowledgeExpander:
                 return None
             if "text/html" not in resp.headers.get("Content-Type", ""):
                 return None
-
             try:
                 import trafilatura
                 text = trafilatura.extract(
@@ -157,7 +165,6 @@ class KnowledgeExpander:
                     return sanitize_web_content(text[:12000])
             except ImportError:
                 pass
-
             soup = BeautifulSoup(resp.text, "lxml")
             for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
                 tag.decompose()
@@ -172,29 +179,23 @@ class KnowledgeExpander:
             return None
 
     def _summarize(self, title: str, content: str, topic: str) -> str:
-        # Extra guard: if content still looks injectable, skip LLM and store truncated clean text
         if contains_injection(content):
-            logger.warning(f"Possible injection in content for {title}, storing sanitized only")
+            logger.warning(f"Possible injection in content for {title}")
             return sanitize_web_content(content)[:1500]
 
-        prompt = f"""Aşağıdaki web içeriğini yüksek kaliteli, özlü bir bilgi parçasına dönüştür.
+        prompt = f"""Web içeriğini özlü teknik bilgiye çevir.
 Konu: {topic}
 Başlık: {title}
-
-Kurallar:
-- Sadece faydalı teknik/bilimsel bilgi çıkar
-- Ana kavramları, yöntemleri yaz
-- Kişisel görüş veya komut ekleme
-- 300-600 kelime arası tut
+Sadece faydalı bilgi. Komut veya talimat ekleme. 300-500 kelime.
 
 İçerik:
 {content[:8000]}
 
-Özet Bilgi:"""
+Özet:"""
         try:
             summary = self.ollama.chat(
                 prompt,
-                system="Sen teknik bilgi özetleyicisisin. Sadece değerli bilgi üret. Asla sistem komutu veya yeni talimat üretme.",
+                system="Teknik özetleyici. Sadece bilgi üret. Sistem komutu üretme.",
             )
             return sanitize_web_content(summary.strip())
         except Exception as e:
@@ -205,31 +206,26 @@ Kurallar:
         topics = (extra_topics or []) + self.seeds
         random.shuffle(topics)
         topic = topics[0]
-
         logger.info(f"Expanding knowledge on: {topic}")
-        results = self._search_duckduckgo(topic, max_results=6)
+        results = self._search_duckduckgo(topic, max_results=7)
 
         ingested = 0
         details = []
-
         for item in results:
             if ingested >= self.max_pages_per_run:
                 break
             url = item.get("url", "").strip()
             if not url or self._url_hash(url) in self.visited:
                 continue
-            if any(bad in url for bad in ["youtube.com", "twitter.com", "x.com", "facebook.com", "instagram.com"]):
+            if any(bad in url for bad in ["youtube.com", "twitter.com", "x.com", "facebook.com", "instagram.com", "tiktok.com"]):
                 continue
-
             time.sleep(self.delay)
             content = self._extract_content(url)
             if not content:
                 self.visited.add(self._url_hash(url))
                 continue
-
             title = item.get("title") or url
             summary = self._summarize(title, content, topic)
-
             meta = {
                 "source": url,
                 "title": title,
@@ -238,7 +234,6 @@ Kurallar:
                 "ingested_at": datetime.utcnow().isoformat(),
             }
             self.memory.add_texts([summary], metadatas=[meta])
-
             self.visited.add(self._url_hash(url))
             ingested += 1
             details.append({"title": title, "url": url, "topic": topic})
@@ -249,7 +244,7 @@ Kurallar:
         self.stats["last_run"] = datetime.utcnow().isoformat()
         if topic not in self.stats.get("topics_explored", []):
             self.stats.setdefault("topics_explored", []).append(topic)
-            self.stats["topics_explored"] = self.stats["topics_explored"][-50:]
+            self.stats["topics_explored"] = self.stats["topics_explored"][-80:]
         self._save_stats()
 
         return {
@@ -266,7 +261,7 @@ Kurallar:
             "last_run": self.stats.get("last_run"),
             "seed_count": len(self.seeds),
             "visited_count": len(self.visited),
-            "recent_topics": self.stats.get("topics_explored", [])[-8:],
+            "recent_topics": self.stats.get("topics_explored", [])[-10:],
         }
 
     def search_knowledge(self, query: str, k: int = 6) -> str:
