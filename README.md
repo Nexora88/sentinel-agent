@@ -1,106 +1,106 @@
-# Sentinel Agent
+# Sentinel Agent v3
 
-Self-hosted multi-agent system powered by **Ollama**.  
-No external paid APIs. Fully under your control.  
-Kişisel, gizli, sürekli genişleyen bilgi evreni.
+Self-hosted, continuously expanding multi-agent system powered by **Ollama**.  
+No paid APIs required. Fully under your control.
 
-## Özellikler
+## Yeni Yetenekler (v3)
 
-- **Web Arayüzü** — Telefon + PC’den tarayıcı ile komut ver
-- **Kişisel Hafıza** — Seni tanır, tercihlerini ve projelerini hatırlar
-- **Bilgi Evreni** — İnternetten yavaş yavaş beslenir, sürekli büyür (uzay gibi)
-- Kod inceleme (gece uykundayken)
-- Defansif güvenlik taraması (kod + website)
-- Hata ayıklama & izin kontrollü kod yazma / düzeltme
-- WhatsApp bildirimleri (opsiyonel, CallMeBot)
-- Strict permission modeli (yazma / push sadece senin onayınla)
+| Motor | Açıklama |
+|-------|----------|
+| **Web Arayüzü** | Telefon + PC tarayıcı, sesli komut (🎤) |
+| **Bilgi Evreni** | İnternetten yavaş yavaş öğrenir, sürekli büyür |
+| **GitHub** | Repo listele, dosya yaz, commit/push, issue/PR (izinli) |
+| **Finans** | Hisse (yfinance) + kripto (CoinGecko) + LLM analizi |
+| **Görsel** | Local Stable Diffusion veya ücretsiz Pollinations |
+| **Multi-user** | Owner / admin / user rolleri, token auth |
+| **Agresif tool-calling** | Doğal dil → otomatik araç seçimi |
+| **Cloud-ready** | Docker + persistent volume (bilgi diskte büyür) |
 
 ## Hızlı Başlangıç
 
 ```bash
 pip install -r requirements.txt
+cp .env.example .env
+# GITHUB_TOKEN ve diğerlerini düzenle
 
-# Web arayüzünü başlat (önerilen)
 python -m scripts.run web
-
-# Tarayıcıda aç:
-# http://localhost:8000
+# → http://localhost:8000
 ```
+
+### Docker / Cloud
+
+```bash
+docker compose up -d --build
+```
+
+`sentinel_memory` volume'u bilgi evreninin diskte büyümesini sağlar (bulut VPS'te yer kaplar).
 
 ## Komutlar
 
 ```bash
-# Web UI (ana arayüz)
-python -m scripts.run web --port 8000
-
-# Terminal sohbet
-python -m scripts.run chat
-
-# Bilgi evrenini bir kez genişlet
-python -m scripts.run expand
-python -m scripts.run expand --topic "rust async programming"
-
-# Scheduler (gece inceleme + her ~90 dk bilgi genişlemesi)
-python -m scripts.run schedule
-
-# Diğer
-python -m scripts.run review dosya.py
-python -m scripts.run repo https://github.com/sen/proje.git
-python -m scripts.run debug "TypeError: ..." --file app.py
-python -m scripts.run website https://siten.com
-python -m scripts.run fix app.py "null check ekle"
-python -m scripts.run test
+python -m scripts.run web              # Ana arayüz
+python -m scripts.run chat             # Terminal sohbet
+python -m scripts.run expand           # Bilgi evrenini büyüt
+python -m scripts.run expand --topic "rust async"
+python -m scripts.run schedule         # Gece review + 90dk'da bir genişleme
+python -m scripts.run repo <url>
+python -m scripts.run debug "error..."
+python -m scripts.run website https://...
+python -m scripts.run fix file.py "issue"
 ```
 
-## Bilgi Evreni Nasıl Çalışır?
+## Web Arayüzü Panelleri
 
-- DuckDuckGo ile ücretsiz arama yapar
-- Sayfaları saygılı şekilde çeker (rate limit + robots dostu)
-- Trafilatura + local LLM ile yüksek kaliteli özet üretir
-- ChromaDB’ye yazar → RAG ile her soruda kullanılabilir hale gelir
-- Scheduler ile her ~90 dakikada bir yavaş yavaş büyür
-- İstediğin konuları tohum olarak ekleyebilirsin (web arayüzünden veya CLI)
+- **Sohbet** + 🎤 sesli komut (tarayıcı SpeechRecognition)
+- **Bilgi Evreni** — tohum ekle, genişlet, istatistik
+- **Finans** — "Bitcoin fiyatı", "AAPL analizi", "piyasa özeti"
+- **Görsel** — prompt yaz, üret
+- **GitHub** — repolarını gör
+- **Onaylar** — yazma/push isteklerini onayla/reddet
+- **Durum**
 
-Hiçbir veri dışarı çıkmaz. Her şey senin sunucunda / bilgisayarında kalır.
+## GitHub Kurulumu
 
-## Web Arayüzü
+1. GitHub → Settings → Developer settings → Personal access tokens
+2. `repo` scope'lu token oluştur
+3. `.env` içine `GITHUB_TOKEN=ghp_...` yaz
 
-- **Sohbet**: Doğal dilde emir ver
-- **Bilgi Evreni**: İstatistikler, tohum ekle, manuel genişlet
-- **Onaylar**: Yazma / push isteklerini onayla veya reddet
-- **Durum**: Sistem + evren özeti
+Artık sohbette "repolarımı listele" diyebilir, onaylı yazma/push yapabilirsin.
 
-## Permission Modeli
+## İzin Modeli
 
-Varsayılan:
-- Okuma & raporlama → serbest
-- Dosya yazma, commit, push → **senin açık onayın şart**
+- Okuma / analiz → serbest
+- Dosya yazma, commit, push, PR → **senin açık onayın şart**
+- Multi-user: sadece owner/admin onaylayabilir
 
-## Ortam Değişkenleri (.env)
+## Ortam Değişkenleri
 
 ```env
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5-coder:32b
-OLLAMA_EMBED_MODEL=nomic-embed-text
-
-REQUIRE_APPROVAL=true
-WATCH_REPOS=
-
-# Opsiyonel WhatsApp bildirim
+GITHUB_TOKEN=
+OWNER_PASSWORD=sentinel-change-me
+AUTH_REQUIRED=false
+SD_API_URL=          # opsiyonel local Automatic1111
 WHATSAPP_PHONE=
 WHATSAPP_APIKEY=
-
-# Web
-WEB_PORT=8000
 ```
 
 ## Mimari
 
-- **Ollama** → tüm zeka local
-- **CrewAI + özel ajanlar** → code reviewer, security, debugger, learner, personal assistant, knowledge expander
-- **ChromaDB** → kod hafızası + kişisel hafıza + bilgi evreni
-- **FastAPI** → self-hosted web kontrol paneli
-- **APScheduler** → gece görevleri + sürekli genişleme
+```
+Web UI / CLI
+    ↓
+PersonalAssistant (agresif tool routing)
+    ├── Code Reviewer / Debugger / Security
+    ├── Knowledge Expander (sürekli büyüyen evren)
+    ├── GitHub Client (izinli yazma/push)
+    ├── Finance Engine
+    ├── Image Generator
+    └── Personal Memory + RAG
+```
+
+Her şey local. Bilgi evreni ve hafıza diskte kalıcı olarak büyür.
 
 ## Lisans
 
