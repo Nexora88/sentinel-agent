@@ -1,100 +1,107 @@
 # Sentinel Agent
 
-**Senin özel, gizli ve süper zeki self-hosted AI ajanın.**  
-Ollama + multi-agent. Hiçbir ücretli API yok. Veri dışarı çıkmaz.
+Self-hosted multi-agent system powered by **Ollama**.  
+No external paid APIs. Fully under your control.  
+Kişisel, gizli, sürekli genişleyen bilgi evreni.
 
-## Ne yapabilir?
+## Özellikler
 
-- **Seninle konuşur** (Telegram + CLI) — telefon ve PC’den
-- Seni tanır, tercihlerini ve projelerini hatırlar (kişisel hafıza)
-- Kod incelemesi (gece de çalışır)
-- Defensive güvenlik taraması (kod + website)
-- Hata ayıklama
-- İzin kontrollü kod yazma / düzeltme / push
-- WhatsApp bildirimleri (CallMeBot)
+- **Web Arayüzü** — Telefon + PC’den tarayıcı ile komut ver
+- **Kişisel Hafıza** — Seni tanır, tercihlerini ve projelerini hatırlar
+- **Bilgi Evreni** — İnternetten yavaş yavaş beslenir, sürekli büyür (uzay gibi)
+- Kod inceleme (gece uykundayken)
+- Defansif güvenlik taraması (kod + website)
+- Hata ayıklama & izin kontrollü kod yazma / düzeltme
+- WhatsApp bildirimleri (opsiyonel, CallMeBot)
+- Strict permission modeli (yazma / push sadece senin onayınla)
 
 ## Hızlı Başlangıç
 
 ```bash
-# 1. Bağımlılıklar
 pip install -r requirements.txt
 
-# 2. .env ayarla
-cp .env.example .env
-# Ollama modelini, Telegram token + user_id’yi doldur
+# Web arayüzünü başlat (önerilen)
+python -m scripts.run web
 
-# 3. Test
-python -m scripts.run test
-
-# 4. CLI’dan sohbet (PC)
-python -m scripts.run chat
-
-# 5. Telegram botu başlat (telefon + PC)
-python -m scripts.run telegram
+# Tarayıcıda aç:
+# http://localhost:8000
 ```
-
-## Telegram Kurulumu (Önerilen — en güvenli & iki yönlü)
-
-1. Telegram’da **@BotFather**’a git → `/newbot` → isim ver → **token** al
-2. **@userinfobot**’a mesaj at → kendi **user_id**’ni al
-3. `.env` dosyasına koy:
-
-```env
-TELEGRAM_BOT_TOKEN=123456:ABC...
-TELEGRAM_ALLOWED_USER_ID=123456789   # sadece sen
-```
-
-4. Çalıştır:
-```bash
-python -m scripts.run telegram
-```
-
-Bot **sadece senin user_id’ne** cevap verir. Başkası yazsa “Yetkisiz” der.
-
-## WhatsApp Bildirimleri (sadece giden)
-
-1. `+34 644 21 99 05` numarasını rehbere ekle
-2. `I allow callmebot to send me messages` yaz
-3. Gelen API key’i `.env`’e koy
 
 ## Komutlar
 
 ```bash
-python -m scripts.run chat                     # interaktif sohbet
-python -m scripts.run chat "Adım Ahmet"        # tek mesaj
-python -m scripts.run telegram                 # Telegram bot
-python -m scripts.run review myfile.py
-python -m scripts.run repo https://github.com/you/project.git
+# Web UI (ana arayüz)
+python -m scripts.run web --port 8000
+
+# Terminal sohbet
+python -m scripts.run chat
+
+# Bilgi evrenini bir kez genişlet
+python -m scripts.run expand
+python -m scripts.run expand --topic "rust async programming"
+
+# Scheduler (gece inceleme + her ~90 dk bilgi genişlemesi)
+python -m scripts.run schedule
+
+# Diğer
+python -m scripts.run review dosya.py
+python -m scripts.run repo https://github.com/sen/proje.git
 python -m scripts.run debug "TypeError: ..." --file app.py
-python -m scripts.run website https://yoursite.com
+python -m scripts.run website https://siten.com
 python -m scripts.run fix app.py "null check ekle"
-python -m scripts.run schedule                 # gece görevleri
-python -m scripts.run permissions
 python -m scripts.run test
 ```
 
-## Kişisel Hafıza
+## Bilgi Evreni Nasıl Çalışır?
 
-Sentinel konuştukça seni öğrenir:
-- Adın, projelerin, tercihler
-- Geçmiş konuşmalar (vektör hafıza)
-- “Hatırla: ...” veya “Öğren: ...” diyerek manuel de ekleyebilirsin
+- DuckDuckGo ile ücretsiz arama yapar
+- Sayfaları saygılı şekilde çeker (rate limit + robots dostu)
+- Trafilatura + local LLM ile yüksek kaliteli özet üretir
+- ChromaDB’ye yazar → RAG ile her soruda kullanılabilir hale gelir
+- Scheduler ile her ~90 dakikada bir yavaş yavaş büyür
+- İstediğin konuları tohum olarak ekleyebilirsin (web arayüzünden veya CLI)
 
-Her şey `./memory/personal` klasöründe kalır. Buluta gitmez.
+Hiçbir veri dışarı çıkmaz. Her şey senin sunucunda / bilgisayarında kalır.
 
-## İzin Modeli
+## Web Arayüzü
+
+- **Sohbet**: Doğal dilde emir ver
+- **Bilgi Evreni**: İstatistikler, tohum ekle, manuel genişlet
+- **Onaylar**: Yazma / push isteklerini onayla veya reddet
+- **Durum**: Sistem + evren özeti
+
+## Permission Modeli
 
 Varsayılan:
-- Okuma, rapor, sohbet → serbest
-- Dosya yazma, commit, push → **senin açık onayın olmadan asla**
+- Okuma & raporlama → serbest
+- Dosya yazma, commit, push → **senin açık onayın şart**
 
-## Güvenlik
+## Ortam Değişkenleri (.env)
 
-- Telegram’da sadece senin user_id’n geçerli
-- Tüm LLM çağrıları local Ollama
-- Veri sadece senin sunucunda / bilgisayarında
-- Yazma işlemleri permission gate’li
+```env
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5-coder:32b
+OLLAMA_EMBED_MODEL=nomic-embed-text
 
-## License
+REQUIRE_APPROVAL=true
+WATCH_REPOS=
+
+# Opsiyonel WhatsApp bildirim
+WHATSAPP_PHONE=
+WHATSAPP_APIKEY=
+
+# Web
+WEB_PORT=8000
+```
+
+## Mimari
+
+- **Ollama** → tüm zeka local
+- **CrewAI + özel ajanlar** → code reviewer, security, debugger, learner, personal assistant, knowledge expander
+- **ChromaDB** → kod hafızası + kişisel hafıza + bilgi evreni
+- **FastAPI** → self-hosted web kontrol paneli
+- **APScheduler** → gece görevleri + sürekli genişleme
+
+## Lisans
 
 MIT
