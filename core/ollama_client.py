@@ -6,10 +6,10 @@ No external paid APIs — only local / self-hosted Ollama.
 from __future__ import annotations
 
 import os
-from typing import Any, Optional
+from typing import Any, List, Optional, Union
 
 from langchain_ollama import ChatOllama, OllamaEmbeddings
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
 
 class OllamaClient:
@@ -51,15 +51,27 @@ class OllamaClient:
 
     def chat(
         self,
-        prompt: str,
+        prompt_or_messages: Union[str, List[dict]],
         system: Optional[str] = None,
         temperature: Optional[float] = None,
     ) -> str:
-        """Simple one-shot chat."""
+        """Chat with either a simple string or a list of role/content dicts."""
         messages = []
-        if system:
-            messages.append(SystemMessage(content=system))
-        messages.append(HumanMessage(content=prompt))
+
+        if isinstance(prompt_or_messages, list):
+            for m in prompt_or_messages:
+                role = m.get("role", "user")
+                content = m.get("content", "")
+                if role == "system":
+                    messages.append(SystemMessage(content=content))
+                elif role == "assistant":
+                    messages.append(AIMessage(content=content))
+                else:
+                    messages.append(HumanMessage(content=content))
+        else:
+            if system:
+                messages.append(SystemMessage(content=system))
+            messages.append(HumanMessage(content=prompt_or_messages))
 
         llm = self.llm
         if temperature is not None:
