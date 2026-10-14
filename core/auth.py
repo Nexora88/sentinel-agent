@@ -1,29 +1,40 @@
 """
 Simple multi-user authentication for Sentinel Web UI.
 Roles: owner > admin > user > viewer
+Passwords and secrets come only from environment / user input — never hardcoded production secrets.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import secrets
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
+logger = logging.getLogger("sentinel.auth")
+
 
 class AuthManager:
     def __init__(self, users_file: str = "./memory/users.json"):
         self.users_file = Path(users_file)
         self.users_file.parent.mkdir(parents=True, exist_ok=True)
-        self.sessions: Dict[str, dict] = {}  # token -> user info
+        self.sessions: Dict[str, dict] = {}
         self._users = self._load()
 
-        # Bootstrap owner from env if no users yet
         if not self._users:
-            owner_pass = os.getenv("OWNER_PASSWORD", "sentinel-change-me")
+            owner_pass = os.getenv("OWNER_PASSWORD", "").strip()
+            if not owner_pass:
+                # Dev-only fallback — log a clear warning
+                owner_pass = secrets.token_urlsafe(16)
+                logger.warning(
+                    "OWNER_PASSWORD not set. Generated a one-time random owner password for this process. "
+                    "Set OWNER_PASSWORD in .env for a stable login."
+                )
+                # Do not print the password to logs in full for safety in shared environments
             self.create_user("owner", owner_pass, role="owner", display_name="Owner")
 
     def _load(self) -> Dict:
@@ -67,7 +78,6 @@ class AuthManager:
         return True
 
     def authenticate(self, username: str, password: str) -> Optional[str]:
-        """Returns session token or None."""
         username = username.lower().strip()
         user = self._users.get(username)
         if not user or not user.get("active"):
