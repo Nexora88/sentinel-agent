@@ -1,44 +1,64 @@
 # Sentinel Agent
 
-Self-hosted, multi-agent AI system powered by **Ollama** (no external paid APIs).
+**Self-hosted multi-agent system** powered by Ollama.  
+No external paid APIs. Fully under your control.
 
-## Core Purpose
-- Continuously reviews your code for errors and improvements while you sleep
-- Performs **defensive** security scans (finds vulnerabilities, never exploits)
-- Learns from your codebase and documentation via RAG
-- Only takes actions (commit, fix, open PR) when you explicitly give permission
-- Fully cloud-ready (RunPod, Vast.ai, VPS, etc.)
+## What it does
+
+- Reviews your code for bugs and improvements while you sleep
+- Performs **defensive** security analysis (finds issues, never exploits)
+- Continuously learns from your codebase via RAG memory
+- Only performs write actions when you explicitly allow it
+- Cloud-ready (RunPod, Vast.ai, any VPS with GPU)
+
+## Quick Start
+
+```bash
+# 1. Clone
+git clone https://github.com/Nexora88/sentinel-agent.git
+cd sentinel-agent
+
+# 2. Setup
+cp .env.example .env
+# edit .env → set your model and WATCH_REPOS
+
+# 3. Install
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# 4. Make sure Ollama is running and model is pulled
+ollama pull qwen2.5-coder:32b
+ollama pull nomic-embed-text
+
+# 5. Test
+python -m scripts.run test
+
+# Review a local file
+python -m scripts.run review path/to/file.py
+
+# Full pipeline on a repository
+python -m scripts.run repo https://github.com/your/repo.git
+
+# Start nightly scheduler
+python -m scripts.run schedule
+```
 
 ## Architecture
 
 ```
-sentinel-agent/
-├── config/           # All settings & agent definitions
-├── agents/           # Individual agents (reviewer, security, learner, reporter)
-├── core/             # Ollama client, RAG, scheduler, permission system
-├── tools/            # Git, code analysis, defensive security tools
-├── memory/           # Vector store for continuous learning
-├── scripts/          # Setup and run scripts
-└── docker-compose.yml
+config/          → settings, agent roles, permissions
+core/            → ollama, rag, pipeline, scheduler, permissions
+agents/          → code_reviewer, security_scanner, learner, reporter
+tools/           → git tools
+scripts/         → CLI entrypoint
 ```
 
-## Tech Stack
-- **Models**: Ollama (Qwen2.5-Coder, Llama 3.1, DeepSeek-Coder, etc.)
-- **Agent Framework**: CrewAI (easy multi-agent orchestration)
-- **Memory / Learning**: ChromaDB + RAG
-- **Security Tools**: Bandit, Semgrep, Trivy (defensive only)
-- **Scheduler**: APScheduler or cron
-
-## Quick Start (Cloud)
-1. Rent a GPU instance (RunPod / Vast.ai recommended)
-2. Clone this repo
-3. `cp .env.example .env` and edit
-4. `docker compose up -d`
-5. Agents start reviewing on schedule
-
 ## Permission Model
-Agents can only **report** by default.  
-Any write action (fix code, commit, open PR) requires explicit approval.
 
----
-Built for autonomy with control.
+By default everything that writes (commit, PR, modify files) requires your approval.  
+Agents can freely read code and generate reports.
+
+## License
+
+MIT

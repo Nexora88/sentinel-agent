@@ -1,93 +1,129 @@
 \"\"\"
-Sentinel Agent - Main Runner
-"\"\"
+Sentinel Agent - Main CLI
+\"\"\"
 
 from __future__ import annotations
 
 import argparse
+import logging
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from core.ollama_client import OllamaClient
-from core.rag import MemoryStore
-from agents.code_reviewer import CodeReviewerAgent
-from agents.security_scanner import SecurityScannerAgent
+# Add project root to path
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from core.config import settings
+from core.pipeline import SentinelPipeline
+from core.scheduler import SentinelScheduler
+from core.permission_manager import PermissionManager
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+logger = logging.getLogger("sentinel")
 
 
-def review_local_file(file_path: str):
-    """Quick test: review a single local file."""
-    path = Path(file_path)
-    if not path.exists():
-        print(f"File not found: {file_path}")
-        return
-
-    content = path.read_text(encoding="utf-8", errors="ignore")
-    language = path.suffix.lstrip(".") or "text"
-
-    print(f"\n🔍 Reviewing: {file_path}\n")
-
-    ollama = OllamaClient()
-    memory = MemoryStore(ollama=ollama)
-
-    reviewer = CodeReviewerAgent(ollama=ollama, memory=memory)
-    result = reviewer.review_file(str(path), content, language=language)
-
-    print("\n" + "=" * 60)
-    print("CODE REVIEW RESULT")
-    print("=" * 60)
-    print(result)
+def cmd_review_file(file_path: str):
+    pipeline = SentinelPipeline()
+    report = pipeline.run_on_local_file(file_path)
+    print("\n" + report)
 
 
-def security_scan_file(file_path: str):
-    """Quick test: defensive security scan."""
-    path = Path(file_path)
-    if not path.exists():
-        print(f"File not found: {file_path}")
-        return
+def cmd_scan_repo(repo_url: str, branch: str = "main"):
+    pipeline = SentinelPipeline()
+    report = pipeline.run_on_repo(repo_url, branch=branch)
+    print("\nFinal report generated.")
 
-    content = path.read_text(encoding="utf-8", errors="ignore")
-    language = path.suffix.lstrip(".") or "text"
 
-    print(f"\n🛡️  Security scanning: {file_path}\n")
+def cmd_start_scheduler():
+    """Start the background scheduler for nightly runs."""
+    pipeline = SentinelPipeline()
+    scheduler = SentinelScheduler()
 
-    ollama = OllamaClient()
-    memory = MemoryStore(ollama=ollama)
+    def nightly_job():
+        repos = settings.watch_repos
+        if not repos:
+            logger.warning("No repositories configured in WATCH_REPOS or settings.yaml")
+            return
+        for repo in repos:
+            try:
+                logger.info(f"Nightly run starting for {repo}")
+                pipeline.run_on_repo(repo)
+            except Exception as e:
+                logger.error(f"Failed on {repo}: {e}")
 
-    scanner = SecurityScannerAgent(ollama=ollama, memory=memory)
-    result = scanner.scan_code(str(path), content, language=language)
+    scheduler.add_cron_job("nightly_code_review", nightly_job, settings.schedule_code_review)
+    scheduler.start()
 
-    print("\n" + "=" * 60)
-    print("SECURITY SCAN RESULT")
-    print("=" * 60)
-    print(result)
+    print("Scheduler started. Nightly jobs are active.")
+    print("Press Ctrl+C to stop.")
+
+    try:
+        import time
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        scheduler.stop()
+        print("\nScheduler stopped.")
+
+
+def cmd_permissions():
+    pm = PermissionManager()
+    print(f"Require approval : {pm.require_approval}")
+    print(f"Pending approvals: {len(pm.list_pending())}")
+    for i, req in enumerate(pm.list_pending()):
+        print(f"  [{i}] {req['action']} → {req['details']}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Sentinel Agent")
-    parser.add_argument("--review", type=str, help="Review a local file")
-    parser.add_argument("--security", type=str, help="Run defensive security scan on a file")
-    parser.add_argument("--test", action="store_true", help="Run a quick self-test")
+    parser = argparse.ArgumentParser(
+        description="Sentinel Agent — Self-hosted multi-agent code & security guardian"
+    )
+    sub = parser.add_subparsers(dest="command")
+
+    # review
+    p_review = sub.add_parser("review", help="Review a local file")
+    p_review.add_argument("file", type=str)
+
+    # repo
+    p_repo = sub.add_parser("repo", help="Run full pipeline on a git repository")
+    p_repo.add_argument("url", type=str, help="Repository URL (https or git)")
+    p_repo.add_argument("--branch", default="main")
+
+    # scheduler
+    sub.add_parser("schedule", help="Start nightly scheduler")
+
+    # permissions
+    sub.add_parser("permissions", help="Show permission status")
+
+    # test
+    sub.add_parser("test", help="Quick health check")
 
     args = parser.parse_args()
 
-    if args.review:
-        review_local_file(args.review)
-    elif args.security:
-        security_scan_file(args.security)
-    elif args.test:
-        print("Sentinel Agent is alive.")
-        print(f"Ollama URL : {os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')}")
-        print(f"Model      : {os.getenv('OLLAMA_MODEL', 'qwen2.5-coder:32b')}")
+    if args.command == "review":
+        cmd_review_file(args.file)
+    elif args.command == "repo":
+        cmd_scan_repo(args.url, branch=args.branch)
+    elif args.command == "schedule":
+        cmd_start_scheduler()
+    elif args.command == "permissions":
+        cmd_permissions()
+    elif args.command == "test":
+        print("Sentinel Agent is ready.")
+        print(f"Model     : {settings.model_name}")
+        print(f"Ollama    : {settings.ollama_base_url}")
+        print(f"Approval  : {settings.require_approval}")
+        print(f"Watch list: {settings.watch_repos or '(empty)'}")
     else:
-        print("Sentinel Agent")
-        print("Usage:")
-        print("  python -m scripts.run --review path/to/file.py")
-        print("  python -m scripts.run --security path/to/file.py")
-        print("  python -m scripts.run --test")
+        parser.print_help()
 
 
 if __name__ == "__main__":
