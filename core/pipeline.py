@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from core.ollama_client import OllamaClient
 from core.rag import MemoryStore
+from core.personal_memory import PersonalMemory
 from core.permission_manager import PermissionManager, Action
 from tools.git_tools import GitTools
 from tools.notifier import Notifier
@@ -20,6 +21,7 @@ from agents.security_scanner import SecurityScannerAgent
 from agents.learner import LearnerAgent
 from agents.reporter import ReporterAgent
 from agents.debugger import DebuggerAgent
+from agents.personal_assistant import PersonalAssistant
 
 logger = logging.getLogger("sentinel.pipeline")
 
@@ -28,6 +30,7 @@ class SentinelPipeline:
     def __init__(self):
         self.ollama = OllamaClient()
         self.memory = MemoryStore(ollama=self.ollama)
+        self.personal_memory = PersonalMemory(ollama=self.ollama)
         self.permissions = PermissionManager()
         self.git = GitTools()
         self.notifier = Notifier()
@@ -39,6 +42,21 @@ class SentinelPipeline:
         self.learner = LearnerAgent(ollama=self.ollama, memory=self.memory)
         self.reporter = ReporterAgent(ollama=self.ollama)
         self.debugger = DebuggerAgent(ollama=self.ollama, memory=self.memory)
+
+        # Personal conversational agent (knows the user)
+        self.assistant = PersonalAssistant(
+            ollama=self.ollama,
+            memory=self.personal_memory,
+            permissions=self.permissions,
+            pipeline=self,
+        )
+
+    def chat(self, message: str) -> str:
+        """Talk to the personal assistant. Works from CLI, Telegram, etc."""
+        return self.assistant.chat(message)
+
+    def status(self) -> str:
+        return self.assistant.get_status()
 
     def run_on_repo(self, repo_url: str, branch: str = "main", max_files: int = 8) -> str:
         logger.info(f"Starting pipeline on {repo_url}")
