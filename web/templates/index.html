@@ -8,75 +8,111 @@
 </head>
 <body>
   <div class="app">
-    <!-- Sidebar -->
     <aside class="sidebar">
       <div class="logo">
         <span class="logo-icon">◉</span>
         <span>Sentinel</span>
       </div>
-
       <nav>
         <button class="nav-btn active" data-panel="chat">Sohbet</button>
         <button class="nav-btn" data-panel="universe">Bilgi Evreni</button>
+        <button class="nav-btn" data-panel="finance">Finans</button>
+        <button class="nav-btn" data-panel="image">Görsel</button>
+        <button class="nav-btn" data-panel="github">GitHub</button>
         <button class="nav-btn" data-panel="approvals">Onaylar</button>
         <button class="nav-btn" data-panel="status">Durum</button>
       </nav>
-
       <div class="sidebar-footer">
         <div id="quick-status" class="quick-status">Yükleniyor...</div>
       </div>
     </aside>
 
-    <!-- Main -->
     <main class="main">
-      <!-- Chat Panel -->
+      <!-- Chat -->
       <section id="panel-chat" class="panel active">
         <header class="panel-header">
           <h1>Kişisel Ajan</h1>
-          <p>Emirlerini buradan ver. Seni tanır, hatırlar, sadece senin için çalışır.</p>
+          <p>Emir ver, sesli konuş, her şeyi öğrensin.</p>
         </header>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="chat-input-area">
-          <textarea id="chat-input" placeholder="Mesajını yaz... (Enter gönder, Shift+Enter yeni satır)" rows="2"></textarea>
+          <button id="voice-btn" title="Sesli komut" class="icon-btn">🎤</button>
+          <textarea id="chat-input" placeholder="Mesaj veya komut yaz... (Enter gönder)" rows="2"></textarea>
           <button id="send-btn">Gönder</button>
         </div>
       </section>
 
-      <!-- Universe Panel -->
+      <!-- Universe -->
       <section id="panel-universe" class="panel">
         <header class="panel-header">
           <h1>Bilgi Evreni</h1>
-          <p>İnternetten yavaş yavaş besleniyor. Sürekli genişliyor.</p>
+          <p>İnternetten yavaş yavaş besleniyor, sürekli büyüyor.</p>
         </header>
         <div class="universe-stats" id="universe-stats">
           <div class="stat-card"><span class="stat-value" id="u-pages">—</span><span class="stat-label">Toplam Bilgi</span></div>
-          <div class="stat-card"><span class="stat-value" id="u-runs">—</span><span class="stat-label">Genişleme Turu</span></div>
-          <div class="stat-card"><span class="stat-value" id="u-seeds">—</span><span class="stat-label">Tohum Konu</span></div>
+          <div class="stat-card"><span class="stat-value" id="u-runs">—</span><span class="stat-label">Tur</span></div>
+          <div class="stat-card"><span class="stat-value" id="u-seeds">—</span><span class="stat-label">Tohum</span></div>
           <div class="stat-card"><span class="stat-value" id="u-visited">—</span><span class="stat-label">Ziyaret</span></div>
         </div>
         <div class="universe-actions">
-          <input type="text" id="new-topic" placeholder="Yeni konu ekle (ör: quantum computing)" />
+          <input type="text" id="new-topic" placeholder="Yeni konu (ör: quantum computing)" />
           <button id="add-seed-btn">Tohum Ekle</button>
           <button id="expand-btn" class="primary">Şimdi Genişlet</button>
         </div>
         <div class="recent-topics">
-          <h3>Son Keşfedilen Konular</h3>
+          <h3>Son Konular</h3>
           <ul id="topic-list"></ul>
         </div>
       </section>
 
-      <!-- Approvals Panel -->
+      <!-- Finance -->
+      <section id="panel-finance" class="panel">
+        <header class="panel-header">
+          <h1>Finans Motoru</h1>
+          <p>Hisse, kripto, piyasa analizi — ücretsiz veriler.</p>
+        </header>
+        <div class="finance-box">
+          <input type="text" id="finance-query" placeholder="Örn: Bitcoin fiyatı, AAPL analizi, piyasa özeti" />
+          <button id="finance-btn" class="primary">Analiz Et</button>
+        </div>
+        <pre id="finance-result" class="status-box">Sonuç burada görünecek...</pre>
+      </section>
+
+      <!-- Image -->
+      <section id="panel-image" class="panel">
+        <header class="panel-header">
+          <h1>Görsel Üretimi</h1>
+          <p>Local SD veya ücretsiz Pollinations ile görsel oluştur.</p>
+        </header>
+        <div class="universe-actions">
+          <input type="text" id="image-prompt" placeholder="Görsel tarifi yaz..." />
+          <button id="image-btn" class="primary">Üret</button>
+        </div>
+        <div id="image-result" class="image-result"></div>
+      </section>
+
+      <!-- GitHub -->
+      <section id="panel-github" class="panel">
+        <header class="panel-header">
+          <h1>GitHub</h1>
+          <p>Repolarını gör, kod yaz / push et (onaylı).</p>
+        </header>
+        <button id="gh-refresh" class="primary">Repoları Yenile</button>
+        <div id="gh-repos" class="gh-repos"></div>
+      </section>
+
+      <!-- Approvals -->
       <section id="panel-approvals" class="panel">
         <header class="panel-header">
           <h1>Bekleyen Onaylar</h1>
-          <p>Yazma / push işlemleri senin onayını bekler.</p>
+          <p>Yazma / push / PR işlemleri senin onayını bekler.</p>
         </header>
         <div id="approvals-list" class="approvals-list">
           <p class="empty">Bekleyen onay yok.</p>
         </div>
       </section>
 
-      <!-- Status Panel -->
+      <!-- Status -->
       <section id="panel-status" class="panel">
         <header class="panel-header">
           <h1>Sistem Durumu</h1>
@@ -85,7 +121,6 @@
       </section>
     </main>
   </div>
-
   <script src="/static/app.js"></script>
 </body>
 </html>
