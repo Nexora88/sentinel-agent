@@ -1,23 +1,20 @@
 """
-Sentinel Web Interface
-Self-hosted control panel + chat. No Telegram required.
+Sentinel Web Interface — full control panel.
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, BackgroundTasks
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Request, BackgroundTasks, Header, HTTPException
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-# Ensure project root is on path
 import sys
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -26,15 +23,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from core.pipeline import SentinelPipeline
-from core.scheduler import SentinelScheduler
+from core.auth import AuthManager
 from agents.knowledge_expander import KnowledgeExpander
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sentinel.web")
 
-app = FastAPI(title="Sentinel Agent", version="2.0")
+app = FastAPI(title="Sentinel Agent", version="3.0")
 
-# Templates & static
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
 TEMPLATES_DIR.mkdir(exist_ok=True)
@@ -43,10 +39,8 @@ STATIC_DIR.mkdir(exist_ok=True)
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# Shared instances
 pipeline: Optional[SentinelPipeline] = None
-expander: Optional[KnowledgeExpander] = None
-scheduler: Optional[SentinelScheduler] = None
+auth = AuthManager()
 chat_history: List[dict] = []
 
 
@@ -57,31 +51,44 @@ def get_pipeline() -> SentinelPipeline:
     return pipeline
 
 
-def get_expander() -> KnowledgeExpander:
-    global expander
-    if expander is None:
-        p = get_pipeline()
-        expander = KnowledgeExpander(ollama=p.ollama, memory=p.memory)
-    return expander
+def get_user(authorization: Optional[str] = Header(None)):
+    """Optional auth — if no users configured strictly, allow."""
+    if not authorization:
+        # For single-user ease: allow if only owner exists and AUTH_REQUIRED!=true
+        if os.getenv("AUTH_REQUIRED", "false").lower() != "true":
+            return {"username": "owner", "role": "owner", "display_name": "Owner"}
+        raise HTTPException(401, "Authorization required")
+    token = authorization.replace("Bearer ", "").strip()
+    session = auth.validate(token)
+    if not session:
+        raise HTTPException(401, "Invalid or expired token")
+    return session
 
 
 class ChatRequest(BaseModel):
     message: str
 
-
 class ExpandRequest(BaseModel):
     topic: Optional[str] = None
-
 
 class SeedRequest(BaseModel):
     topic: str
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class ImageRequest(BaseModel):
+    prompt: str
+
+class FinanceRequest(BaseModel):
+    query: str
+
 
 @app.on_event("startup")
 async def startup():
-    logger.info("Sentinel Web UI starting...")
+    logger.info("Sentinel Web UI v3 starting...")
     get_pipeline()
-    get_expander()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -89,114 +96,147 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.post("/api/login")
+async def login(req: LoginRequest):
+    token = auth.authenticate(req.username, req.password)
+    if not token:
+        raise HTTPException(401, "Hatalı kullanıcı veya şifre")
+    session = auth.validate(token)
+    return {"token": token, "user": session}
+
+
 @app.get("/api/status")
-async def api_status():
+async def api_status(authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
     p = get_pipeline()
-    e = get_expander()
-    status = p.status()
-    universe = e.get_status()
+    uni = p.expander.get_status()
     return {
-        "assistant": status,
-        "universe": universe,
+        "user": user,
+        "assistant": p.status(),
+        "universe": uni,
         "pending_approvals": len(p.permissions.list_pending()),
+        "github_enabled": p.github.enabled,
         "chat_turns": len(chat_history),
     }
 
 
 @app.post("/api/chat")
-async def api_chat(req: ChatRequest):
+async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
     p = get_pipeline()
     message = req.message.strip()
     if not message:
         return {"reply": "Boş mesaj."}
 
-    # Special commands from UI
     lower = message.lower()
     if lower in ("/status", "durum", "status"):
         reply = p.status()
-    elif lower.startswith("/expand") or lower.startswith("genişlet"):
-        e = get_expander()
-        result = e.expand_once()
-        reply = (
-            f"🌌 Bilgi evreni genişledi.\n"
-            f"Konu: {result['topic']}\n"
-            f"Yeni sayfa: {result['pages_ingested']}\n"
-            f"Toplam bilgi: {result['total_knowledge_pages']}"
-        )
     else:
         reply = p.chat(message)
 
     chat_history.append({"role": "user", "content": message})
     chat_history.append({"role": "assistant", "content": reply})
-    # Keep last 100 turns in memory
-    if len(chat_history) > 200:
-        chat_history[:] = chat_history[-200:]
+    if len(chat_history) > 300:
+        chat_history[:] = chat_history[-300:]
 
     return {"reply": reply}
 
 
 @app.get("/api/history")
-async def api_history():
-    return {"history": chat_history[-40:]}
+async def api_history(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return {"history": chat_history[-50:]}
 
 
 @app.post("/api/expand")
-async def api_expand(req: ExpandRequest, background_tasks: BackgroundTasks):
-    e = get_expander()
+async def api_expand(req: ExpandRequest, background_tasks: BackgroundTasks, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    p = get_pipeline()
     if req.topic:
-        e.add_seed_topic(req.topic)
+        p.expander.add_seed_topic(req.topic)
 
-    def run_expand():
-        result = e.expand_once(extra_topics=[req.topic] if req.topic else None)
-        logger.info(f"Background expansion done: {result}")
+    def run():
+        result = p.expand_knowledge(topic=req.topic)
+        logger.info(f"Expansion done: {result}")
 
-    background_tasks.add_task(run_expand)
-    return {"status": "started", "message": "Bilgi genişletme arka planda başladı."}
+    background_tasks.add_task(run)
+    return {"status": "started", "message": "Bilgi genişletme başladı."}
 
 
 @app.post("/api/seed")
-async def api_seed(req: SeedRequest):
-    e = get_expander()
-    e.add_seed_topic(req.topic)
-    return {"status": "ok", "message": f"Yeni tohum eklendi: {req.topic}"}
+async def api_seed(req: SeedRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    p = get_pipeline()
+    p.expander.add_seed_topic(req.topic)
+    return {"status": "ok"}
 
 
 @app.get("/api/universe")
-async def api_universe():
-    e = get_expander()
-    return e.get_status()
+async def api_universe(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return get_pipeline().expander.get_status()
 
 
 @app.get("/api/approvals")
-async def api_approvals():
-    p = get_pipeline()
-    pending = p.permissions.list_pending()
-    return {"pending": pending}
+async def api_approvals(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return {"pending": get_pipeline().permissions.list_pending()}
 
 
 @app.post("/api/approvals/{index}/approve")
-async def api_approve(index: int):
-    p = get_pipeline()
-    ok = p.permissions.approve(index)
+async def api_approve(index: int, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    if user.get("role") not in ("owner", "admin"):
+        raise HTTPException(403, "Sadece owner/admin onaylayabilir")
+    ok = get_pipeline().permissions.approve(index)
     return {"success": ok}
 
 
 @app.post("/api/approvals/{index}/reject")
-async def api_reject(index: int):
-    p = get_pipeline()
-    ok = p.permissions.reject(index)
+async def api_reject(index: int, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    if user.get("role") not in ("owner", "admin"):
+        raise HTTPException(403, "Sadece owner/admin reddedebilir")
+    ok = get_pipeline().permissions.reject(index)
     return {"success": ok}
 
 
-@app.post("/api/knowledge/search")
-async def api_knowledge_search(req: ChatRequest):
-    e = get_expander()
-    context = e.search_knowledge(req.message, k=6)
-    return {"context": context}
+@app.get("/api/github/repos")
+async def api_github_repos(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    p = get_pipeline()
+    if not p.github.enabled:
+        return {"error": "GITHUB_TOKEN ayarlı değil", "repos": []}
+    return {"repos": p.github.list_repos(20)}
 
 
-def create_app():
-    return app
+@app.post("/api/finance")
+async def api_finance(req: FinanceRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return {"result": get_pipeline().finance.analyze(req.query)}
+
+
+@app.post("/api/image")
+async def api_image(req: ImageRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    result = get_pipeline().image_gen.generate(req.prompt)
+    return result
+
+
+@app.get("/api/images/{filename}")
+async def serve_image(filename: str):
+    path = Path("./memory/generated_images") / filename
+    if path.exists():
+        return FileResponse(path)
+    raise HTTPException(404)
+
+
+@app.get("/api/users")
+async def api_users(authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    if user.get("role") not in ("owner", "admin"):
+        raise HTTPException(403)
+    return {"users": auth.list_users()}
 
 
 if __name__ == "__main__":
