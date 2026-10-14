@@ -64,8 +64,9 @@ def main():
     p_ingest.add_argument("file", type=str)
 
     sub.add_parser("night", help="Run one safe night research cycle (proposals only)")
+    sub.add_parser("finance", help="Run one paper-trading cycle (virtual money only)")
 
-    sub.add_parser("schedule", help="Scheduler: nightly review + knowledge + night research")
+    sub.add_parser("schedule", help="Scheduler: review + knowledge + night + paper finance")
 
     sub.add_parser("permissions", help="Show permission status")
     sub.add_parser("test", help="Health check")
@@ -109,9 +110,22 @@ def main():
         print(pipeline.ingest_document(args.file))
 
     elif args.command == "night":
-        print("🌙 Gece araştırma döngüsü başlıyor (sadece öneri, yazma yok)...")
+        print("🌙 Gece araştırma döngüsü...")
         result = pipeline.run_night_research()
         print(result.get("summary", str(result)))
+
+    elif args.command == "finance":
+        print("💰 Paper trading döngüsü (sanal para)...")
+        result = pipeline.run_finance_cycle()
+        st = result.get("status") or {}
+        dec = result.get("decision") or {}
+        print(f"Mode     : {st.get('mode')}")
+        print(f"Equity   : ${st.get('equity', 0):.2f}")
+        print(f"Cash     : ${st.get('cash', 0):.2f}")
+        print(f"PnL      : {st.get('pnl_total_pct', 0):+.2f}%")
+        print(f"Decision : {dec}")
+        if result.get("stops_triggered"):
+            print(f"Stops    : {result['stops_triggered']}")
 
     elif args.command == "schedule":
         scheduler = SentinelScheduler()
@@ -119,7 +133,6 @@ def main():
         def nightly_job():
             repos = settings.watch_repos
             if not repos:
-                logger.warning("No repositories in WATCH_REPOS")
                 return
             for repo in repos:
                 try:
@@ -137,24 +150,34 @@ def main():
         def night_job():
             try:
                 r = pipeline.run_night_research()
-                logger.info("Night research cycle completed")
-                # Optionally notify summary via WhatsApp
                 summary = r.get("summary", "")[:800]
                 if summary:
                     pipeline.notifier.notify(f"🌙 Night Report\n{summary}", whatsapp=True)
             except Exception as e:
                 logger.error(f"Night research failed: {e}")
 
+        def finance_job():
+            try:
+                r = pipeline.run_finance_cycle()
+                st = r.get("status") or {}
+                logger.info(
+                    f"Paper finance: equity=${st.get('equity')} pnl={st.get('pnl_total_pct')}%"
+                )
+            except Exception as e:
+                logger.error(f"Finance cycle failed: {e}")
+
         scheduler.add_cron_job("nightly_review", nightly_job, settings.schedule_code_review)
         scheduler.add_cron_job("universe_expand", knowledge_job, "*/90 * * * *")
-        # Night research around 03:30
         scheduler.add_cron_job("night_research", night_job, "30 3 * * *")
+        # Paper trading every 2 hours
+        scheduler.add_cron_job("paper_finance", finance_job, "15 */2 * * *")
 
         scheduler.start()
         print("Scheduler started:")
         print("  • Nightly code review")
         print("  • Knowledge expand every ~90 min")
-        print("  • Night research ~03:30 (proposals only)")
+        print("  • Night research ~03:30")
+        print("  • Paper finance every ~2 hours")
         print("Ctrl+C to stop.")
         try:
             import time
