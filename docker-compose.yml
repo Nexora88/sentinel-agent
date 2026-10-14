@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: sentinel-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    # Uncomment if you have NVIDIA GPU
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  sentinel:
+    build: .
+    container_name: sentinel-agent
+    depends_on:
+      - ollama
+    env_file:
+      - .env
+    volumes:
+      - ./:/app
+      - ./memory:/app/memory
+    restart: unless-stopped
+    command: python -m scripts.run
+
+volumes:
+  ollama_data:

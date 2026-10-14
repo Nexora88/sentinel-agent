@@ -1,0 +1,28 @@
+# Sentinel Agent - Core Settings
+
+model:
+  name: qwen2.5-coder:32b
+  temperature: 0.2
+  base_url: ${OLLAMA_BASE_URL}
+
+schedule:
+  code_review: "0 3 * * *"      # Every day 03:00
+  security_scan: "0 4 * * *"    # Every day 04:00
+  learning: "0 5 * * 0"         # Every Sunday 05:00
+
+permissions:
+  auto_commit: false
+  auto_pr: false
+  require_explicit_approval: true
+  max_changes_per_run: 5
+
+watch:
+  # List of repositories to monitor (owner/repo)
+  repositories: []
+
+notification:
+  enabled: true
+  channels:
+    - console
+    # - discord
+    # - telegram
