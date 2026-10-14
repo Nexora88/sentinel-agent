@@ -1,54 +1,99 @@
 # Sentinel Agent
 
-Self-hosted multi-agent system powered by **Ollama**.  
-No external paid APIs. Fully under your control.
+**Senin özel, gizli ve süper zeki self-hosted AI ajanın.**  
+Ollama + multi-agent. Hiçbir ücretli API yok. Veri dışarı çıkmaz.
 
-## Features
+## Ne yapabilir?
 
-- Code review while you sleep
-- Defensive security scanning (code + website)
-- Continuous learning (RAG)
-- Debugging help
-- Permission-controlled code writing & fixing
-- WhatsApp notifications (free via CallMeBot)
-- Git push / commit only with your approval
+- **Seninle konuşur** (Telegram + CLI) — telefon ve PC’den
+- Seni tanır, tercihlerini ve projelerini hatırlar (kişisel hafıza)
+- Kod incelemesi (gece de çalışır)
+- Defensive güvenlik taraması (kod + website)
+- Hata ayıklama
+- İzin kontrollü kod yazma / düzeltme / push
+- WhatsApp bildirimleri (CallMeBot)
 
-## Quick Commands
+## Hızlı Başlangıç
 
 ```bash
+# 1. Bağımlılıklar
+pip install -r requirements.txt
+
+# 2. .env ayarla
+cp .env.example .env
+# Ollama modelini, Telegram token + user_id’yi doldur
+
+# 3. Test
 python -m scripts.run test
 
-# Review a file
-python -m scripts.run review myfile.py
+# 4. CLI’dan sohbet (PC)
+python -m scripts.run chat
 
-# Full repo scan
-python -m scripts.run repo https://github.com/you/project.git
-
-# Debug an error
-python -m scripts.run debug "TypeError: 'NoneType' object is not subscriptable" --file app.py
-
-# Scan your website (defensive only)
-python -m scripts.run website https://yoursite.com
-
-# Propose a fix (will ask permission before writing)
-python -m scripts.run fix app.py "Fix the null pointer when user is not logged in"
-
-# Start nightly scheduler
-python -m scripts.run schedule
+# 5. Telegram botu başlat (telefon + PC)
+python -m scripts.run telegram
 ```
 
-## WhatsApp Setup (Free)
+## Telegram Kurulumu (Önerilen — en güvenli & iki yönlü)
 
-1. Add **+34 644 21 99 05** to your contacts
-2. Send this message: `I allow callmebot to send me messages`
-3. You will receive an API key
-4. Put phone and apikey into `.env`
+1. Telegram’da **@BotFather**’a git → `/newbot` → isim ver → **token** al
+2. **@userinfobot**’a mesaj at → kendi **user_id**’ni al
+3. `.env` dosyasına koy:
 
-## Permission Model
+```env
+TELEGRAM_BOT_TOKEN=123456:ABC...
+TELEGRAM_ALLOWED_USER_ID=123456789   # sadece sen
+```
 
-By default:
-- Reading & reporting → allowed
-- Writing files, committing, pushing → **requires your approval**
+4. Çalıştır:
+```bash
+python -m scripts.run telegram
+```
+
+Bot **sadece senin user_id’ne** cevap verir. Başkası yazsa “Yetkisiz” der.
+
+## WhatsApp Bildirimleri (sadece giden)
+
+1. `+34 644 21 99 05` numarasını rehbere ekle
+2. `I allow callmebot to send me messages` yaz
+3. Gelen API key’i `.env`’e koy
+
+## Komutlar
+
+```bash
+python -m scripts.run chat                     # interaktif sohbet
+python -m scripts.run chat "Adım Ahmet"        # tek mesaj
+python -m scripts.run telegram                 # Telegram bot
+python -m scripts.run review myfile.py
+python -m scripts.run repo https://github.com/you/project.git
+python -m scripts.run debug "TypeError: ..." --file app.py
+python -m scripts.run website https://yoursite.com
+python -m scripts.run fix app.py "null check ekle"
+python -m scripts.run schedule                 # gece görevleri
+python -m scripts.run permissions
+python -m scripts.run test
+```
+
+## Kişisel Hafıza
+
+Sentinel konuştukça seni öğrenir:
+- Adın, projelerin, tercihler
+- Geçmiş konuşmalar (vektör hafıza)
+- “Hatırla: ...” veya “Öğren: ...” diyerek manuel de ekleyebilirsin
+
+Her şey `./memory/personal` klasöründe kalır. Buluta gitmez.
+
+## İzin Modeli
+
+Varsayılan:
+- Okuma, rapor, sohbet → serbest
+- Dosya yazma, commit, push → **senin açık onayın olmadan asla**
+
+## Güvenlik
+
+- Telegram’da sadece senin user_id’n geçerli
+- Tüm LLM çağrıları local Ollama
+- Veri sadece senin sunucunda / bilgisayarında
+- Yazma işlemleri permission gate’li
 
 ## License
 
