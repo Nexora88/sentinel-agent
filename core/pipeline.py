@@ -22,6 +22,7 @@ from agents.learner import LearnerAgent
 from agents.reporter import ReporterAgent
 from agents.debugger import DebuggerAgent
 from agents.personal_assistant import PersonalAssistant
+from agents.knowledge_expander import KnowledgeExpander
 
 logger = logging.getLogger("sentinel.pipeline")
 
@@ -43,7 +44,10 @@ class SentinelPipeline:
         self.reporter = ReporterAgent(ollama=self.ollama)
         self.debugger = DebuggerAgent(ollama=self.ollama, memory=self.memory)
 
-        # Personal conversational agent (knows the user)
+        # Knowledge universe (continuously expands from the internet)
+        self.expander = KnowledgeExpander(ollama=self.ollama, memory=self.memory)
+
+        # Personal conversational agent
         self.assistant = PersonalAssistant(
             ollama=self.ollama,
             memory=self.personal_memory,
@@ -52,11 +56,26 @@ class SentinelPipeline:
         )
 
     def chat(self, message: str) -> str:
-        """Talk to the personal assistant. Works from CLI, Telegram, etc."""
+        """Talk to the personal assistant."""
         return self.assistant.chat(message)
 
     def status(self) -> str:
-        return self.assistant.get_status()
+        base = self.assistant.get_status()
+        uni = self.expander.get_status()
+        return (
+            f"{base}\n\n"
+            f"🌌 Bilgi Evreni\n"
+            f"Toplam bilgi parçası : {uni.get('total_pages', 0)}\n"
+            f"Genişleme turu       : {uni.get('total_runs', 0)}\n"
+            f"Son genişleme        : {uni.get('last_run') or 'henüz yok'}\n"
+            f"Tohum konu sayısı    : {uni.get('seed_count', 0)}"
+        )
+
+    def expand_knowledge(self, topic: Optional[str] = None) -> dict:
+        """Trigger one knowledge expansion cycle."""
+        if topic:
+            self.expander.add_seed_topic(topic)
+        return self.expander.expand_once(extra_topics=[topic] if topic else None)
 
     def run_on_repo(self, repo_url: str, branch: str = "main", max_files: int = 8) -> str:
         logger.info(f"Starting pipeline on {repo_url}")
@@ -106,9 +125,7 @@ class SentinelPipeline:
             repo=repo_name,
         )
 
-        # Notify
         self.notifier.notify(report, whatsapp=True)
-
         return report
 
     def run_on_local_file(self, file_path: str) -> str:
@@ -146,7 +163,6 @@ class SentinelPipeline:
         return report
 
     def fix_file(self, file_path: str, issue: str) -> str:
-        """Propose and (if allowed) apply a fix."""
         path = Path(file_path)
         content = path.read_text(encoding="utf-8", errors="ignore")
         return self.code_writer.apply_fix(str(path), content, issue)
