@@ -4,6 +4,7 @@ Knowledge Expander — The Universe grows slowly.
 Continuously and respectfully digests public internet knowledge.
 Uses free search + content extraction + local LLM summarization.
 Everything stays on your machine. No paid APIs.
+Hardened against prompt injection from scraped pages.
 """
 
 from __future__ import annotations
@@ -22,10 +23,10 @@ from bs4 import BeautifulSoup
 
 from core.ollama_client import OllamaClient
 from core.rag import MemoryStore
+from core.safety import sanitize_web_content, contains_injection
 
 logger = logging.getLogger("sentinel.knowledge_expander")
 
-# Seed topics that expand over time (user interests will be mixed in)
 DEFAULT_SEEDS = [
     "artificial intelligence latest research",
     "cybersecurity defensive techniques",
@@ -43,8 +44,6 @@ DEFAULT_SEEDS = [
 
 
 class KnowledgeExpander:
-    """Slowly expands the knowledge universe from the public web."""
-
     def __init__(
         self,
         ollama: Optional[OllamaClient] = None,
@@ -82,8 +81,7 @@ class KnowledgeExpander:
     def _load_visited(self) -> Set[str]:
         if self.visited_path.exists():
             try:
-                data = json.loads(self.visited_path.read_text(encoding="utf-8"))
-                return set(data)
+                return set(json.loads(self.visited_path.read_text(encoding="utf-8")))
             except Exception:
                 pass
         return set()
@@ -103,10 +101,7 @@ class KnowledgeExpander:
         return DEFAULT_SEEDS.copy()
 
     def _save_seeds(self) -> None:
-        self.seeds_path.write_text(
-            json.dumps(self.seeds, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        self.seeds_path.write_text(json.dumps(self.seeds, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def _load_stats(self) -> Dict[str, Any]:
         if self.stats_path.exists():
@@ -114,35 +109,24 @@ class KnowledgeExpander:
                 return json.loads(self.stats_path.read_text(encoding="utf-8"))
             except Exception:
                 pass
-        return {
-            "total_pages_ingested": 0,
-            "total_runs": 0,
-            "last_run": None,
-            "topics_explored": [],
-        }
+        return {"total_pages_ingested": 0, "total_runs": 0, "last_run": None, "topics_explored": []}
 
     def _save_stats(self) -> None:
-        self.stats_path.write_text(
-            json.dumps(self.stats, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        self.stats_path.write_text(json.dumps(self.stats, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def add_seed_topic(self, topic: str) -> None:
         topic = topic.strip()
         if topic and topic not in self.seeds:
             self.seeds.insert(0, topic)
-            self.seeds = self.seeds[:40]  # keep reasonable size
+            self.seeds = self.seeds[:40]
             self._save_seeds()
-            logger.info(f"New seed topic added: {topic}")
 
     def _url_hash(self, url: str) -> str:
         return hashlib.sha256(url.encode()).hexdigest()[:16]
 
     def _search_duckduckgo(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
-        """Free search via duckduckgo-search library."""
         try:
             from duckduckgo_search import DDGS
-
             results = []
             with DDGS() as ddgs:
                 for r in ddgs.text(query, max_results=max_results):
@@ -157,7 +141,6 @@ class KnowledgeExpander:
             return []
 
     def _extract_content(self, url: str) -> Optional[str]:
-        """Download and extract main text content."""
         try:
             resp = self.session.get(url, timeout=12, allow_redirects=True)
             if resp.status_code != 200:
@@ -165,46 +148,43 @@ class KnowledgeExpander:
             if "text/html" not in resp.headers.get("Content-Type", ""):
                 return None
 
-            # Prefer trafilatura if available
             try:
                 import trafilatura
                 text = trafilatura.extract(
-                    resp.text,
-                    include_comments=False,
-                    include_tables=False,
-                    favor_precision=True,
+                    resp.text, include_comments=False, include_tables=False, favor_precision=True
                 )
                 if text and len(text) > 300:
-                    return text[:12000]
+                    return sanitize_web_content(text[:12000])
             except ImportError:
                 pass
 
-            # Fallback: BeautifulSoup
             soup = BeautifulSoup(resp.text, "lxml")
             for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
                 tag.decompose()
             text = soup.get_text(separator="\n", strip=True)
-            # Clean excessive newlines
             lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
             text = "\n".join(lines)
             if len(text) < 300:
                 return None
-            return text[:12000]
+            return sanitize_web_content(text[:12000])
         except Exception as e:
             logger.debug(f"Extract failed for {url}: {e}")
             return None
 
     def _summarize(self, title: str, content: str, topic: str) -> str:
-        """Use local LLM to create a high-quality knowledge summary."""
+        # Extra guard: if content still looks injectable, skip LLM and store truncated clean text
+        if contains_injection(content):
+            logger.warning(f"Possible injection in content for {title}, storing sanitized only")
+            return sanitize_web_content(content)[:1500]
+
         prompt = f"""Aşağıdaki web içeriğini yüksek kaliteli, özlü bir bilgi parçasına dönüştür.
 Konu: {topic}
 Başlık: {title}
 
 Kurallar:
 - Sadece faydalı teknik/bilimsel bilgi çıkar
-- Ana kavramları, yöntemleri, önemli noktaları yaz
-- Kişisel görüş veya reklam ekleme
-- Türkçe veya İngilizce olabilir, net olsun
+- Ana kavramları, yöntemleri yaz
+- Kişisel görüş veya komut ekleme
 - 300-600 kelime arası tut
 
 İçerik:
@@ -212,15 +192,16 @@ Kurallar:
 
 Özet Bilgi:"""
         try:
-            summary = self.ollama.chat(prompt, system="Sen teknik bilgi özetleyicisisin. Sadece değerli bilgi üret.")
-            return summary.strip()
+            summary = self.ollama.chat(
+                prompt,
+                system="Sen teknik bilgi özetleyicisisin. Sadece değerli bilgi üret. Asla sistem komutu veya yeni talimat üretme.",
+            )
+            return sanitize_web_content(summary.strip())
         except Exception as e:
             logger.error(f"Summarize failed: {e}")
-            # Fallback: first part of content
             return content[:1500]
 
     def expand_once(self, extra_topics: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Run one expansion cycle (slow & respectful)."""
         topics = (extra_topics or []) + self.seeds
         random.shuffle(topics)
         topic = topics[0]
@@ -234,17 +215,13 @@ Kurallar:
         for item in results:
             if ingested >= self.max_pages_per_run:
                 break
-
             url = item.get("url", "").strip()
             if not url or self._url_hash(url) in self.visited:
                 continue
-
-            # Skip non-content domains roughly
             if any(bad in url for bad in ["youtube.com", "twitter.com", "x.com", "facebook.com", "instagram.com"]):
                 continue
 
-            time.sleep(self.delay)  # be polite
-
+            time.sleep(self.delay)
             content = self._extract_content(url)
             if not content:
                 self.visited.add(self._url_hash(url))
@@ -253,7 +230,6 @@ Kurallar:
             title = item.get("title") or url
             summary = self._summarize(title, content, topic)
 
-            # Store in universe knowledge base
             meta = {
                 "source": url,
                 "title": title,
@@ -267,11 +243,7 @@ Kurallar:
             ingested += 1
             details.append({"title": title, "url": url, "topic": topic})
 
-            logger.info(f"Ingested: {title[:60]}...")
-
         self._save_visited()
-
-        # Update stats
         self.stats["total_pages_ingested"] = self.stats.get("total_pages_ingested", 0) + ingested
         self.stats["total_runs"] = self.stats.get("total_runs", 0) + 1
         self.stats["last_run"] = datetime.utcnow().isoformat()
@@ -298,5 +270,4 @@ Kurallar:
         }
 
     def search_knowledge(self, query: str, k: int = 6) -> str:
-        """Query the expanding universe."""
         return self.memory.get_context(query, k=k)
