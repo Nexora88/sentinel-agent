@@ -1,63 +1,54 @@
 # Sentinel Agent
 
-**Self-hosted multi-agent system** powered by Ollama.  
+Self-hosted multi-agent system powered by **Ollama**.  
 No external paid APIs. Fully under your control.
 
-## What it does
+## Features
 
-- Reviews your code for bugs and improvements while you sleep
-- Performs **defensive** security analysis (finds issues, never exploits)
-- Continuously learns from your codebase via RAG memory
-- Only performs write actions when you explicitly allow it
-- Cloud-ready (RunPod, Vast.ai, any VPS with GPU)
+- Code review while you sleep
+- Defensive security scanning (code + website)
+- Continuous learning (RAG)
+- Debugging help
+- Permission-controlled code writing & fixing
+- WhatsApp notifications (free via CallMeBot)
+- Git push / commit only with your approval
 
-## Quick Start
+## Quick Commands
 
 ```bash
-# 1. Clone
-git clone https://github.com/Nexora88/sentinel-agent.git
-cd sentinel-agent
-
-# 2. Setup
-cp .env.example .env
-# edit .env → set your model and WATCH_REPOS
-
-# 3. Install
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# 4. Make sure Ollama is running and model is pulled
-ollama pull qwen2.5-coder:32b
-ollama pull nomic-embed-text
-
-# 5. Test
 python -m scripts.run test
 
-# Review a local file
-python -m scripts.run review path/to/file.py
+# Review a file
+python -m scripts.run review myfile.py
 
-# Full pipeline on a repository
-python -m scripts.run repo https://github.com/your/repo.git
+# Full repo scan
+python -m scripts.run repo https://github.com/you/project.git
+
+# Debug an error
+python -m scripts.run debug "TypeError: 'NoneType' object is not subscriptable" --file app.py
+
+# Scan your website (defensive only)
+python -m scripts.run website https://yoursite.com
+
+# Propose a fix (will ask permission before writing)
+python -m scripts.run fix app.py "Fix the null pointer when user is not logged in"
 
 # Start nightly scheduler
 python -m scripts.run schedule
 ```
 
-## Architecture
+## WhatsApp Setup (Free)
 
-```
-config/          → settings, agent roles, permissions
-core/            → ollama, rag, pipeline, scheduler, permissions
-agents/          → code_reviewer, security_scanner, learner, reporter
-tools/           → git tools
-scripts/         → CLI entrypoint
-```
+1. Add **+34 644 21 99 05** to your contacts
+2. Send this message: `I allow callmebot to send me messages`
+3. You will receive an API key
+4. Put phone and apikey into `.env`
 
 ## Permission Model
 
-By default everything that writes (commit, PR, modify files) requires your approval.  
-Agents can freely read code and generate reports.
+By default:
+- Reading & reporting → allowed
+- Writing files, committing, pushing → **requires your approval**
 
 ## License
 

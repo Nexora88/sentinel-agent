@@ -1,6 +1,6 @@
 # Permission Rules
-# Agents can only perform actions listed under "allowed" when require_approval is false
-# Otherwise they must request approval first
+# allowed          → can do without asking
+# needs_approval   → must request approval first
 
 default:
   require_approval: true
@@ -9,6 +9,9 @@ actions:
   read_code: allowed
   run_static_analysis: allowed
   create_report: allowed
+  send_notification: allowed
+  scan_website: allowed
+
   open_github_issue: needs_approval
   create_pull_request: needs_approval
   commit_changes: needs_approval

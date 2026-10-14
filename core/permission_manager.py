@@ -20,6 +20,8 @@ class Action(str, Enum):
     COMMIT_CHANGES = "commit_changes"
     PUSH_TO_REMOTE = "push_to_remote"
     MODIFY_FILES = "modify_files"
+    SEND_NOTIFICATION = "send_notification"
+    SCAN_WEBSITE = "scan_website"
 
 
 class PermissionManager:
@@ -56,7 +58,7 @@ class PermissionManager:
             f"Action : {action_key}\n"
             f"Details: {details}\n"
             f"Status : Waiting for your explicit approval.\n"
-            f"(Agents will never perform write actions without permission.)"
+            f"(Agents will never perform write / push actions without permission.)"
         )
 
     def list_pending(self) -> List[Dict]:
