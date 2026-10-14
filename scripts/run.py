@@ -21,6 +21,7 @@ from core.config import settings
 from core.pipeline import SentinelPipeline
 from core.scheduler import SentinelScheduler
 from core.permission_manager import PermissionManager
+from core.energy_policy import should_run_heavy_job
 
 logging.basicConfig(
     level=logging.INFO,
@@ -60,14 +61,24 @@ def main():
     p_secrets = sub.add_parser("secrets", help="Scan project for hardcoded secrets")
     p_secrets.add_argument("--path", type=str, default=".")
 
+    p_lic = sub.add_parser("licenses", help="License / copyright hygiene scan")
+    p_lic.add_argument("--path", type=str, default=".")
+
     p_ingest = sub.add_parser("ingest", help="Ingest local PDF/MD/TXT into knowledge base")
     p_ingest.add_argument("file", type=str)
 
-    sub.add_parser("night", help="Run one safe night research cycle (proposals only)")
-    sub.add_parser("finance", help="Run one paper-trading cycle (virtual money only)")
+    p_doc = sub.add_parser("doc-analyze", help="Analyze document text (suggestions only)")
+    p_doc.add_argument("file", type=str, help="Path to text/md file")
 
-    sub.add_parser("schedule", help="Scheduler: review + knowledge + night + paper finance")
+    p_legacy = sub.add_parser("legacy-backup", help="Encrypted local memory backup")
+    p_legacy.add_argument("--passphrase", required=True)
+    p_legacy.add_argument("--out", default="./memory/legacy_backup.bin")
 
+    sub.add_parser("discover", help="Read-only localhost port discovery")
+    sub.add_parser("curiosity", help="One curiosity-driven knowledge cycle")
+    sub.add_parser("night", help="Run one safe night research cycle")
+    sub.add_parser("finance", help="Run one paper-trading cycle")
+    sub.add_parser("schedule", help="Scheduler: review + knowledge + night + finance + curiosity")
     sub.add_parser("permissions", help="Show permission status")
     sub.add_parser("test", help="Health check")
 
@@ -99,15 +110,38 @@ def main():
     elif args.command == "expand":
         print("🌌 Bilgi evreni genişliyor...")
         result = pipeline.expand_knowledge(topic=args.topic)
-        print(f"Konu          : {result.get('topic')}")
-        print(f"Yeni sayfa    : {result.get('pages_ingested')}")
-        print(f"Toplam bilgi  : {result.get('total_knowledge_pages')}")
+        if result.get("deferred"):
+            print(f"Ertelendi: {result.get('reason')}")
+        else:
+            print(f"Konu          : {result.get('topic')}")
+            print(f"Yeni sayfa    : {result.get('pages_ingested')}")
+            print(f"Toplam bilgi  : {result.get('total_knowledge_pages')}")
 
     elif args.command == "secrets":
         print(pipeline.scan_secrets(args.path))
 
+    elif args.command == "licenses":
+        print(pipeline.check_licenses(args.path))
+
     elif args.command == "ingest":
         print(pipeline.ingest_document(args.file))
+
+    elif args.command == "doc-analyze":
+        text = Path(args.file).read_text(encoding="utf-8", errors="ignore")
+        print(pipeline.analyze_document_text(text))
+
+    elif args.command == "legacy-backup":
+        print(pipeline.legacy_export(args.passphrase, out_path=args.out))
+
+    elif args.command == "discover":
+        print(pipeline.discover_local())
+
+    elif args.command == "curiosity":
+        print("🔭 Merak döngüsü...")
+        r = pipeline.run_curiosity()
+        print(f"Konu: {r.get('topic')}")
+        print(f"Sayfa: {r.get('expand', {}).get('pages_ingested')}")
+        print(r.get("reflection", "")[:1500])
 
     elif args.command == "night":
         print("🌙 Gece araştırma döngüsü...")
@@ -142,6 +176,10 @@ def main():
 
         def knowledge_job():
             try:
+                advice = should_run_heavy_job("universe_expand")
+                if advice.get("prefer_defer") and not advice.get("off_peak"):
+                    logger.info("Knowledge expand deferred (energy policy)")
+                    return
                 result = pipeline.expand_knowledge()
                 logger.info(f"Knowledge +{result.get('pages_ingested', 0)}")
             except Exception as e:
@@ -166,18 +204,30 @@ def main():
             except Exception as e:
                 logger.error(f"Finance cycle failed: {e}")
 
+        def curiosity_job():
+            try:
+                advice = should_run_heavy_job("curiosity")
+                if advice.get("prefer_defer") and not advice.get("off_peak"):
+                    logger.info("Curiosity deferred (energy policy)")
+                    return
+                r = pipeline.run_curiosity()
+                logger.info(f"Curiosity: {r.get('topic')}")
+            except Exception as e:
+                logger.error(f"Curiosity failed: {e}")
+
         scheduler.add_cron_job("nightly_review", nightly_job, settings.schedule_code_review)
         scheduler.add_cron_job("universe_expand", knowledge_job, "*/90 * * * *")
         scheduler.add_cron_job("night_research", night_job, "30 3 * * *")
-        # Paper trading every 2 hours
         scheduler.add_cron_job("paper_finance", finance_job, "15 */2 * * *")
+        scheduler.add_cron_job("curiosity", curiosity_job, "45 */3 * * *")
 
         scheduler.start()
         print("Scheduler started:")
         print("  • Nightly code review")
-        print("  • Knowledge expand every ~90 min")
+        print("  • Knowledge expand ~90 min (energy-aware)")
         print("  • Night research ~03:30")
-        print("  • Paper finance every ~2 hours")
+        print("  • Paper finance ~2 hours")
+        print("  • Curiosity ~3 hours")
         print("Ctrl+C to stop.")
         try:
             import time
