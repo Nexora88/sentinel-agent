@@ -4,6 +4,7 @@ from .learner import LearnerAgent
 from .reporter import ReporterAgent
 from .debugger import DebuggerAgent
 from .personal_assistant import PersonalAssistant
+from .knowledge_expander import KnowledgeExpander
 
 __all__ = [
     "CodeReviewerAgent",
@@ -12,4 +13,5 @@ __all__ = [
     "ReporterAgent",
     "DebuggerAgent",
     "PersonalAssistant",
+    "KnowledgeExpander",
 ]
