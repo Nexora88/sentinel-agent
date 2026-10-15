@@ -192,3 +192,23 @@ CI; Python derlemesi, JavaScript sözdizimi, Compose profillerinin yapılandırm
 
 
 Ağ gizliliği, çalışma zamanı çıkış testi ve işletim sistemi güvenlik duvarı sınırları için [Ağ Gizliliği Rehberi](docs/NETWORK_PRIVACY.md) belgesine bak.
+
+
+## Deneysel MKAOS yerel motoru (isteğe bağlı)
+
+MKAOS'un yerleşik HTTP sunucusu model ağırlıklarını ve tokenizer'ı başlangıçta bir kez yükler; aynı sistem istemi tekrar kullanıldığında sınırlı bir KV önek önbelleğinden yararlanır, her isteğin kullanıcı bağlamı için ayrı KV durumu oluşturur. Sunucu güvenlik için yalnızca loopback adresine bağlanır:
+
+```bash
+python tools/fetch_model.py
+cargo run --release --manifest-path engine/mkaos-hf-adapter/Cargo.toml --bin mkaos_server -- models/smollm2-135m-instruct
+```
+
+Varsayılan adres `http://127.0.0.1:11435` şeklindedir. `/health`, `/api/chat`, `/api/generate` ve `/api/tags` uç noktaları desteklenir. Sohbet yanıtı uyumluluk amacıyla tek NDJSON yanıtı olarak gönderilir; token token canlı akış henüz uygulanmamıştır.
+
+Uygulamayı MKAOS'a yönlendirmek için `.env` içinde `MKAOS_ENABLED=true` ve `MKAOS_BASE_URL=http://127.0.0.1:11435` ayarlanır. **Geri alma:** `MKAOS_ENABLED=false` yapıp uygulamayı yeniden başlatmak, sohbet üretimini önceki yerel Ollama sağlayıcısına döndürür. Embedding işlemleri Ollama'da kalır. MKAOS sunucusu çalışmıyorsa uygulama otomatik olarak Ollama'ya geçmez; sessiz sağlayıcı değişimi yerine açık hata davranışı korunur.
+
+Bu özellik deneysel durumdadır. Mevcut aday ağırlıklar üçüncü taraf SmolLM2'dir; bu sunucu kendi ağırlıklarımızı eğitmez. Türkçe kalite, semantik doğruluk ve hedef cihaz performansı sabit değerlendirme kümesiyle ölçülmeden varsayılan yapılmamalıdır. Kalite raporu:
+
+```bash
+python tools/evaluate_mkaos_quality.py --model-dir models/smollm2-135m-instruct\n# Sunucu çalışırken tekrar yükleme maliyeti olmadan ölçüm:\npython tools/evaluate_mkaos_quality.py --server-url http://127.0.0.1:11435 --output artifacts/mkaos-resident-quality.json
+```
