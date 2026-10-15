@@ -117,7 +117,9 @@ pub fn generate_cached(
             stopped_on_sequence = true;
             break;
         }
-        logits = model.step(token, &mut cache)?;
+        if step + 1 < config.max_new_tokens {
+            logits = model.step(token, &mut cache)?;
+        }
     }
     Ok(GenerationResult {
         prompt_tokens: prompt.to_vec(), generated_tokens: generated,
