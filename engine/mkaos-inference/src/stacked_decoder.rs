@@ -156,6 +156,13 @@ impl GqaDecoder {
         Ok(logits.as_slice().to_vec())
     }
 
+    /// Slow correctness reference: recompute a fresh cache for the entire prefix.
+    /// Use only for validation, never for production decoding.
+    pub fn logits_for_prefix_reference(&self, prefix: &[usize]) -> Result<Vec<f32>, KernelError> {
+        let mut fresh = KvCache::new(self.weights.layers.len());
+        self.prefill(prefix, &mut fresh)
+    }
+
     /// Prefill a prompt using the same incremental path. Returns the last token's logits.
     pub fn prefill(&self, prompt: &[usize], cache: &mut KvCache) -> Result<Vec<f32>, KernelError> {
         if prompt.is_empty() { return Err(KernelError::EmptyTensor); }
@@ -218,6 +225,20 @@ mod tests {
         assert_eq!(cache.sequence_len(),3); assert!(logits.iter().all(|x|x.is_finite()));
         assert!(m.step(4,&mut cache).unwrap().iter().all(|x|x.is_finite()));
         cache.clear(); assert_eq!(cache.sequence_len(),0);
+    }
+    #[test]
+    fn incremental_logits_match_fresh_prefix_recomputation() {
+        let m=model();
+        let mut cache=KvCache::new(2);
+        let prompt=[1,2,3,4];
+        for (i, token) in prompt.iter().copied().enumerate() {
+            let cached=m.step(token,&mut cache).unwrap();
+            let reference=m.logits_for_prefix_reference(&prompt[..=i]).unwrap();
+            assert_eq!(cached.len(), reference.len());
+            for (a,b) in cached.iter().zip(reference.iter()) {
+                assert!((a-b).abs() < 1e-6, "incremental/reference mismatch: {a} vs {b}");
+            }
+        }
     }
     #[test]
     fn rejects_cache_with_wrong_layer_count() {
