@@ -72,6 +72,59 @@ pub fn generate<P: LogitsProvider>(
     Ok(GenerationResult { prompt_tokens: prompt.to_vec(), generated_tokens: generated, stopped_on_eos, stopped_on_sequence })
 }
 
+
+/// Generate directly with the multi-layer decoder's incremental per-layer KV cache.
+/// The prompt is prefetched once; after each emitted token only that token is evaluated.
+pub fn generate_cached(
+    model: &crate::stacked_decoder::GqaDecoder,
+    prompt: &[usize],
+    config: &GenerationConfig,
+    sampling_mode: Sampling,
+    random_draws: &[f32],
+) -> Result<GenerationResult, KernelError> {
+    if prompt.is_empty() || config.max_new_tokens == 0 { return Err(KernelError::InvalidConfig); }
+    if matches!(sampling_mode, Sampling::TopK { k: 0, .. }) { return Err(KernelError::InvalidConfig); }
+    if matches!(sampling_mode, Sampling::TopK { temperature_milli: 0, .. } | Sampling::TopP { temperature_milli: 0, .. }) {
+        return Err(KernelError::InvalidConfig);
+    }
+    if matches!(sampling_mode, Sampling::TopP { p_milli: 0, .. } | Sampling::TopP { p_milli: 1001.., .. }) {
+        return Err(KernelError::InvalidConfig);
+    }
+    if !matches!(sampling_mode, Sampling::Greedy) && random_draws.len() < config.max_new_tokens {
+        return Err(KernelError::InvalidConfig);
+    }
+    if config.stop_sequences.iter().any(Vec::is_empty) { return Err(KernelError::InvalidConfig); }
+
+    let mut cache = crate::stacked_decoder::KvCache::new(model.weights.layers.len());
+    let mut logits = model.prefill(prompt, &mut cache)?;
+    let mut generated = Vec::new();
+    let mut stopped_on_eos = false;
+    let mut stopped_on_sequence = false;
+    for step in 0..config.max_new_tokens {
+        let token = match sampling_mode {
+            Sampling::Greedy => sampling::greedy_sample(&logits)?,
+            Sampling::TopK { k, temperature_milli } =>
+                sampling::sample_top_k(&logits, temperature_milli as f32 / 1000.0, k, random_draws[step])?,
+            Sampling::TopP { p_milli, temperature_milli } =>
+                sampling::sample_top_p(&logits, temperature_milli as f32 / 1000.0, p_milli as f32 / 1000.0, random_draws[step])?,
+        };
+        if config.eos_token_ids.contains(&token) {
+            stopped_on_eos = true;
+            break;
+        }
+        generated.push(token);
+        if config.stop_sequences.iter().any(|seq| generated.ends_with(seq)) {
+            stopped_on_sequence = true;
+            break;
+        }
+        logits = model.step(token, &mut cache)?;
+    }
+    Ok(GenerationResult {
+        prompt_tokens: prompt.to_vec(), generated_tokens: generated,
+        stopped_on_eos, stopped_on_sequence,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
