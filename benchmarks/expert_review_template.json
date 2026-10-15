@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "purpose": "Human evaluation records; this template contains no claimed results.",
+  "review_id": "replace-with-random-review-id",
+  "blind_model_id": "replace-with-blinded-model-id",
+  "task_id": "replace-with-task-id",
+  "reviewer_id": "use-pseudonymous-reviewer-id",
+  "scores": {
+    "factual_correctness": null,
+    "task_completion": null,
+    "security_and_safety": null,
+    "reasoning_and_evidence": null,
+    "clarity_in_turkish": null
+  },
+  "critical_security_failure": null,
+  "unsupported_claims": null,
+  "notes": "",
+  "reviewed_at_utc": null
+}
