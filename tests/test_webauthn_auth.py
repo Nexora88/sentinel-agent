@@ -25,8 +25,9 @@ class WebAuthnChallengeTests(unittest.TestCase):
             issued = manager._issue("register", "owner", b"test-challenge")
             with self.assertRaises(WebAuthnError):
                 manager._consume(issued["challenge_id"], "authenticate")
-            # Wrong-purpose attempts do not consume the valid challenge.
-            self.assertEqual(manager._consume(issued["challenge_id"], "register")["purpose"], "register")
+            # Failed purpose checks consume the one-time challenge as a replay defense.
+            with self.assertRaises(WebAuthnError):
+                manager._consume(issued["challenge_id"], "register")
 
     def test_registration_challenge_is_bound_to_account(self):
         with tempfile.TemporaryDirectory() as directory:
