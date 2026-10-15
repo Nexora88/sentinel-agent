@@ -38,16 +38,20 @@ def parse_memory_mb(value: str) -> float | None:
 
 
 def sample_memory(stop_event: threading.Event, peak: list, *, process_name: str | None = None,
-                  container_name: str | None = None) -> None:
+                  container_name: str | None = None,
+                  container_fallbacks: tuple[str, ...] = ()) -> None:
     while not stop_event.is_set():
         try:
             value = None
-            if container_name:
+            for candidate in ((container_name,) if container_name else ()) + container_fallbacks:
                 result = subprocess.run(
-                    ["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", container_name],
+                    ["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", candidate],
                     capture_output=True, text=True, check=False, timeout=2,
                 )
-                value = parse_memory_mb(result.stdout.strip().split("/")[0]) if result.returncode == 0 else None
+                if result.returncode == 0:
+                    value = parse_memory_mb(result.stdout.strip().split("/")[0])
+                    if value is not None:
+                        break
             if value is None and process_name:
                 result = subprocess.run(
                     ["ps", "-C", process_name, "-o", "rss="],
@@ -86,7 +90,7 @@ def ollama_once(base_url: str, model: str, prompt: str, max_new_tokens: int) -> 
     peak = [0.0]
     stop = threading.Event()
     sampler = threading.Thread(
-        target=sample_memory, args=(stop, peak), kwargs={"container_name": "ollama"}, daemon=True
+        target=sample_memory, args=(stop, peak), kwargs={"container_name": "ollama", "container_fallbacks": ("seka-ollama",)}, daemon=True
     )
     sampler.start()
     try:
