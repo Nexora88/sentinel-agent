@@ -324,7 +324,7 @@ async def api_status(authorization: Optional[str] = Header(None)):
     cur = p.curiosity.get_status()
     return {
         "brand": "MKAOS",
-        "version": "6.3",
+        "version": "6.5",
         "status": "ok",
         "ollama": _ollama_status(p),
         "rag": p.memory.stats(),
