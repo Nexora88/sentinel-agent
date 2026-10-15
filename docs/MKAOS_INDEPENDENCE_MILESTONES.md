@@ -75,3 +75,15 @@ Uzun vadeli hedef, MKAOS'un kendi model dosya biçimi, tokenizer'ı, CPU çıkar
 - [ ] Fiziksel GPU/HPU cihaz testleri, ortak kalıcı dağıtık durum katmanı ve canlı mTLS peer taşıması ayrı kabul kapıları olarak açık kalıyor.
 
 Doğrulayıcı yalnızca metadata tutarlılığı kontrol eder; lisans iznini, kaynağın doğruluğunu veya modelin niteliğini sertifikalandırmaz.
+
+
+## 2026-10-16 — sıfırdan yerel model eğitim hattı
+- [x] Önceden eğitilmiş model ağırlığı indirmeyen, rastgele başlatılmış MKAOS GQA/SwiGLU decoder'ı için PyTorch eğitim betiği eklendi: `tools/train_mkaos_from_scratch.py`.
+- [x] UTF-8 byte tokenizer sözleşmesi ve Rust `MKAOSW1` checkpoint biçimine aktarım eklendi; Rust motoruyla aynı split-half RoPE konvansiyonu kullanılır.
+- [x] Korpus içeriği SHA-256/manifest eşleştirmesi, manifest dışı örnek engeli ve boş test split'i reddi için testler eklendi.
+- [ ] Eğitim için yetkili gerçek Türkçe korpus henüz sağlanmadı; eğitilmiş MKAOS checkpoint'i veya kullanılabilir Türkçe kalite sonucu henüz üretilmedi.
+- [ ] Eğitilen checkpoint'in Rust decoder ile uçtan uca yükleme/üretim testi ve bağımsız Türkçe held-out değerlendirmesi henüz geçmedi.
+- [ ] HTTP sohbet servisi üçüncü taraf SmolLM2 adayını kullanmaya devam ediyor; yerel model üretim varsayılanına alınmadı.
+- [ ] CUDA/ROCm/Metal/Gaudi fiziksel cihaz testi, yatay Kubernetes ve paylaşılan kalıcı durum, canlı mTLS mesh/sertifika iptali ve çok düğümlü güvenlik testleri açık kabul kapıları olarak kalıyor.
+
+Bu adım bir **eğitim altyapısı** ekler; eğitimin gerçekten çalıştırıldığı, modelin iyi Türkçe bildiği veya yüzde yüz yerli üretim sistemine ulaşıldığı iddiası değildir.
