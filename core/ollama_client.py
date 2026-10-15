@@ -132,8 +132,12 @@ class OllamaClient:
 
         # CrewAI's current Agent schema does not accept LangChain ChatOllama directly.
         # The explicit ollama/ provider and validated local base_url keep inference local.
-        return LLM(
-            model=f"ollama/{self.model_name}",
-            base_url=self.chat_base_url,
-            temperature=self.temperature,
-        )
+        options = {
+            "model": f"ollama/{self.model_name}",
+            "base_url": self.chat_base_url,
+            "temperature": self.temperature,
+        }
+        if self.mkaos_enabled:
+            options["top_p"] = self.top_p
+            options["repeat_penalty"] = self.repetition_penalty
+        return LLM(**options)
