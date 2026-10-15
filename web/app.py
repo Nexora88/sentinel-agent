@@ -695,7 +695,7 @@ async def api_finance_cycle(authorization: Optional[str] = Header(None)):
 async def api_image(req: ImageRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
     try:
-        return get_pipeline().media_bridge.execute("generate", {"prompt": req.prompt, "width": req.width, "height": req.height})
+        return await asyncio.to_thread(get_pipeline().media_bridge.execute, "generate", {"prompt": req.prompt, "width": req.width, "height": req.height})
     except Exception as exc:
         from tools.image_gen import MediaToolError
         if isinstance(exc, MediaToolError):
@@ -711,7 +711,7 @@ async def api_media_edit(prompt: str = Form(...), file: UploadFile = File(...), 
     if len(raw) > 12 * 1024 * 1024:
         raise HTTPException(413, "Görsel en fazla 12 MB olabilir.")
     try:
-        return get_pipeline().media_bridge.execute("edit", {"prompt": prompt, "image_bytes": raw})
+        return await asyncio.to_thread(get_pipeline().media_bridge.execute, "edit", {"prompt": prompt, "image_bytes": raw})
     except Exception as exc:
         from tools.image_gen import MediaToolError
         if isinstance(exc, MediaToolError):
@@ -727,7 +727,7 @@ async def api_media_background(file: UploadFile = File(...), color: str = Form("
     if len(raw) > 12 * 1024 * 1024:
         raise HTTPException(413, "Görsel en fazla 12 MB olabilir.")
     try:
-        return get_pipeline().media_bridge.execute("background", {"image_bytes": raw, "color": color})
+        return await asyncio.to_thread(get_pipeline().media_bridge.execute, "background", {"image_bytes": raw, "color": color})
     except Exception as exc:
         from tools.image_gen import MediaToolError
         if isinstance(exc, MediaToolError):
@@ -745,7 +745,7 @@ class VideoRequest(BaseModel):
 async def api_media_video(req: VideoRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
     try:
-        return get_pipeline().media_bridge.execute("video", {"filename": req.filename, "duration": req.duration})
+        return await asyncio.to_thread(get_pipeline().media_bridge.execute, "video", {"filename": req.filename, "duration": req.duration})
     except Exception as exc:
         from tools.image_gen import MediaToolError
         if isinstance(exc, MediaToolError):
@@ -795,7 +795,7 @@ async def api_media_queue(req: MediaQueueRequest, authorization: Optional[str] =
 async def api_media_run_job(job_id: str, authorization: Optional[str] = Header(None)):
     get_user(authorization)
     try:
-        return get_pipeline().media_engine.run_job(job_id)
+        return await asyncio.to_thread(get_pipeline().media_engine.run_job, job_id)
     except Exception as exc:
         raise HTTPException(400, str(exc))
 
