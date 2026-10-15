@@ -51,6 +51,59 @@ class NativeHashEmbeddingTests(unittest.TestCase):
                 self.assertEqual(store.stats()["embedding_provider"], "mkaos-native")
                 ollama.embeddings.assert_not_called()
 
+    def test_native_memory_survives_store_reopen(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(
+            os.environ, {"SEKA_EMBEDDINGS_PROVIDER": "mkaos-native"}
+        ):
+            directory = str(Path(temp) / "persistent-memory")
+            first = MemoryStore(persist_directory=directory, collection_name="native_restart_test")
+            first.add_texts(
+                ["Trakya tarlalarında toprak nemi ve yağış sulama kararını etkiler."],
+                [{"source": "farm-notes"}],
+            )
+            self.assertEqual(first.stats()["documents"], 1)
+            del first
+
+            reopened = MemoryStore(
+                persist_directory=directory, collection_name="native_restart_test"
+            )
+            results = reopened.search("Toprak nemi sulama ve yağış", k=1)
+            self.assertTrue(results)
+            self.assertEqual(results[0].metadata["source"], "farm-notes")
+
+    def test_tenant_scoped_search_does_not_return_other_tenant_documents(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(
+            os.environ, {"SEKA_EMBEDDINGS_PROVIDER": "mkaos-native"}
+        ):
+            directory = str(Path(temp) / "shared-memory")
+            alice = MemoryStore(
+                persist_directory=directory,
+                collection_name="native_tenant_isolation_test",
+                tenant_id="alice",
+            )
+            bob = MemoryStore(
+                persist_directory=directory,
+                collection_name="native_tenant_isolation_test",
+                tenant_id="bob",
+            )
+            alice.add_texts(
+                ["Alice özel notu: mor sümbül yetiştirme takvimi."],
+                [{"source": "alice-private"}],
+            )
+            bob.add_texts(
+                ["Bob özel notu: mavi ladin budama takvimi."],
+                [{"source": "bob-private"}],
+            )
+
+            alice_results = alice.search("özel not yetiştirme takvimi", k=10)
+            bob_results = bob.search("özel not budama takvimi", k=10)
+            alice_sources = {doc.metadata.get("source") for doc in alice_results}
+            bob_sources = {doc.metadata.get("source") for doc in bob_results}
+            self.assertIn("alice-private", alice_sources)
+            self.assertNotIn("bob-private", alice_sources)
+            self.assertIn("bob-private", bob_sources)
+            self.assertNotIn("alice-private", bob_sources)
+
     def test_unknown_embedding_provider_fails_closed(self):
         with tempfile.TemporaryDirectory() as temp:
             with patch.dict(os.environ, {"SEKA_EMBEDDINGS_PROVIDER": "remote-api"}):
