@@ -19,6 +19,6 @@ Only safetensors and JSON/text files are in scope. Do not load or execute pickle
 
 ## Compatibility gate
 
-This is a real candidate model, not a currently supported Rust runtime model. SmolLM2 uses a Llama-style decoder with grouped-query attention and a BPE tokenizer/chat template. The existing `ByteTokenizer` is not compatible. The safetensors converter is a format converter, not a model architecture mapper. Do not claim inference compatibility until the exact weights, tensor mapping, tokenizer output, and logits have been validated against the official reference.
+This is a real candidate model with a newly added but not yet validated Rust loading path. The mkaos-hf-adapter crate now maps standard Llama tensor names and F32/F16/BF16 SafeTensors values into the multi-layer GQA decoder; mkaos_generate and mkaos_logits are available as local binaries. The existing ByteTokenizer remains incompatible with this model; use the Hugging Face tokenizer.json adapter. Do not claim inference compatibility until the exact files are downloaded and tools/validate_tokenizer.py plus tools/validate_model_logits.py pass against the official reference.
 
-The model card describes the model as primarily English. Turkish quality must be measured. Ollama remains the fallback until identical prompt-set tests establish quality, stability, latency, and memory thresholds.
+The model card describes the model as primarily English. Turkish quality must be measured. tools/benchmark_mkaos_vs_ollama.py provides a same-device prompt runner, but has not been run against real artifacts here. Ollama remains the fallback until identical prompt-set tests establish quality, stability, latency, and memory thresholds.
