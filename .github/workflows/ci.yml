@@ -27,5 +27,12 @@ jobs:
         run: python -m compileall -q agents core scripts tools web
       - name: Check frontend JavaScript syntax
         run: node --check web/static/app.js
+      - name: Validate Docker Compose profiles
+        run: |
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.offline.yml config --quiet
+          docker compose -f docker-compose.bootstrap.yml config --quiet
+      - name: Build container image
+        run: docker build --tag seka-agent-ci .
       - name: Run security regression tests
         run: python -m unittest discover -s tests -v
