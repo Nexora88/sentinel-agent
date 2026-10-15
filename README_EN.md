@@ -47,7 +47,7 @@ Set these environment variables to match the exact HTTPS website origin:
 - REQUIRE_HTTPS=true: reject non-HTTPS non-local requests.
 - TRUST_PROXY_HEADERS=true: only when a trusted reverse proxy strips incoming forwarded headers and sets its own X-Forwarded-Proto.
 
-The default origin http://localhost:8000 is for local development only. Passkey browser operations require frontend code using navigator.credentials.create() and navigator.credentials.get(); the API provides registration/authentication options and verification endpoints, but a browser UI still needs to call them and correctly serialize/deserialize WebAuthn binary fields.
+The default origin http://localhost:8000 is for local development only. Passkey browser operations require frontend code using navigator.credentials.create() and navigator.credentials.get(); the browser UI includes passkey sign-in and a signed-in sidebar action to register a passkey. Browser compatibility and hardware-specific acceptance testing are still required.
 
 API flow:
 
@@ -63,12 +63,13 @@ Challenges expire after three minutes and are single-use. Registration is bound 
 
 Optional encrypted personal-profile mode:
 
-- MKAOS_ENCRYPT_PERSONAL_PROFILE=true
+- MKAOS_ENCRYPT_MEMORY_FILES=true (encrypts the personal profile, chat-history JSON, and account store)
+- MKAOS_ENCRYPT_PERSONAL_PROFILE=true (encrypts only the personal profile)
 - MKAOS_MEMORY_KEY=<base64-encoded-random-32-byte-key>
 
 The key must be provided out-of-band and kept outside the repository and data volume. Losing the key means losing access to the encrypted profile. When encrypted mode is enabled, a legacy plaintext profile.json is not automatically migrated or ignored; stop and perform a reviewed migration. When disabled, backward-compatible plaintext profile mode remains.
 
-**This does not encrypt all application storage.** Chroma/RAG vectors, conversation history, user records, uploads, generated media, logs, and backups need separate protection. For production, use full-disk/volume encryption and an external OS credential vault or secret manager; include restore drills and a data inventory in acceptance testing.
+**This does not encrypt all application storage.** Chroma/RAG vectors, uploads, generated media, logs, backups, and the WebAuthn public-credential registry need separate protection. Use full-disk/volume encryption for the whole data volume. For production, use full-disk/volume encryption and an external OS credential vault or secret manager; include restore drills and a data inventory in acceptance testing.
 
 ## Local image and video generation
 
