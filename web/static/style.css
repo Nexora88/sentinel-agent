@@ -558,3 +558,5 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .control-actions input { flex:1; min-width:170px; }
 .control-card pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:360px; overflow:auto; }
 @media (max-width:850px) { .control-grid { grid-template-columns:1fr; } }
+
+#forget-memory-result { color:var(--text-muted); }
