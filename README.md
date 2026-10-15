@@ -6,9 +6,9 @@ SEKA; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik ta
 
 ## Gizlilik modeli ve sınırlar
 
-- **Yerel çıkarım:** Ollama modelleri kendi cihazında çalışır. Varsayılan model \`qwen2.5-coder:7b\`; embedding modeli \`nomic-embed-text\`.
-- **Yerel saklama:** bellek, kullanıcılar ve vektör deposu yerel proje/volume içinde tutulur. Bu dizini şifreli disk üzerinde tut ve yedekle.
-- **Ağ kullanımı isteğe bağlıdır:** araştırma özellikleri web'e bağlanabilir; GitHub token'ı GitHub'a istek gönderir. Üçüncü taraf bildirim sağlayıcıları da veri dışarı çıkarır. Tam çevrimdışı kullanım için bu özellikleri çalıştırma, kimlik bilgilerini tanımlama ve ağ çıkışını işletim sistemi/firewall seviyesinde kısıtla.
+- **Yerel çıkarım:** Ollama istemcisi yalnızca loopback veya yerel Docker uç noktasını kabul eder; uzak model/API uç noktaları reddedilir. Varsayılan model \`qwen2.5-coder:7b\`; embedding modeli \`nomic-embed-text\`.
+- **Yerel saklama:** kullanıcıya göre ayrılmış sohbet geçmişi ve onay günlüğü atomik dosya yazımıyla yerel `memory/` içinde tutulur; bozuk veri sessizce sıfırlanmaz. Bellek ve vektör deposu da yerel proje/volume içindedir. Bu dizini şifreli disk üzerinde tut ve yedekle.
+- **Web araştırması kapalı başlar:** `ALLOW_WEB_RESEARCH=false` iken bilgi genişletme arama sorgusu göndermez. Bilerek açarsan arama sorguları ve sayfa istekleri internete çıkar. GitHub token'ı GitHub'a istek gönderir. Üçüncü taraf bildirim sağlayıcıları da veri dışarı çıkarır. Tam çevrimdışı kullanım için bu özellikleri çalıştırma, kimlik bilgilerini tanımlama ve ağ çıkışını işletim sistemi/firewall seviyesinde kısıtla.
 - **Onay varsayılanı açık:** GitHub yazma, commit, push ve dosya değişiklikleri otomatik yapılmamalıdır. Her onay kararlı bir istek kimliğine bağlıdır.
 - **Savunmacı tarama:** web tarayıcısı yerel/özel IP'leri ve doğrulanmayan yönlendirmeleri engeller. Yalnızca sahibi olduğun veya tarama iznin olan hedeflerde kullan.
 - **Güvenlik dürüstlüğü:** uygulama tek başına “veri asla dışarı çıkamaz” garantisi veremez. Bu; uygulama ayarlarına, işletim sistemi/firewall'a, model endpoint'ine, yedeklemeye ve etkinleştirilen entegrasyonlara bağlıdır.
@@ -55,6 +55,7 @@ python -m scripts.run secrets --path .
 python -m scripts.run licenses --path .
 python -m scripts.run permissions
 python -m unittest discover -s tests -v
+node --check web/static/app.js
 \`\`\`
 
 ## Kalıcı veri ve yedek
