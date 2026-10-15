@@ -39,6 +39,7 @@ from core.local_voice import LocalVoiceError, voice_status, synthesize as synthe
 from core.night_scheduler import NightScheduler
 from core.safety.sovereignty import sovereignty_status
 from core.approval_protocol import SignedApprovalProtocol, ApprovalProtocolError
+from core.integrations.catalog import integration_status
 from tools.clean_room_audit import scan_code_cleanliness
 
 logging.basicConfig(level=logging.INFO)
@@ -350,6 +351,7 @@ async def api_status(authorization: Optional[str] = Header(None)):
             "privacy": {"web_research": False, "external_finance_data": False, "site_scanning": False, "external_notifications": False, "github_network_access": False},
             "night_scheduler": night_scheduler.status() if night_scheduler else {"enabled": False, "running": False},
             "sovereignty": sovereignty_status(),
+            "integrations": integration_status(),
         }
     uni = p.expander.get_status()
     fin = p.finance_status()
@@ -359,6 +361,7 @@ async def api_status(authorization: Optional[str] = Header(None)):
         "version": "6.5",
         "status": "ok",
         "sovereignty": sovereignty_status(),
+        "integrations": integration_status(),
         "ollama": _ollama_status(p),
         "rag": p.memory.stats(),
         "user": user,
