@@ -7,6 +7,8 @@ Run it on the target physical device and preserve the JSON report with the sourc
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 import hashlib
 import math
 import json
@@ -127,7 +129,7 @@ def wait_healthy(url: str, process: subprocess.Popen[str], timeout: float) -> fl
 def launch(command: list[str], env: dict[str, str]) -> subprocess.Popen[str]:
     return subprocess.Popen(
         command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        text=True, env=env, start_new_session=True,
+        text=True, env=env, start_new_session=(os.name != "nt"),
     )
 
 
@@ -135,11 +137,17 @@ def stop_process(process: subprocess.Popen[str]) -> None:
     if process.poll() is not None:
         return
     try:
-        os.killpg(process.pid, signal.SIGTERM)
+        if os.name == "nt":
+            process.terminate()
+        else:
+            os.killpg(process.pid, signal.SIGTERM)
         process.wait(timeout=8)
     except (OSError, subprocess.TimeoutExpired):
         try:
-            os.killpg(process.pid, signal.SIGKILL)
+            if os.name == "nt":
+                process.kill()
+            else:
+                os.killpg(process.pid, signal.SIGKILL)
         except OSError:
             pass
         try:
@@ -150,12 +158,25 @@ def stop_process(process: subprocess.Popen[str]) -> None:
 
 def sample_rss_mib(pid: int) -> float | None:
     status = Path(f"/proc/{pid}/status")
-    try:
-        for line in status.read_text(encoding="utf-8").splitlines():
-            if line.startswith("VmRSS:"):
-                return round(int(line.split()[1]) / 1024, 3)
-    except (OSError, ValueError, IndexError):
-        return None
+    if status.exists():
+        try:
+            for line in status.read_text(encoding="utf-8").splitlines():
+                if line.startswith("VmRSS:"):
+                    return round(int(line.split()[1]) / 1024, 3)
+        except (OSError, ValueError, IndexError):
+            return None
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True, text=True, timeout=2, check=False,
+            )
+            rows = list(csv.reader(io.StringIO(result.stdout)))
+            if rows and len(rows[0]) >= 5 and str(pid) in rows[0][1]:
+                memory = rows[0][4].replace(",", "").replace(" K", "").replace("K", "").strip()
+                return round(float(memory) / 1024, 3)
+        except (OSError, ValueError, IndexError, subprocess.TimeoutExpired):
+            return None
     return None
 
 
