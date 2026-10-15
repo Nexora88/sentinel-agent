@@ -13,6 +13,7 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urljoin
 from typing import Any, Dict, List, Optional, Set
 
 import requests
@@ -21,6 +22,7 @@ from bs4 import BeautifulSoup
 from core.ollama_client import OllamaClient
 from core.rag import MemoryStore
 from core.safety import sanitize_web_content, contains_injection, source_credibility
+from tools.website_scanner import UnsafeTarget, validate_public_url
 
 logger = logging.getLogger("sentinel.knowledge_expander")
 
@@ -91,6 +93,7 @@ class KnowledgeExpander:
             "Accept": "text/html,application/xhtml+xml",
             "Accept-Language": "en-US,en;q=0.9,tr;q=0.8",
         })
+        self.session.trust_env = False
 
     def _load_visited(self) -> Set[str]:
         if self.visited_path.exists():
@@ -154,33 +157,65 @@ class KnowledgeExpander:
             return []
 
     def _extract_content(self, url: str) -> Optional[str]:
+        """Fetch bounded HTML from public hosts; validate every redirect to reduce SSRF."""
+        current = url
+        response = None
         try:
-            resp = self.session.get(url, timeout=12, allow_redirects=True)
-            if resp.status_code != 200:
-                return None
-            if "text/html" not in resp.headers.get("Content-Type", ""):
-                return None
-            try:
-                import trafilatura
-                text = trafilatura.extract(
-                    resp.text, include_comments=False, include_tables=False, favor_precision=True
+            for _ in range(4):
+                validate_public_url(current)
+                response = self.session.get(
+                    current, timeout=12, allow_redirects=False, stream=True
                 )
-                if text and len(text) > 300:
-                    return sanitize_web_content(text[:12000])
-            except ImportError:
-                pass
-            soup = BeautifulSoup(resp.text, "lxml")
-            for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
-                tag.decompose()
-            text = soup.get_text(separator="\n", strip=True)
-            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-            text = "\n".join(lines)
-            if len(text) < 300:
-                return None
-            return sanitize_web_content(text[:12000])
-        except Exception as e:
-            logger.debug(f"Extract failed for {url}: {e}")
+                if response.status_code in {301, 302, 303, 307, 308}:
+                    location = response.headers.get("Location")
+                    response.close()
+                    response = None
+                    if not location:
+                        return None
+                    current = urljoin(current, location)
+                    continue
+                if response.status_code != 200:
+                    return None
+                if "text/html" not in response.headers.get("Content-Type", ""):
+                    return None
+                declared_size = response.headers.get("Content-Length")
+                if declared_size and int(declared_size) > 2 * 1024 * 1024:
+                    return None
+                chunks = []
+                total = 0
+                for chunk in response.iter_content(chunk_size=65536):
+                    if not chunk:
+                        continue
+                    total += len(chunk)
+                    if total > 2 * 1024 * 1024:
+                        return None
+                    chunks.append(chunk)
+                html = b"".join(chunks).decode(response.encoding or "utf-8", errors="replace")
+                try:
+                    import trafilatura
+                    text = trafilatura.extract(
+                        html, include_comments=False, include_tables=False, favor_precision=True
+                    )
+                    if text and len(text) > 300:
+                        return sanitize_web_content(text[:12000])
+                except ImportError:
+                    pass
+                soup = BeautifulSoup(html, "lxml")
+                for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
+                    tag.decompose()
+                text = soup.get_text(separator="\n", strip=True)
+                lines = [line.strip() for line in text.splitlines() if line.strip()]
+                text = "\n".join(lines)
+                if len(text) < 300:
+                    return None
+                return sanitize_web_content(text[:12000])
             return None
+        except (RequestException, UnsafeTarget, ValueError) as exc:
+            logger.debug("Safe page extraction stopped (%s)", type(exc).__name__)
+            return None
+        finally:
+            if response is not None:
+                response.close()
 
     def _summarize(self, title: str, content: str, topic: str) -> str:
         if contains_injection(content):
