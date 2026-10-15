@@ -1,0 +1,21 @@
+# Never send local secrets, conversations, databases or voice models to Docker build context.
+.env
+.env.*
+!.env.example
+memory/
+models/
+chroma/
+*.db
+*.sqlite3
+*.pem
+*.key
+*.p12
+*.pfx
+.git/
+.github/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.log
+tests/

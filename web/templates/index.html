@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SEKA v5 — Egemen Kişisel Ajan</title>
+  <title>SEKA v6.2 — Yerel Türkçe Ajan</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -13,7 +13,7 @@
         <span class="logo-icon">◈</span>
         <div class="logo-text">
           <span class="brand">SEKA</span>
-          <span class="tag">v5 · yerel · apisiz</span>
+          <span class="tag">v6.2 · yerel · güvenli</span>
         </div>
       </div>
       <nav>
@@ -42,7 +42,7 @@
       <section id="panel-bridge" class="panel active">
         <header class="panel-header">
           <h1>Komut Köprüsü</h1>
-          <p>SEKA v5 — plan, canlı işler, bilgi paketi. Ücretli API yok.</p>
+          <p>SEKA v6.2 — yerel Türkçe ajan. Ağ özellikleri varsayılan olarak kapalıdır.</p>
         </header>
         <div class="quick-grid">
           <button class="qcard" data-cmd="expand">🌌 Bilgi genişlet</button>
@@ -55,8 +55,24 @@
           <button class="qcard" data-cmd="plan">🗺 Plan oluştur</button>
         </div>
         <div id="chat-messages" class="chat-messages"></div>
+        <div class="voice-console">
+          <div class="voice-console-heading">
+            <div><strong>Türkçe ses stüdyosu</strong><p>Ses tanıma ve seslendirme yerel modellerle çalışır; tarayıcı bulut sesi kullanılmaz.</p></div>
+            <span id="voice-status" class="voice-status">Yerel ses denetleniyor…</span>
+          </div>
+          <div class="voice-controls">
+            <label for="voice-select">Ses karakteri</label>
+            <select id="voice-select">
+              <option value="male">Erkek · tok ve bilge</option>
+              <option value="female">Kadın · enerjik ve net</option>
+            </select>
+            <label class="cat-toggle"><input type="checkbox" id="cat-dub-toggle" /> 🐈 Kedi dublajı</label>
+            <button id="voice-test-btn" type="button">Sesi dene</button>
+            <button id="voice-stop-btn" type="button" class="voice-stop">Durdur</button>
+          </div>
+        </div>
         <div class="chat-input-area">
-          <button id="voice-btn" title="Sesli komut" class="icon-btn">🎤</button>
+          <button id="voice-btn" title="Yerel Türkçe sesli komut" class="icon-btn">🎤</button>
           <textarea id="chat-input" placeholder="Emir veya hedef yaz... (plan için: planla: ...)" rows="2"></textarea>
           <button id="send-btn">Gönder</button>
         </div>
@@ -224,6 +240,8 @@
       <section id="panel-approvals" class="panel">
         <header class="panel-header"><h1>Onaylar</h1></header>
         <div id="approvals-list" class="approvals-list"><p class="empty">Yok</p></div>
+        <h3 class="section-h">İşlem geçmişi</h3>
+        <div id="approval-history" class="approvals-list"><p class="empty">Geçmiş yükleniyor…</p></div>
       </section>
 
       <section id="panel-status" class="panel">

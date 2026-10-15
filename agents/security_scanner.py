@@ -52,18 +52,12 @@ class SecurityScannerAgent:
                 f"Relevant memory:\n{context}\n\n"
                 f"Code:\n```{language}\n{content}\n```\n\n"
                 "Look for:\n"
-                "- Injection risks
-"
-                "- Hardcoded secrets / credentials
-"
-                "- Insecure deserialization
-"
-                "- Path traversal
-"
-                "- Weak cryptography
-"
-                "- Authentication / authorization issues
-"
+                "- Injection risks\n"
+                "- Hardcoded secrets / credentials\n"
+                "- Insecure deserialization\n"
+                "- Path traversal\n"
+                "- Weak cryptography\n"
+                "- Authentication / authorization issues\n"
                 "- Any OWASP Top 10 related problems\n\n"
                 "Output format:\n"
                 "- Severity (Critical / High / Medium / Low)\n"

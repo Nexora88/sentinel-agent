@@ -53,13 +53,10 @@ class CodeReviewerAgent:
                 f"Relevant past knowledge from memory:\n{context}\n\n"
                 f"Code to review:\n```{language}\n{content}\n```\n\n"
                 "Provide a clear review with:\n"
-                "1. Critical issues (bugs / crashes / security)
-"
-                "2. Important improvements
-"
-                "3. Minor suggestions
-"
-                "4. Positive notes (what is good)\n\n"
+                "1. Critical issues (bugs / crashes / security)\n"
+                "2. Important improvements\n"
+                "3. Minor suggestions\n"
+                "4. Positive notes (what is good)\n"
                 "Be specific. Show line references when possible. "
                 "Only suggest changes that are safe."
             ),

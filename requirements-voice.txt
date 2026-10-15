@@ -1,0 +1,4 @@
+-r requirements.txt
+# Optional offline Turkish voice engine; install only if you want local TTS/STT.
+piper-tts>=1.2.0
+faster-whisper>=1.0.0

@@ -89,6 +89,15 @@ def main():
     p_webui.add_argument("--host", type=str, default="0.0.0.0")
 
     args = parser.parse_args()
+
+    # The web panel must start even when Ollama/Chroma cannot initialize yet.
+    # Initialize the full agent graph only for commands that actually need it.
+    if args.command == "web":
+        import uvicorn
+        print(f"◈ SEKA → http://{args.host}:{args.port}")
+        uvicorn.run("web.app:app", host=args.host, port=args.port, reload=False, log_level="info")
+        return
+
     pipeline = SentinelPipeline()
 
     if args.command == "review":
@@ -221,10 +230,6 @@ def main():
                     print(f"\nSEKA: {pipeline.chat(u)}\n")
                 except (KeyboardInterrupt, EOFError):
                     break
-    elif args.command == "web":
-        import uvicorn
-        print(f"◈ SEKA → http://{args.host}:{args.port}")
-        uvicorn.run("web.app:app", host=args.host, port=args.port, reload=False, log_level="info")
     else:
         parser.print_help()
 

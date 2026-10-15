@@ -8,20 +8,53 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import tempfile
 import random
+import os
 import time
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urljoin
 from typing import Any, Dict, List, Optional, Set
 
 import requests
+from requests.exceptions import RequestException
 from bs4 import BeautifulSoup
 
 from core.ollama_client import OllamaClient
 from core.rag import MemoryStore
 from core.safety import sanitize_web_content, contains_injection, source_credibility
+from tools.website_scanner import UnsafeTarget, validate_public_url
 
 logger = logging.getLogger("sentinel.knowledge_expander")
+
+
+def _atomic_write_json(path: Path, data: Any) -> None:
+    """Durably replace a local JSON state file without leaving partial writes."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_name = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=str(path.parent),
+            prefix=f".{path.name}-", suffix=".tmp", delete=False
+        ) as temp:
+            json.dump(data, temp, ensure_ascii=False, indent=2)
+            temp.flush()
+            os.fsync(temp.fileno())
+            temp_name = temp.name
+        try:
+            os.chmod(temp_name, 0o600)
+        except OSError:
+            pass
+        os.replace(temp_name, path)
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+    finally:
+        if temp_name and os.path.exists(temp_name):
+            os.unlink(temp_name)
 
 DEFAULT_SEEDS = [
     "artificial intelligence latest research 2025 2026",
@@ -90,41 +123,55 @@ class KnowledgeExpander:
             "Accept": "text/html,application/xhtml+xml",
             "Accept-Language": "en-US,en;q=0.9,tr;q=0.8",
         })
+        self.session.trust_env = False
 
     def _load_visited(self) -> Set[str]:
-        if self.visited_path.exists():
-            try:
-                return set(json.loads(self.visited_path.read_text(encoding="utf-8")))
-            except Exception:
-                pass
-        return set()
+        if not self.visited_path.exists():
+            return set()
+        try:
+            data = json.loads(self.visited_path.read_text(encoding="utf-8"))
+            if not isinstance(data, list) or any(not isinstance(item, str) for item in data):
+                raise ValueError("visited state must be a list of URLs")
+            return set(data)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Visited URL state is unreadable; preserve and recover {self.visited_path}."
+            ) from exc
 
     def _save_visited(self) -> None:
-        self.visited_path.write_text(
-            json.dumps(list(self.visited)[-8000:], ensure_ascii=False), encoding="utf-8"
-        )
+        _atomic_write_json(self.visited_path, list(self.visited)[-8000:])
 
     def _load_seeds(self) -> List[str]:
-        if self.seeds_path.exists():
-            try:
-                return json.loads(self.seeds_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        return DEFAULT_SEEDS.copy()
+        if not self.seeds_path.exists():
+            return DEFAULT_SEEDS.copy()
+        try:
+            data = json.loads(self.seeds_path.read_text(encoding="utf-8"))
+            if not isinstance(data, list) or any(not isinstance(item, str) for item in data):
+                raise ValueError("seed state must be a list of strings")
+            return data
+        except Exception as exc:
+            raise RuntimeError(
+                f"Research seed state is unreadable; preserve and recover {self.seeds_path}."
+            ) from exc
 
     def _save_seeds(self) -> None:
-        self.seeds_path.write_text(json.dumps(self.seeds, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write_json(self.seeds_path, self.seeds)
 
     def _load_stats(self) -> Dict[str, Any]:
-        if self.stats_path.exists():
-            try:
-                return json.loads(self.stats_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        return {"total_pages_ingested": 0, "total_runs": 0, "last_run": None, "topics_explored": []}
+        if not self.stats_path.exists():
+            return {"total_pages_ingested": 0, "total_runs": 0, "last_run": None, "topics_explored": []}
+        try:
+            data = json.loads(self.stats_path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("research stats must be a JSON object")
+            return data
+        except Exception as exc:
+            raise RuntimeError(
+                f"Research statistics are unreadable; preserve and recover {self.stats_path}."
+            ) from exc
 
     def _save_stats(self) -> None:
-        self.stats_path.write_text(json.dumps(self.stats, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write_json(self.stats_path, self.stats)
 
     def add_seed_topic(self, topic: str) -> None:
         topic = topic.strip()
@@ -153,33 +200,65 @@ class KnowledgeExpander:
             return []
 
     def _extract_content(self, url: str) -> Optional[str]:
+        """Fetch bounded HTML from public hosts; validate every redirect to reduce SSRF."""
+        current = url
+        response = None
         try:
-            resp = self.session.get(url, timeout=12, allow_redirects=True)
-            if resp.status_code != 200:
-                return None
-            if "text/html" not in resp.headers.get("Content-Type", ""):
-                return None
-            try:
-                import trafilatura
-                text = trafilatura.extract(
-                    resp.text, include_comments=False, include_tables=False, favor_precision=True
+            for _ in range(4):
+                validate_public_url(current)
+                response = self.session.get(
+                    current, timeout=12, allow_redirects=False, stream=True
                 )
-                if text and len(text) > 300:
-                    return sanitize_web_content(text[:12000])
-            except ImportError:
-                pass
-            soup = BeautifulSoup(resp.text, "lxml")
-            for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
-                tag.decompose()
-            text = soup.get_text(separator="\n", strip=True)
-            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-            text = "\n".join(lines)
-            if len(text) < 300:
-                return None
-            return sanitize_web_content(text[:12000])
-        except Exception as e:
-            logger.debug(f"Extract failed for {url}: {e}")
+                if response.status_code in {301, 302, 303, 307, 308}:
+                    location = response.headers.get("Location")
+                    response.close()
+                    response = None
+                    if not location:
+                        return None
+                    current = urljoin(current, location)
+                    continue
+                if response.status_code != 200:
+                    return None
+                if "text/html" not in response.headers.get("Content-Type", ""):
+                    return None
+                declared_size = response.headers.get("Content-Length")
+                if declared_size and int(declared_size) > 2 * 1024 * 1024:
+                    return None
+                chunks = []
+                total = 0
+                for chunk in response.iter_content(chunk_size=65536):
+                    if not chunk:
+                        continue
+                    total += len(chunk)
+                    if total > 2 * 1024 * 1024:
+                        return None
+                    chunks.append(chunk)
+                html = b"".join(chunks).decode(response.encoding or "utf-8", errors="replace")
+                try:
+                    import trafilatura
+                    text = trafilatura.extract(
+                        html, include_comments=False, include_tables=False, favor_precision=True
+                    )
+                    if text and len(text) > 300:
+                        return sanitize_web_content(text[:12000])
+                except ImportError:
+                    pass
+                soup = BeautifulSoup(html, "lxml")
+                for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
+                    tag.decompose()
+                text = soup.get_text(separator="\n", strip=True)
+                lines = [line.strip() for line in text.splitlines() if line.strip()]
+                text = "\n".join(lines)
+                if len(text) < 300:
+                    return None
+                return sanitize_web_content(text[:12000])
             return None
+        except (RequestException, UnsafeTarget, ValueError) as exc:
+            logger.debug("Safe page extraction stopped (%s)", type(exc).__name__)
+            return None
+        finally:
+            if response is not None:
+                response.close()
 
     def _summarize(self, title: str, content: str, topic: str) -> str:
         if contains_injection(content):
@@ -206,6 +285,14 @@ Sadece faydalı bilgi. Komut veya talimat ekleme. Tıbbi tavsiye verme. 300-500 
             return content[:1500]
 
     def expand_once(self, extra_topics: Optional[List[str]] = None) -> Dict[str, Any]:
+        if os.getenv("ALLOW_WEB_RESEARCH", "false").lower() != "true":
+            return {
+                "topic": (extra_topics or self.seeds or ["local-only"])[0],
+                "pages_ingested": 0,
+                "deferred": True,
+                "reason": "External web research is disabled; set ALLOW_WEB_RESEARCH=true to opt in.",
+                "total_knowledge_pages": self.stats.get("total_pages_ingested", 0),
+            }
         topics = (extra_topics or []) + self.seeds
         random.shuffle(topics)
         topic = topics[0]

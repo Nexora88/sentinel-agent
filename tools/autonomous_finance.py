@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 import time
 import uuid
 from datetime import datetime, timedelta
@@ -58,9 +59,17 @@ class AutonomousFinance:
     def _load_state(self) -> Dict[str, Any]:
         if self.state_path.exists():
             try:
-                return json.loads(self.state_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
+                data = json.loads(self.state_path.read_text(encoding="utf-8"))
+                required = {"mode", "cash_usd", "equity_start", "positions", "closed_trades"}
+                if not isinstance(data, dict) or not required.issubset(data):
+                    raise ValueError("paper portfolio has an invalid structure")
+                if not isinstance(data.get("positions"), dict) or not isinstance(data.get("closed_trades"), list):
+                    raise ValueError("paper portfolio collections have invalid types")
+                return data
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Paper portfolio is unreadable; preserve and recover {self.state_path} before restarting."
+                ) from exc
         return {
             "mode": "paper",
             "cash_usd": self.starting_balance,
@@ -75,7 +84,29 @@ class AutonomousFinance:
         }
 
     def _save_state(self) -> None:
-        self.state_path.write_text(json.dumps(self.state, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        temp_name = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=str(self.state_dir),
+                prefix=".portfolio-", suffix=".tmp", delete=False
+            ) as temp:
+                json.dump(self.state, temp, ensure_ascii=False, indent=2)
+                temp.flush()
+                os.fsync(temp.fileno())
+                temp_name = temp.name
+            try:
+                os.chmod(temp_name, 0o600)
+            except OSError:
+                pass
+            os.replace(temp_name, self.state_path)
+            try:
+                os.chmod(self.state_path, 0o600)
+            except OSError:
+                pass
+        finally:
+            if temp_name and os.path.exists(temp_name):
+                os.unlink(temp_name)
 
     def _log_thought(self, thought: str, action: str = "info", meta: Optional[dict] = None) -> None:
         entry = {
@@ -89,7 +120,9 @@ class AutonomousFinance:
 
     # ---------- market data (free) ----------
     def get_price(self, symbol: str) -> Optional[float]:
-        """USDT pair price via CoinGecko simple API (free, no key)."""
+        """Fetch external prices only after an explicit privacy opt-in."""
+        if os.getenv("ALLOW_EXTERNAL_FINANCE_DATA", "false").lower() != "true":
+            return None
         # Map common symbols
         id_map = {
             "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",

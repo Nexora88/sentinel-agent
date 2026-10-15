@@ -6,6 +6,7 @@ No paid APIs required (yfinance + CoinGecko).
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -21,7 +22,9 @@ class FinanceEngine:
         self.ollama = ollama or OllamaClient()
 
     def stock_quote(self, symbol: str) -> Dict[str, Any]:
-        """Get stock/ETF quote via yfinance."""
+        """Get stock/ETF quote via yfinance, only after explicit network opt-in."""
+        if os.getenv("ALLOW_EXTERNAL_FINANCE_DATA", "false").lower() != "true":
+            return {"error": "Dış piyasa verisi gizlilik için kapalı.", "symbol": symbol}
         try:
             import yfinance as yf
             t = yf.Ticker(symbol.upper())
@@ -46,7 +49,9 @@ class FinanceEngine:
             return {"error": str(e), "symbol": symbol}
 
     def crypto_quote(self, coin_id: str = "bitcoin") -> Dict[str, Any]:
-        """CoinGecko free API."""
+        """CoinGecko free API, only after explicit network opt-in."""
+        if os.getenv("ALLOW_EXTERNAL_FINANCE_DATA", "false").lower() != "true":
+            return {"error": "Dış piyasa verisi gizlilik için kapalı.", "id": coin_id}
         try:
             url = f"https://api.coingecko.com/api/v3/simple/price"
             params = {
@@ -88,7 +93,10 @@ class FinanceEngine:
         return "\n".join(lines)
 
     def analyze(self, query: str) -> str:
-        """Natural language finance question → data + LLM insight."""
+        """Natural language finance question → data + local LLM insight."""
+        if os.getenv("ALLOW_EXTERNAL_FINANCE_DATA", "false").lower() != "true":
+            return ("Gizlilik koruması: canlı piyasa verisi için dış ağ erişimi kapalı. "
+                    "Canlı fiyat kullanımı için ALLOW_EXTERNAL_FINANCE_DATA=true ayarını bilinçli olarak aç.")
         # Simple extraction
         lower = query.lower()
         data_parts = []

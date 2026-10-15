@@ -1,6 +1,81 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
+// Authenticated local session. Token is kept in sessionStorage, not in URLs.
+const nativeFetch = window.fetch.bind(window);
+let authToken = sessionStorage.getItem("seka.session") || "";
+let authPromptActive = false;
+async function requestLogin() {
+  if (authToken) return true;
+  if (authPromptActive) return false;
+  authPromptActive = true;
+  try {
+    return await new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        document.querySelector("#seka-auth-overlay")?.remove();
+        resolve(value);
+      };
+      const overlay = document.createElement("div");
+      overlay.id = "seka-auth-overlay";
+      overlay.style.cssText = "position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(3,8,18,.88);padding:20px";
+      overlay.innerHTML = '<form id="seka-auth-form" style="width:min(420px,100%);box-sizing:border-box;background:#111827;color:#f8fafc;border:1px solid #334155;border-radius:16px;padding:24px;font:14px system-ui;box-shadow:0 20px 70px #0009"><h2 style="margin:0 0 8px">SEKA güvenli oturum</h2><p style="color:#94a3b8;margin:0 0 18px">Kimlik bilgileri bu cihazda doğrulanır.</p><label style="display:block;margin:10px 0 6px">Kullanıcı adı</label><input id="seka-auth-user" autocomplete="username" required value="owner" style="box-sizing:border-box;width:100%;padding:12px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff"><label style="display:block;margin:14px 0 6px">Parola</label><input id="seka-auth-password" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff"><p id="seka-auth-error" role="alert" style="color:#fca5a5;min-height:18px"></p><div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" id="seka-auth-cancel" style="padding:10px 14px;border-radius:8px">İptal</button><button type="submit" style="padding:10px 16px;border-radius:8px;background:#14b8a6;color:#042f2e;font-weight:700;border:0">Giriş yap</button></div></form>';
+      document.body.appendChild(overlay);
+      const form = overlay.querySelector("#seka-auth-form");
+      overlay.querySelector("#seka-auth-cancel").addEventListener("click", () => finish(false));
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const username = overlay.querySelector("#seka-auth-user").value.trim();
+        const password = overlay.querySelector("#seka-auth-password").value;
+        const submit = form.querySelector('button[type="submit"]');
+        submit.disabled = true;
+        try {
+          const response = await nativeFetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+          });
+          if (!response.ok) {
+            overlay.querySelector("#seka-auth-error").textContent = "Giriş başarısız. Bilgileri ve OWNER_PASSWORD ayarını kontrol et.";
+            submit.disabled = false;
+            return;
+          }
+          const data = await response.json();
+          authToken = data.token || "";
+          if (authToken) sessionStorage.setItem("seka.session", authToken);
+          finish(Boolean(authToken));
+        } catch (error) {
+          overlay.querySelector("#seka-auth-error").textContent = "Sunucuya bağlanılamadı.";
+          submit.disabled = false;
+        }
+      });
+      overlay.querySelector("#seka-auth-password").focus();
+    });
+  } finally {
+    authPromptActive = false;
+  }
+}
+window.fetch = async (input, init = {}) => {
+  const url = typeof input === "string" ? input : input.url;
+  if (!url || url.includes("/api/login") || !url.includes("/api/")) return nativeFetch(input, init);
+  const sourceHeaders = init.headers || (typeof input !== "string" ? input.headers : undefined);
+  const headers = new Headers(sourceHeaders);
+  if (authToken) headers.set("Authorization", "Bearer " + authToken);
+  let response = await nativeFetch(input, { ...init, headers });
+  if (response.status === 401) {
+    authToken = "";
+    sessionStorage.removeItem("seka.session");
+    if (await requestLogin()) {
+      const retryHeaders = new Headers(sourceHeaders);
+      retryHeaders.set("Authorization", "Bearer " + authToken);
+      response = await nativeFetch(input, { ...init, headers: retryHeaders });
+    }
+  }
+  return response;
+};
+
 function switchPanel(name) {
   $$(".nav-btn").forEach((b) => b.classList.remove("active"));
   $$(".panel").forEach((p) => p.classList.remove("active"));
@@ -29,7 +104,21 @@ const sendBtn = $("#send-btn");
 function addMessage(role, content) {
   const div = document.createElement("div");
   div.className = `message ${role}`;
-  div.textContent = content;
+  const body = document.createElement("div");
+  body.className = "message-content";
+  body.textContent = content;
+  div.appendChild(body);
+  if (role === "assistant") {
+    const actions = document.createElement("div");
+    actions.className = "message-actions";
+    const speak = document.createElement("button");
+    speak.type = "button";
+    speak.className = "message-speak";
+    speak.textContent = "🔊 Seslendir";
+    speak.addEventListener("click", () => speakText(content));
+    actions.appendChild(speak);
+    div.appendChild(actions);
+  }
   chatBox.appendChild(div);
   chatBox.scrollTop = chatBox.scrollHeight;
 }
@@ -106,31 +195,44 @@ async function createPlan(goal) {
 function renderPlan(plan) {
   const box = $("#plan-view");
   if (!box) return;
-  box.innerHTML = "";
+  box.replaceChildren();
   const head = document.createElement("div");
   head.className = "approval-card";
-  head.innerHTML = `
-    <div class="details">
-      <div class="action-name">${plan.goal || plan.id}</div>
-      <div>Durum: ${plan.status} · id ${plan.id}</div>
-    </div>
-    <button class="primary" id="run-plan-btn" data-id="${plan.id}">Güvenli Adımları Çalıştır</button>`;
+  const details = document.createElement("div");
+  details.className = "details";
+  const title = document.createElement("div");
+  title.className = "action-name";
+  title.textContent = String(plan.goal || plan.id || "Plan");
+  const status = document.createElement("div");
+  status.textContent = "Durum: " + String(plan.status || "—") + " · id " + String(plan.id || "—");
+  details.append(title, status);
+  const run = document.createElement("button");
+  run.className = "primary";
+  run.textContent = "Güvenli Adımları Çalıştır";
+  run.addEventListener("click", async () => {
+    const response = await fetch("/api/plan/" + encodeURIComponent(String(plan.id)) + "/run", { method: "POST" });
+    if (response.ok) addMessage("assistant", "Plan güvenli adımları arka planda çalışıyor.");
+    else addMessage("assistant", "Plan başlatılamadı; durum panelini kontrol et.");
+  });
+  head.append(details, run);
   box.appendChild(head);
-  (plan.steps || []).forEach((s, i) => {
+  (plan.steps || []).forEach((step, index) => {
     const div = document.createElement("div");
     div.className = "approval-card";
-    const badge = s.needs_approval ? "🔒 onay" : "⚡ güvenli";
-    div.innerHTML = `
-      <div class="details">
-        <div class="action-name">${i + 1}. ${s.title}</div>
-        <div>${s.type} · ${badge} · ${s.status || "pending"}</div>
-        <div style="color:var(--text-muted);font-size:0.85rem">${s.detail || ""}</div>
-      </div>`;
+    const stepDetails = document.createElement("div");
+    stepDetails.className = "details";
+    const stepTitle = document.createElement("div");
+    stepTitle.className = "action-name";
+    stepTitle.textContent = String(index + 1) + ". " + String(step.title || "Adım");
+    const meta = document.createElement("div");
+    meta.textContent = String(step.type || "işlem") + " · " +
+      (step.needs_approval ? "🔒 onay" : "⚡ güvenli") + " · " + String(step.status || "pending");
+    const description = document.createElement("div");
+    description.className = "plan-step-description";
+    description.textContent = String(step.detail || "");
+    stepDetails.append(stepTitle, meta, description);
+    div.appendChild(stepDetails);
     box.appendChild(div);
-  });
-  $("#run-plan-btn")?.addEventListener("click", async () => {
-    await fetch(`/api/plan/${plan.id}/run`, { method: "POST" });
-    addMessage("assistant", "Plan güvenli adımları arka planda çalışıyor (canlı işler)." );
   });
 }
 
@@ -139,22 +241,27 @@ async function loadPlans() {
     const res = await fetch("/api/plans");
     const data = await res.json();
     const box = $("#plans-list");
-    box.innerHTML = "";
-    (data.plans || []).forEach((p) => {
+    if (!box) return;
+    box.replaceChildren();
+    (data.plans || []).forEach((plan) => {
       const div = document.createElement("div");
       div.className = "approval-card";
-      div.innerHTML = `
-        <div class="details">
-          <div class="action-name">${p.goal}</div>
-          <div>${p.status} · ${(p.steps || []).length} adım</div>
-        </div>
-        <button data-pid="${p.id}">Aç</button>`;
-      div.querySelector("button").addEventListener("click", () => renderPlan(p));
+      const details = document.createElement("div");
+      details.className = "details";
+      const title = document.createElement("div");
+      title.className = "action-name";
+      title.textContent = String(plan.goal || "Adsız plan");
+      const meta = document.createElement("div");
+      meta.textContent = String(plan.status || "—") + " · " + (plan.steps || []).length + " adım";
+      const open = document.createElement("button");
+      open.textContent = "Aç";
+      open.addEventListener("click", () => renderPlan(plan));
+      details.append(title, meta);
+      div.append(details, open);
       box.appendChild(div);
     });
-  } catch (e) {}
+  } catch (_) {}
 }
-
 $("#plan-create-btn")?.addEventListener("click", async () => {
   const goal = $("#plan-goal").value.trim();
   if (!goal) return;
@@ -237,39 +344,153 @@ async function exportPack() {
 
 $("#pack-btn")?.addEventListener("click", exportPack);
 
-// Voice
+// Local-only Turkish voice: no browser SpeechRecognition/TTS cloud fallback.
 const voiceBtn = $("#voice-btn");
-let recognizing = false;
-let recognition = null;
-if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SR();
-  recognition.lang = "tr-TR";
-  recognition.continuous = false;
-  recognition.onresult = (e) => {
-    chatInput.value = e.results[0][0].transcript;
-    sendMessage();
-  };
-  recognition.onend = () => {
-    recognizing = false;
-    voiceBtn.classList.remove("recording");
-    voiceBtn.textContent = "🎤";
-  };
-  recognition.onerror = () => {
-    recognizing = false;
-    voiceBtn.classList.remove("recording");
-  };
-  voiceBtn.addEventListener("click", () => {
-    if (recognizing) {
-      recognition.stop();
+const voiceSelect = $("#voice-select");
+const catDubToggle = $("#cat-dub-toggle");
+const voiceStatus = $("#voice-status");
+let mediaRecorder = null;
+let recordingChunks = [];
+let recordingTimer = null;
+let activeAudio = null;
+let activeAudioUrl = null;
+
+async function loadVoiceStatus() {
+  try {
+    const response = await fetch("/api/voice/status");
+    if (!response.ok) throw new Error("Ses durumu okunamadı");
+    const data = await response.json();
+    const male = data.voices?.male?.configured;
+    const female = data.voices?.female?.configured;
+    const stt = data.whisper_available;
+    const piper = data.piper_available;
+    if (voiceStatus) {
+      voiceStatus.textContent = `Piper ${piper ? "hazır" : "eksik"} · Erkek ${male ? "hazır" : "model eksik"} · Kadın ${female ? "hazır" : "model eksik"} · Yerel STT ${stt ? "hazır" : "model eksik"}`;
+      voiceStatus.classList.toggle("is-ready", Boolean(piper && male && female && stt));
+    }
+    if (voiceBtn && (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder)) {
+      voiceBtn.disabled = true;
+      voiceBtn.title = "Bu tarayıcı yerel ses kaydını desteklemiyor.";
+    }
+  } catch (_) {
+    if (voiceStatus) voiceStatus.textContent = "Ses motoru durumu alınamadı";
+  }
+}
+
+async function speakText(text) {
+  if (activeAudio) {
+    activeAudio.pause();
+    activeAudio = null;
+  }
+  if (activeAudioUrl) {
+    URL.revokeObjectURL(activeAudioUrl);
+    activeAudioUrl = null;
+  }
+  try {
+    const response = await fetch("/api/voice/synthesize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: String(text).slice(0, 4000),
+        voice: voiceSelect?.value || "male",
+        cat_mode: Boolean(catDubToggle?.checked)
+      })
+    });
+    if (!response.ok) {
+      let message = "Yerel ses üretilemedi.";
+      try { message = (await response.json()).detail || message; } catch (_) {}
+      addMessage("assistant", message);
       return;
     }
-    recognizing = true;
+    activeAudioUrl = URL.createObjectURL(await response.blob());
+    activeAudio = new Audio(activeAudioUrl);
+    activeAudio.addEventListener("ended", () => {
+      activeAudio = null;
+      if (activeAudioUrl) URL.revokeObjectURL(activeAudioUrl);
+      activeAudioUrl = null;
+    }, { once: true });
+    await activeAudio.play();
+  } catch (error) {
+    addMessage("assistant", "Yerel ses hatası: " + error.message);
+  }
+}
+
+$("#voice-test-btn")?.addEventListener("click", () => {
+  const text = catDubToggle?.checked
+    ? "Merhaba! Ben SEKA. Bu yerel kedi dublajı denemesidir."
+    : voiceSelect?.value === "female"
+      ? "Merhaba, ben SEKA. Türkçe konuşma kalitemi yerel ses motoruyla test ediyoruz."
+      : "Merhaba. Ben SEKA. Sakin, tok ve anlaşılır Türkçe ses denemesi.";
+  speakText(text);
+});
+
+$("#voice-stop-btn")?.addEventListener("click", () => {
+  if (activeAudio) activeAudio.pause();
+  activeAudio = null;
+  if (activeAudioUrl) URL.revokeObjectURL(activeAudioUrl);
+  activeAudioUrl = null;
+  if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+});
+
+async function transcribeRecording(blob) {
+  const form = new FormData();
+  const extension = blob.type.includes("ogg") ? "ogg" : blob.type.includes("mp4") ? "m4a" : "webm";
+  form.append("file", blob, `seka-speech.${extension}`);
+  if (voiceStatus) voiceStatus.textContent = "Ses yerel modelde çözümleniyor…";
+  try {
+    const response = await fetch("/api/voice/transcribe", { method: "POST", body: form });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Yerel konuşma tanıma başarısız.");
+    chatInput.value = data.text || "";
+    chatInput.focus();
+    if (voiceStatus) voiceStatus.textContent = "Metin hazır · gönder tuşuyla onayla";
+  } catch (error) {
+    addMessage("assistant", error.message);
+    loadVoiceStatus();
+  }
+}
+
+voiceBtn?.addEventListener("click", async () => {
+  if (!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia) {
+    addMessage("assistant", "Bu tarayıcı yerel ses kaydını desteklemiyor.");
+    return;
+  }
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : "";
+    mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    recordingChunks = [];
+    mediaRecorder.addEventListener("dataavailable", (event) => {
+      if (event.data?.size) recordingChunks.push(event.data);
+    });
+    mediaRecorder.addEventListener("stop", async () => {
+      clearTimeout(recordingTimer);
+      stream.getTracks().forEach((track) => track.stop());
+      voiceBtn.classList.remove("recording");
+      voiceBtn.textContent = "🎤";
+      const blob = new Blob(recordingChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+      recordingChunks = [];
+      if (blob.size) await transcribeRecording(blob);
+    }, { once: true });
+    mediaRecorder.start();
     voiceBtn.classList.add("recording");
-    voiceBtn.textContent = "🔴";
-    recognition.start();
-  });
-} else if (voiceBtn) voiceBtn.style.display = "none";
+    voiceBtn.textContent = "⏹";
+    if (voiceStatus) voiceStatus.textContent = "Kayıt açık · en fazla 45 saniye";
+    recordingTimer = setTimeout(() => {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+    }, 45000);
+  } catch (error) {
+    addMessage("assistant", "Mikrofon izni alınamadı: " + error.message);
+  }
+});
+
+loadVoiceStatus();
 
 // SSE jobs
 function renderJobs(jobs) {
@@ -277,47 +498,63 @@ function renderJobs(jobs) {
   const live = $("#job-live");
   if (!jobs || !jobs.length) {
     if (live) live.textContent = "İş yok";
-    if (box) box.innerHTML = '<p class="empty">Canlı iş yok</p>';
+    if (box) box.textContent = "Canlı iş yok";
     return;
   }
   const top = jobs[0];
-  if (live) {
-    live.textContent = `${top.status} · ${top.title} · ${Math.round((top.progress || 0) * 100)}%`;
-  }
+  if (live) live.textContent = String(top.status || "—") + " · " + String(top.title || "İş") + " · " + Math.round((top.progress || 0) * 100) + "%";
   if (!box) return;
-  box.innerHTML = "";
-  jobs.slice(0, 12).forEach((j) => {
+  box.replaceChildren();
+  jobs.slice(0, 12).forEach((job) => {
     const div = document.createElement("div");
     div.className = "approval-card";
-    div.innerHTML = `
-      <div class="details">
-        <div class="action-name">${j.title}</div>
-        <div>${j.kind} · ${j.status} · ${Math.round((j.progress || 0) * 100)}%</div>
-        <div style="color:var(--text-muted);font-size:0.82rem">${j.message || ""}</div>
-      </div>`;
+    const details = document.createElement("div");
+    details.className = "details";
+    const title = document.createElement("div");
+    title.className = "action-name";
+    title.textContent = String(job.title || "İş");
+    const meta = document.createElement("div");
+    meta.textContent = String(job.kind || "iş") + " · " + String(job.status || "—") + " · " + Math.round((job.progress || 0) * 100) + "%";
+    const message = document.createElement("div");
+    message.className = "plan-step-description";
+    message.textContent = String(job.message || "");
+    details.append(title, meta, message);
+    div.appendChild(details);
     box.appendChild(div);
   });
 }
-
-function connectSSE() {
+async function connectSSE() {
+  const cache = new Map();
   try {
-    const es = new EventSource("/api/jobs/stream");
-    const cache = new Map();
-    es.onmessage = (ev) => {
-      try {
-        const j = JSON.parse(ev.data);
-        cache.set(j.id, j);
-        const list = Array.from(cache.values()).sort((a, b) =>
-          (b.updated_at || "").localeCompare(a.updated_at || "")
-        );
-        renderJobs(list);
-      } catch (e) {}
-    };
-    es.onerror = () => {
-      es.close();
+    const response = await fetch("/api/jobs/stream", { headers: { Accept: "text/event-stream" } });
+    if (!response.ok || !response.body) {
       setTimeout(connectSSE, 5000);
-    };
+      return;
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+      for (const event of events) {
+        const line = event.split("\n").find((part) => part.startsWith("data: "));
+        if (!line) continue;
+        try {
+          const job = JSON.parse(line.slice(6));
+          cache.set(job.id, job);
+          const list = Array.from(cache.values()).sort((a, b) =>
+            (b.updated_at || "").localeCompare(a.updated_at || "")
+          );
+          renderJobs(list);
+        } catch (e) {}
+      }
+    }
   } catch (e) {}
+  setTimeout(connectSSE, 5000);
 }
 
 async function loadPulse() {
@@ -461,14 +698,22 @@ async function loadPortfolio() {
     $("#fin-mode").textContent = d.mode || "paper";
     const box = $("#fin-positions");
     const positions = d.open_positions || [];
-    if (!positions.length) box.innerHTML = '<p class="empty">Yok</p>';
-    else {
-      box.innerHTML = "";
-      positions.forEach((p) => {
+    if (!positions.length) {
+      box.textContent = "Açık pozisyon yok";
+    } else {
+      box.replaceChildren();
+      positions.forEach((position) => {
         const div = document.createElement("div");
         div.className = "approval-card";
-        div.innerHTML = `<div class="details"><div class="action-name">${p.symbol}</div>
-          <div>PnL $${p.pnl?.toFixed(2)}</div></div>`;
+        const details = document.createElement("div");
+        details.className = "details";
+        const symbol = document.createElement("div");
+        symbol.className = "action-name";
+        symbol.textContent = String(position.symbol || "Varlık");
+        const pnl = document.createElement("div");
+        pnl.textContent = "PnL $" + (Number.isFinite(position.pnl) ? position.pnl.toFixed(2) : "—");
+        details.append(symbol, pnl);
+        div.appendChild(details);
         box.appendChild(div);
       });
     }
@@ -499,74 +744,199 @@ $("#finance-btn").addEventListener("click", async () => {
 $("#image-btn").addEventListener("click", async () => {
   const prompt = $("#image-prompt").value.trim();
   if (!prompt) return;
-  $("#image-result").innerHTML = "Üretiliyor...";
+  $("#image-result").textContent = "Üretiliyor...";
   const res = await fetch("/api/image", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt }),
   });
   const data = await res.json();
-  if (data.success) {
-    $("#image-result").innerHTML = `<img src="/api/images/${data.filename}" style="max-width:100%;border-radius:12px" />`;
-  } else $("#image-result").textContent = data.error || "Hata";
+  if (data.success && /^[A-Za-z0-9._-]+$/.test(String(data.filename || ""))) {
+    const image = document.createElement("img");
+    image.src = "/api/images/" + encodeURIComponent(data.filename);
+    image.alt = "SEKA tarafından üretilen görsel";
+    image.loading = "lazy";
+    image.style.maxWidth = "100%";
+    image.style.borderRadius = "12px";
+    $("#image-result").replaceChildren(image);
+  } else $("#image-result").textContent = data.error || "Görsel üretilemedi.";
 });
-
 async function loadGithub() {
   const box = $("#gh-repos");
-  box.innerHTML = "...";
-  const res = await fetch("/api/github/repos");
-  const data = await res.json();
-  if (data.error) {
-    box.innerHTML = `<p class="empty">${data.error}</p>`;
-    return;
+  if (!box) return;
+  box.textContent = "Yükleniyor…";
+  try {
+    const res = await fetch("/api/github/repos");
+    const data = await res.json();
+    box.replaceChildren();
+    if (data.error) {
+      const message = document.createElement("p");
+      message.className = "empty";
+      message.textContent = String(data.error);
+      box.appendChild(message);
+      return;
+    }
+    (data.repos || []).forEach((repo) => {
+      const div = document.createElement("div");
+      div.className = "approval-card";
+      const details = document.createElement("div");
+      details.className = "details";
+      const title = document.createElement("div");
+      title.className = "action-name";
+      title.textContent = String(repo.full_name || repo.name || "Depo");
+      const description = document.createElement("div");
+      description.textContent = String(repo.description || "");
+      details.append(title, description);
+      div.appendChild(details);
+      try {
+        const url = new URL(repo.url);
+        if (url.protocol === "https:" && url.hostname === "github.com") {
+          const link = document.createElement("a");
+          link.href = url.href;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = "Aç";
+          link.style.color = "var(--accent-2)";
+          div.appendChild(link);
+        }
+      } catch (_) {}
+      box.appendChild(div);
+    });
+  } catch (_) {
+    box.textContent = "GitHub depoları alınamadı.";
   }
-  box.innerHTML = "";
-  (data.repos || []).forEach((r) => {
-    const div = document.createElement("div");
-    div.className = "approval-card";
-    div.innerHTML = `<div class="details"><div class="action-name">${r.full_name}</div>
-      <div>${r.description || ""}</div></div>
-      <a href="${r.url}" target="_blank" style="color:var(--accent-2)">Aç</a>`;
-    box.appendChild(div);
-  });
 }
 $("#gh-refresh").addEventListener("click", loadGithub);
 
 async function loadApprovals() {
   const box = $("#approvals-list");
-  const res = await fetch("/api/approvals");
-  const data = await res.json();
-  const pending = data.pending || [];
-  if (!pending.length) {
-    box.innerHTML = '<p class="empty">Bekleyen yok</p>';
-    return;
+  if (!box) return;
+  try {
+    const res = await fetch("/api/approvals");
+    const data = await res.json();
+    const actionable = data.pending || [];
+    const historyBox = $("#approval-history");
+    if (historyBox) {
+      historyBox.innerHTML = "";
+      const history = data.history || [];
+      if (!history.length) {
+        historyBox.innerHTML = '<p class="empty">Henüz tamamlanmış işlem yok</p>';
+      } else {
+        history.slice().reverse().forEach((entry) => {
+          const row = document.createElement("div");
+          row.className = "approval-card audit-row";
+          const summary = document.createElement("div");
+          summary.className = "details";
+          const title = document.createElement("div");
+          title.className = "action-name";
+          title.textContent = entry.action || "İşlem";
+          const description = document.createElement("div");
+          description.textContent = entry.details || "";
+          const result = document.createElement("div");
+          result.className = "approval-state";
+          result.textContent = "Durum: " + (entry.status || "—") + (entry.execution_result ? " · " + entry.execution_result : "");
+          summary.append(title, description, result);
+          row.appendChild(summary);
+          historyBox.appendChild(row);
+        });
+      }
+    }
+    if (!actionable.length) {
+      box.innerHTML = '<p class="empty">Bekleyen veya yürütülmeye hazır onay yok</p>';
+      return;
+    }
+    box.innerHTML = "";
+    actionable.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "approval-card";
+      const details = document.createElement("div");
+      details.className = "details";
+      const name = document.createElement("div");
+      name.className = "action-name";
+      name.textContent = item.action || "İşlem";
+      const description = document.createElement("div");
+      description.className = "approval-description";
+      const context = item.context || {};
+      let preview = item.details || "";
+      if (item.action === "open_github_issue") {
+        preview += "\nDepo: " + (context.owner || "?") + "/" + (context.repo || "?") +
+          "\nBaşlık: " + (context.title || "") + "\nGövde:\n" + (context.body || "");
+      } else if (item.action === "create_pull_request") {
+        preview += "\nDepo: " + (context.owner || "?") + "/" + (context.repo || "?") +
+          "\nDal: " + (context.head || "?") + " → " + (context.base || "?") +
+          "\nBaşlık: " + (context.title || "") + "\nAçıklama:\n" + (context.body || "");
+      } else if (["modify_files", "push_to_remote"].includes(item.action)) {
+        preview += "\nDepo: " + (context.owner || "?") + "/" + (context.repo || "?") +
+          "\nDosya: " + (context.path || "?") + "\nDal: " + (context.branch || "main") +
+          "\nCommit: " + (context.message || "") + "\nSHA: " + (context.sha || "Yeni dosya");
+      } else if (context.preview) {
+        preview += "\nÖnizleme:\n" + context.preview;
+      }
+      description.textContent = preview;
+      if (["modify_files", "push_to_remote"].includes(item.action) && typeof context.content === "string") {
+        const contentDetails = document.createElement("details");
+        contentDetails.className = "approval-content-details";
+        const summary = document.createElement("summary");
+        summary.textContent = "Dosya içeriğini incele (" + context.content.length + " karakter)";
+        const code = document.createElement("pre");
+        code.className = "approval-preview";
+        code.textContent = context.content;
+        contentDetails.append(summary, code);
+        description.appendChild(contentDetails);
+      }
+      const state = document.createElement("div");
+      state.className = "approval-state";
+      state.textContent = "Durum: " + (item.status || "pending");
+      details.append(name, description, state);
+      const actions = document.createElement("div");
+      actions.className = "approval-actions";
+      if (item.status === "pending") {
+        const approve = document.createElement("button");
+        approve.className = "approve";
+        approve.textContent = "Onayla";
+        approve.addEventListener("click", async () => {
+          const result = await fetch(`/api/approvals/${encodeURIComponent(item.id)}/approve`, { method: "POST" });
+          if (!result.ok) addMessage("assistant", "Onay kaydedilemedi.");
+          await loadApprovals();
+        });
+        const reject = document.createElement("button");
+        reject.className = "reject";
+        reject.textContent = "Reddet";
+        reject.addEventListener("click", async () => {
+          const result = await fetch(`/api/approvals/${encodeURIComponent(item.id)}/reject`, { method: "POST" });
+          if (!result.ok) addMessage("assistant", "Reddetme işlemi kaydedilemedi.");
+          await loadApprovals();
+        });
+        actions.append(approve, reject);
+      } else if (item.status === "approved" && ["open_github_issue", "create_pull_request", "modify_files", "push_to_remote"].includes(item.action)) {
+        const execute = document.createElement("button");
+        execute.className = "primary";
+        execute.textContent = item.action === "modify_files" ? "İkinci onayı hazırla" : "Onaylı GitHub işlemini yürüt";
+        execute.addEventListener("click", async () => {
+          const confirmation = item.action === "modify_files"
+            ? "Bu adım yalnızca ikinci push onayını oluşturur; dosya henüz GitHub'a gönderilmez. Devam edilsin mi?"
+            : "Bu GitHub işlemi dış sistemde değişiklik yapacak. Ayrıntıları ve hedef depoyu kontrol ettin mi?";
+          if (!confirm(confirmation)) return;
+          execute.disabled = true;
+          const result = await fetch(`/api/approvals/${encodeURIComponent(item.id)}/execute`, { method: "POST" });
+          const payload = await result.json();
+          addMessage("assistant", payload.result || payload.detail || "İşlem sonucu alınamadı.");
+          await loadApprovals();
+        });
+        actions.appendChild(execute);
+      } else if (item.status === "approved") {
+        const note = document.createElement("span");
+        note.className = "approval-note";
+        note.textContent = "Onay kaydedildi; bu işlem türü için güvenli yürütücü henüz yok.";
+        actions.appendChild(note);
+      }
+      card.append(details, actions);
+      box.appendChild(card);
+    });
+  } catch (error) {
+    box.innerHTML = '<p class="empty">Onay listesi alınamadı.</p>';
   }
-  box.innerHTML = "";
-  pending.forEach((item, idx) => {
-    const card = document.createElement("div");
-    card.className = "approval-card";
-    card.innerHTML = `
-      <div class="details"><div class="action-name">${item.action}</div><div>${item.details}</div></div>
-      <div class="approval-actions">
-        <button class="approve" data-idx="${idx}">Onayla</button>
-        <button class="reject" data-idx="${idx}">Reddet</button>
-      </div>`;
-    box.appendChild(card);
-  });
-  box.querySelectorAll(".approve").forEach((btn) =>
-    btn.addEventListener("click", async () => {
-      await fetch(`/api/approvals/${btn.dataset.idx}/approve`, { method: "POST" });
-      loadApprovals();
-    })
-  );
-  box.querySelectorAll(".reject").forEach((btn) =>
-    btn.addEventListener("click", async () => {
-      await fetch(`/api/approvals/${btn.dataset.idx}/reject`, { method: "POST" });
-      loadApprovals();
-    })
-  );
 }
-
 async function loadStatus() {
   try {
     const res = await fetch("/api/status");
@@ -574,11 +944,20 @@ async function loadStatus() {
     $("#status-text").textContent = JSON.stringify(data, null, 2);
     const u = data.universe || {};
     const f = data.finance || {};
+    const ollama = data.ollama || {};
+    const rag = data.rag || {};
+    const ollamaLabel = ollama.status === "online" ? "hazır" : ollama.status === "model_missing" ? "model eksik" : "bağlantı yok";
+    const diskMb = Number(rag.disk_bytes || 0) / (1024 * 1024);
     $("#quick-status").innerHTML = `
       <strong>SEKA ${data.version || ""}</strong><br>
+      Ollama: ${ollamaLabel}<br>
       Bilgi: ${u.total_pages || 0}<br>
+      RAG: ${rag.documents ?? 0}/${rag.max_documents ?? "—"} parça · ${diskMb.toFixed(1)} MB<br>
       Paper: ${f.equity ?? "—"}<br>
-      Onay: ${data.pending_approvals || 0}`;
+      Onay: ${data.pending_approvals || 0}<br>
+      Ağ: ${data.privacy?.web_research ? "web açık" : "web kapalı"} · ${data.privacy?.external_finance_data ? "finans açık" : "finans kapalı"} · ${data.privacy?.site_scanning ? "tarama açık" : "tarama kapalı"}<br>
+      Bildirim: ${data.privacy?.external_notifications ? "açık" : "kapalı"}`;
+    $("#quick-status").classList.toggle("is-degraded", ollama.status !== "online" || data.status === "degraded");
     renderJobs(data.jobs || []);
   } catch (e) {}
 }
@@ -588,11 +967,11 @@ loadStatus();
 setInterval(loadStatus, 30000);
 addMessage(
   "assistant",
-  "SEKA v5 online.\n" +
+  "SEKA v6.1 online · yerel Türkçe ajan.\n" +
     "• Canlı iş kuyruğu (SSE)\n" +
     "• Plan motoru → planla: hedef\n" +
     "• Bilgi paketi dışa aktar (paylaşılabilir)\n" +
     "• Hızlı/derin model yönlendirme\n" +
     "• Paper finans · merak · gece · podcast taslağı\n\n" +
-    "Ücretli API yok. Veri sende kalır."
+    "Ağ özellikleri varsayılan kapalıdır; çevrimdışı profil internet çıkışını sınırlar."
 );

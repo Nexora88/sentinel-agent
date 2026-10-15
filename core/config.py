@@ -13,6 +13,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Keep optional telemetry/tracing disabled even when no .env file is present.
+for _key, _value in {
+    "ANONYMIZED_TELEMETRY": "False",
+    "CHROMA_TELEMETRY": "False",
+    "LANGCHAIN_TRACING_V2": "false",
+    "LANGSMITH_TRACING": "false",
+    "OTEL_SDK_DISABLED": "true",
+}.items():
+    os.environ.setdefault(_key, _value)
+
 ROOT = Path(__file__).resolve().parent.parent
 
 

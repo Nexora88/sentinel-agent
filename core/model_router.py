@@ -14,9 +14,9 @@ from core.ollama_client import OllamaClient
 class ModelRouter:
     def __init__(self):
         base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        default = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:7b")
-        fast = os.getenv("OLLAMA_MODEL_FAST", default)
-        deep = os.getenv("OLLAMA_MODEL_DEEP", default)
+        default = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
+        fast = os.getenv("OLLAMA_MODEL_FAST", "qwen2.5:7b")
+        deep = os.getenv("OLLAMA_MODEL_DEEP", "qwen2.5-coder:7b")
         embed = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 
         self.fast = OllamaClient(model=fast, embed_model=embed, base_url=base, temperature=0.3)

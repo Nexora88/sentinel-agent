@@ -1,0 +1,14 @@
+# Use only for the one-time model preparation phase while internet access is permitted.
+# The same named volume is mounted by docker-compose.offline.yml after preparation.
+services:
+  ollama-bootstrap:
+    image: ollama/ollama:latest
+    container_name: seka-ollama-bootstrap
+    ports:
+      - "127.0.0.1:11435:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+volumes:
+  ollama_models:
+    name: seka_ollama_models

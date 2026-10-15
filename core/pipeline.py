@@ -238,6 +238,9 @@ class SentinelPipeline:
         return result
 
     def scan_website(self, url: str) -> str:
+        import os
+        if os.getenv("ALLOW_SITE_SCANNING", "false").lower() != "true":
+            return "Gizlilik koruması: site taraması varsayılan olarak kapalı. ALLOW_SITE_SCANNING=true ile yalnızca izinli hedeflerde aç."
         if not self.permissions.can_perform(Action.SCAN_WEBSITE):
             return self.permissions.request_approval(Action.SCAN_WEBSITE, f"Scan: {url}")
         result = self.website_scanner.scan(url)

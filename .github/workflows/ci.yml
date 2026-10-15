@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile Python modules
+        run: python -m compileall -q agents core scripts tools web
+      - name: Check frontend JavaScript syntax
+        run: node --check web/static/app.js
+      - name: Validate Docker Compose profiles
+        run: |
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.offline.yml config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.networked.yml config --quiet
+          docker compose -f docker-compose.bootstrap.yml config --quiet
+      - name: Build container image
+        run: docker build --tag seka-agent-ci .
+      - name: Smoke-test web startup without Ollama
+        run: |
+          set -eu
+          docker run -d --name seka-web-smoke -p 127.0.0.1:18000:8000 -e AUTH_REQUIRED=true seka-agent-ci
+          trap 'docker rm -f seka-web-smoke >/dev/null 2>&1 || true' EXIT
+          healthy=0
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18000/health; then
+              healthy=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$healthy" -ne 1 ]; then
+            docker logs seka-web-smoke
+            exit 1
+          fi
+          bootstrap_secret="$(docker exec seka-web-smoke cat /app/memory/first-run-password.txt)"
+          token="$(curl --fail --silent -X POST http://127.0.0.1:18000/api/login -H 'Content-Type: application/json' -d "{\"username\":\"owner\",\"password\":\"$bootstrap_secret\"}" | python -c 'import json,sys; print(json.load(sys.stdin)["token"])')"
+          status="$(curl --fail --silent -H "Authorization: Bearer $token" http://127.0.0.1:18000/api/status)"
+          printf '%s' "$status" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["status"] == "ok", d; assert d["ollama"]["status"] == "unavailable", d.get("ollama"); assert "rag" in d, d; print("Pipeline initializes; panel stays healthy and reports Ollama outage gracefully.")'
+      - name: Run security regression tests
+        run: python -m unittest discover -s tests -v
+      - name: Scan repository for likely hardcoded secrets
+        run: |
+          python - <<'PY'
+          from tools.secret_scanner import SecretScanner
+          findings = SecretScanner().scan_directory(".", max_files=2000)
+          if findings:
+              for finding in findings:
+                  print(f"{finding['type']} at {finding['source']}:{finding['line']}")
+              raise SystemExit("Potential hardcoded credentials found.")
+          print("No likely hardcoded credentials found.")
+          PY
