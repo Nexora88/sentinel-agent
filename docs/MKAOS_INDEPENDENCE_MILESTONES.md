@@ -101,3 +101,12 @@ Bu adım bir **eğitim altyapısı** ekler; eğitimin gerçekten çalıştırıl
 - [ ] Gerçek Türkçe korpus/checkpoint, bağımsız kalite, fiziksel hızlandırıcı, Kubernetes kalıcı durum, canlı mTLS/iptal ve çok düğümlü güvenlik kapıları hâlâ açık.
 
 **Önemli:** Statik tarama dosya hash'lerini ve şüpheli referansları envanterler; yazar menşeini, lisans iznini, fiziksel donanımın ülke menşeini veya ağ çıkışının imkânsızlığını kanıtlamaz.
+
+## 2026-10-16 — HTTP sohbet yolu yerel Rust motoruna bağlandı
+- [x] core/mkaos_native_chat.py: yalnızca yerel Rust CLI çağıran, SHA-256 doğrulamasını CLI'a zorunlu kılan, zaman aşımı ve boyut sınırları olan fail-closed HTTP adaptörü eklendi.
+- [x] POST /api/chat varsayılanı MKAOS_CHAT_BACKEND=native-rust oldu; checkpoint yoksa 503 döndürür, SmolLM2'ye sessiz geri dönüş yapmaz.
+- [x] Docker imajı Rust CLI'ı çok aşamalı derlemeyle paketler; Compose'taki üçüncü taraf SmolLM2 servisi yalnızca legacy-third-party-chat profiliyle açılır.
+- [x] Yerel adaptör için çevrimdışı testler eklendi.
+- [ ] Bu değişiklik bir çalışma zamanı geçiş kapısıdır, kullanılabilir model teslimi değildir: onaylı korpus, eğitilmiş checkpoint, gerçek Türkçe kalite kanıtı ve checkpoint'in gerçek CLI/HTTP uçtan uca testi hâlâ yoktur.
+- [ ] Varsayılan native sohbet, checkpoint sağlanana kadar 503 verir. Bu kasıtlı fail-closed davranıştır; üçüncü taraf modele sessiz geçiş yapılmaz.
+- [ ] CI, Docker derlemesi ve uçtan uca testler bu commit için yeniden doğrulanmalıdır.
