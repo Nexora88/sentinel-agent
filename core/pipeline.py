@@ -42,7 +42,7 @@ from agents.knowledge_expander import KnowledgeExpander
 from agents.night_researcher import NightResearcher
 from agents.curiosity import CuriosityEngine
 from agents.podcast_draft import PodcastDraft
-from core.tenant_storage import tenant_root
+from core.tenant_storage import tenant_root, tenant_storage_id
 
 logger = logging.getLogger("seka.pipeline")
 
@@ -50,7 +50,7 @@ logger = logging.getLogger("seka.pipeline")
 class SentinelPipeline:
     def __init__(self, tenant_id: str = "owner"):
         self.tenant_id = str(tenant_id).strip().lower()
-        self.storage_root = tenant_root("./memory/tenants", self.tenant_id)
+        self.storage_root = tenant_root("./memory/tenants", tenant_storage_id(self.tenant_id))
         self.storage_root.mkdir(parents=True, exist_ok=True)
         self.router = ModelRouter()
         self.ollama = self.router.default
