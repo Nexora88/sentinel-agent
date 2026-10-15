@@ -30,6 +30,17 @@ def _canonical(payload: dict[str, Any]) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
+def _contains_executable_fields(value: Any) -> bool:
+    forbidden = {"shell", "command", "exec", "executable", "script", "raw_code"}
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str) or key.lower() in forbidden or _contains_executable_fields(item):
+                return True
+    elif isinstance(value, list):
+        return any(_contains_executable_fields(item) for item in value)
+    return False
+
+
 @dataclass(frozen=True)
 class VerifiedTask:
     sender_id: str
@@ -54,7 +65,7 @@ def sign_task(*, sender_id: str, recipient_id: str, task_id: str, task_type: str
         raise MeshMessageError("Task type is not in the mesh allowlist.")
     if not isinstance(payload, dict) or len(_canonical(payload)) > 48 * 1024:
         raise MeshMessageError("Task payload must be a bounded JSON object.")
-    if any(k.lower() in {"shell", "command", "exec", "executable", "script", "raw_code"} for k in payload):
+    if _contains_executable_fields(payload):
         raise MeshMessageError("Executable payload fields are not allowed.")
     body = {"version": 1, "sender_id": sender_id, "recipient_id": recipient_id,
             "task_id": task_id, "task_type": task_type, "payload": payload,
@@ -96,7 +107,9 @@ class MeshVerifier:
             raise MeshMessageError("Task type is not allowed.")
         if expires <= current or expires - issued > MAX_TTL_SECONDS or issued > current + MAX_CLOCK_SKEW_SECONDS:
             raise MeshMessageError("Task is expired or timestamp is invalid.")
-        if not isinstance(payload, dict) or any(k.lower() in {"shell", "command", "exec", "executable", "script", "raw_code"} for k in payload):
+        if not isinstance(payload, dict) or len(_canonical(payload)) > 48 * 1024:
+            raise MeshMessageError("Task payload must be a bounded JSON object.")
+        if _contains_executable_fields(payload):
             raise MeshMessageError("Executable task payloads are not allowed.")
         replay_key = sender + ":" + str(task_id)
         if replay_key in self._seen:
