@@ -93,6 +93,10 @@ jobs:
         env:
           SEKA_EMBEDDINGS_PROVIDER: mkaos-native
         run: python -m scripts.benchmark_mkaos_retrieval
+      - name: Test offline provenance audit
+        run: |
+          python -m unittest discover -s tests -p test_mkaos_provenance_audit.py -v
+          python tools/audit_mkaos_provenance.py --root . --output artifacts/mkaos-provenance-audit.json
       - name: Scan repository for likely hardcoded secrets
         run: |
           python - <<'PY'
