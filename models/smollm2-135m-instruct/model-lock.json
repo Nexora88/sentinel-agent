@@ -9,19 +9,38 @@
   "weights": {
     "path": "model.safetensors",
     "url": "https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/resolve/12fd25f77366fa6b3b4b768ec3050bf629380bac/model.safetensors",
-    "sha256": null,
-    "sha256_status": "not_measured; do not treat as verified until the exact artifact is downloaded and hashed"
+    "sha256": "5af571cbf074e6d21a03528d2330792e532ca608f24ac70a143f6b369968ab8c",
+    "sha256_status": "measured_from_pinned_artifact"
   },
   "tokenizer": {
     "files": [
-      {"path":"tokenizer.json","url":"https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/resolve/12fd25f77366fa6b3b4b768ec3050bf629380bac/tokenizer.json","sha256":null},
-      {"path":"tokenizer_config.json","url":"https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/resolve/12fd25f77366fa6b3b4b768ec3050bf629380bac/tokenizer_config.json","sha256":null},
-      {"path":"special_tokens_map.json","url":"https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/resolve/12fd25f77366fa6b3b4b768ec3050bf629380bac/special_tokens_map.json","sha256":null}
-    ]
+      {
+        "path": "tokenizer.json",
+        "url": "https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/resolve/12fd25f77366fa6b3b4b768ec3050bf629380bac/tokenizer.json",
+        "sha256": "9ca9acddb6525a194ec8ac7a87f24fbba7232a9a15ffa1af0c1224fcd888e47c"
+      },
+      {
+        "path": "tokenizer_config.json",
+        "url": "https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/resolve/12fd25f77366fa6b3b4b768ec3050bf629380bac/tokenizer_config.json",
+        "sha256": "4ec77d44f62efeb38d7e044a1db318f6a939438425312dfa333b8382dbad98df"
+      },
+      {
+        "path": "special_tokens_map.json",
+        "url": "https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/resolve/12fd25f77366fa6b3b4b768ec3050bf629380bac/special_tokens_map.json",
+        "sha256": "2b7379f3ae813529281a5c602bc5a11c1d4e0a99107aaa597fe936c1e813ca52"
+      }
+    ],
+    "sha256_status": "measured_from_pinned_artifacts"
   },
   "architecture": {
     "transformers_architecture": "LlamaForCausalLM",
     "note": "Rust SafeTensors loader, GQA decoder, and BPE adapter are implemented but not yet validated against real pinned artifacts; compatibility is not established until tokenizer and logits parity scripts pass."
   },
-  "safety": "Only safetensors and JSON files are in scope. Never load pickle-based training_args.bin."
+  "safety": "Only safetensors and JSON files are in scope. Never load pickle-based training_args.bin.",
+  "hash_measurement": {
+    "status": "measured_in_github_actions",
+    "workflow_run": "https://github.com/Nexora88/sentinel-agent/actions/runs/38777075969",
+    "revision": "12fd25f77366fa6b3b4b768ec3050bf629380bac",
+    "note": "SHA-256 values were measured after downloading the exact pinned revision. This establishes byte integrity only, not tokenizer/runtime compatibility or model quality."
+  }
 }
