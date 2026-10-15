@@ -755,6 +755,32 @@ async function loadApprovals() {
     const res = await fetch("/api/approvals");
     const data = await res.json();
     const actionable = data.pending || [];
+    const historyBox = $("#approval-history");
+    if (historyBox) {
+      historyBox.innerHTML = "";
+      const history = data.history || [];
+      if (!history.length) {
+        historyBox.innerHTML = '<p class="empty">Henüz tamamlanmış işlem yok</p>';
+      } else {
+        history.slice().reverse().forEach((entry) => {
+          const row = document.createElement("div");
+          row.className = "approval-card audit-row";
+          const summary = document.createElement("div");
+          summary.className = "details";
+          const title = document.createElement("div");
+          title.className = "action-name";
+          title.textContent = entry.action || "İşlem";
+          const description = document.createElement("div");
+          description.textContent = entry.details || "";
+          const result = document.createElement("div");
+          result.className = "approval-state";
+          result.textContent = "Durum: " + (entry.status || "—") + (entry.execution_result ? " · " + entry.execution_result : "");
+          summary.append(title, description, result);
+          row.appendChild(summary);
+          historyBox.appendChild(row);
+        });
+      }
+    }
     if (!actionable.length) {
       box.innerHTML = '<p class="empty">Bekleyen veya yürütülmeye hazır onay yok</p>';
       return;
@@ -770,7 +796,19 @@ async function loadApprovals() {
       name.textContent = item.action || "İşlem";
       const description = document.createElement("div");
       description.className = "approval-description";
-      description.textContent = item.details || "";
+      const context = item.context || {};
+      let preview = item.details || "";
+      if (item.action === "open_github_issue") {
+        preview += "\nDepo: " + (context.owner || "?") + "/" + (context.repo || "?") +
+          "\nBaşlık: " + (context.title || "") + "\nGövde:\n" + (context.body || "");
+      } else if (item.action === "create_pull_request") {
+        preview += "\nDepo: " + (context.owner || "?") + "/" + (context.repo || "?") +
+          "\nDal: " + (context.head || "?") + " → " + (context.base || "?") +
+          "\nBaşlık: " + (context.title || "") + "\nAçıklama:\n" + (context.body || "");
+      } else if (context.preview) {
+        preview += "\nÖnizleme:\n" + context.preview;
+      }
+      description.textContent = preview;
       const state = document.createElement("div");
       state.className = "approval-state";
       state.textContent = "Durum: " + (item.status || "pending");
