@@ -1110,3 +1110,15 @@ $("#clean-room-audit-btn")?.addEventListener("click",async()=>{
   try{const response=await fetch("/api/audit/clean-room");const data=await response.json();out.textContent=JSON.stringify(data,null,2);}
   catch(_){out.textContent="Denetim çalıştırılamadı.";}
 });
+
+$("#forget-memory-btn")?.addEventListener("click",async()=>{
+  const out=$("#forget-memory-result");
+  if(!confirm("Seçilen konuya ait eşleşen kişisel hafıza ve sohbet kayıtları silinsin mi?")) return;
+  out.textContent="Yerel eşleşmeler taranıyor…";
+  try {
+    const response=await fetch("/api/privacy/forget",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      topic:$("#forget-topic").value, last_hours:Number($("#forget-hours").value||24), confirmation:$("#forget-confirm").value
+    })});
+    const data=await response.json(); out.textContent=JSON.stringify(data,null,2);
+  } catch(_) { out.textContent="Silme işlemi tamamlanamadı; yerel veriler otomatik sıfırlanmadı."; }
+});
