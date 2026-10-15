@@ -28,6 +28,17 @@ class SignedApprovalProtocol:
         except ApprovalProtocolError: raise
         except Exception as exc: raise ApprovalProtocolError("İmza doğrulanamadı.") from exc
         digest = hashlib.sha256(self.canonical_payload(payload)).hexdigest()
+        # Prevent replay of an already accepted request ID.
+        if self.audit_path.exists():
+            try:
+                for line in self.audit_path.read_text(encoding="utf-8").splitlines()[-5000:]:
+                    previous = json.loads(line)
+                    if previous.get("request_id") == str(payload["request_id"]) and previous.get("result") == "signature_validated":
+                        raise ApprovalProtocolError("Bu onay isteği daha önce kullanılmış; replay engellendi.")
+            except ApprovalProtocolError:
+                raise
+            except (OSError, ValueError):
+                raise ApprovalProtocolError("Onay günlüğü okunamıyor; güvenlik için işlem durduruldu.")
         self.audit_path.parent.mkdir(parents=True, exist_ok=True)
         record = {"timestamp": int(time.time()), "request_id": str(payload["request_id"]),
                   "action": str(payload["action"]), "payload_sha256": digest,
