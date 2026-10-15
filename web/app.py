@@ -39,7 +39,7 @@ from core.local_voice import LocalVoiceError, voice_status, synthesize as synthe
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("seka.web")
 
-app = FastAPI(title="SEKA", version="6.1", description="Sentinel Egemen Kişisel Ajan")
+app = FastAPI(title="SEKA", version="6.2", description="Sentinel Egemen Kişisel Ajan")
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"

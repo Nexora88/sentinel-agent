@@ -1,0 +1,17 @@
+# Explicit opt-in runtime network profile.
+# Network access alone does not enable integrations; each ALLOW_* setting remains false by default.
+services:
+  sentinel:
+    environment:
+      ALLOW_WEB_RESEARCH: ${ALLOW_WEB_RESEARCH:-false}
+      ALLOW_EXTERNAL_FINANCE_DATA: ${ALLOW_EXTERNAL_FINANCE_DATA:-false}
+      ALLOW_SITE_SCANNING: ${ALLOW_SITE_SCANNING:-false}
+      ALLOW_EXTERNAL_NOTIFICATIONS: ${ALLOW_EXTERNAL_NOTIFICATIONS:-false}
+    networks:
+      - seka_isolated
+  ollama:
+    networks:
+      - seka_isolated
+networks:
+  seka_isolated:
+    internal: false

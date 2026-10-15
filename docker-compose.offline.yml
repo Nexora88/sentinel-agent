@@ -28,6 +28,8 @@ services:
       - offline_internal
     restart: unless-stopped
 networks:
+  seka_isolated:
+    internal: true
   offline_internal:
     internal: true
 volumes:
