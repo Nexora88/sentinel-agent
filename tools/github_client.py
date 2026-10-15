@@ -37,16 +37,22 @@ class GitHubClient:
         return bool(self.token)
 
     def _get(self, path: str, params: Optional[dict] = None) -> Any:
+        if not self.enabled:
+            raise RuntimeError("GitHub token tanımlı değil; ağ isteği engellendi.")
         r = self.session.get(f"{self.api}{path}", params=params, timeout=30)
         r.raise_for_status()
         return r.json()
 
     def _post(self, path: str, data: dict) -> Any:
+        if not self.enabled:
+            raise RuntimeError("GitHub token tanımlı değil; ağ isteği engellendi.")
         r = self.session.post(f"{self.api}{path}", json=data, timeout=30)
         r.raise_for_status()
         return r.json()
 
     def _put(self, path: str, data: dict) -> Any:
+        if not self.enabled:
+            raise RuntimeError("GitHub token tanımlı değil; ağ isteği engellendi.")
         r = self.session.put(f"{self.api}{path}", json=data, timeout=30)
         r.raise_for_status()
         return r.json()
