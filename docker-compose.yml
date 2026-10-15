@@ -17,9 +17,17 @@ services:
       - AUTH_REQUIRED=${AUTH_REQUIRED:-true}
       - REQUIRE_APPROVAL=${REQUIRE_APPROVAL:-true}
       - WEB_PORT=8000
+      - PIPER_EXECUTABLE=${PIPER_EXECUTABLE:-piper}
+      - SEKA_VOICE_MODEL_DIR=${SEKA_VOICE_MODEL_DIR:-/app/models/voices}
+      - SEKA_VOICE_MALE_MODEL=${SEKA_VOICE_MALE_MODEL:-tr_TR-fettah-medium.onnx}
+      - SEKA_VOICE_FEMALE_MODEL=${SEKA_VOICE_FEMALE_MODEL:-tr_TR-dfki-medium.onnx}
+      - FASTER_WHISPER_MODEL_PATH=${FASTER_WHISPER_MODEL_PATH:-/app/models/whisper-small}
+      - WHISPER_CPP_BIN=${WHISPER_CPP_BIN:-whisper-cli}
+      - WHISPER_MODEL_PATH=${WHISPER_MODEL_PATH:-}
     volumes:
       # Persistent local knowledge and memory. Keep this volume backed up.
       - sentinel_memory:/app/memory
+      - ./models:/app/models:ro
       - ./config:/app/config:ro
     restart: unless-stopped
     command: ["python", "-m", "scripts.run", "web", "--host", "0.0.0.0", "--port", "8000"]
