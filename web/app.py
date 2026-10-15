@@ -498,7 +498,7 @@ async def api_execute_approved(request_id: str, authorization: Optional[str] = H
     request = p.permissions.get_request(request_id)
     if not request or request.get("status") != "approved":
         raise HTTPException(409, "İşlem bulunamadı veya yürütme için onaylı değil.")
-    if request.get("action") not in {"open_github_issue", "create_pull_request"}:
+    if request.get("action") not in {"open_github_issue", "create_pull_request", "modify_files", "push_to_remote"}:
         raise HTTPException(400, "Bu işlem türü henüz güvenli yürütücüde desteklenmiyor.")
     if not p.permissions.begin_execution(request_id):
         raise HTTPException(409, "İşlem zaten yürütülüyor veya daha önce tüketildi.")
