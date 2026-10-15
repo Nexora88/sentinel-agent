@@ -908,7 +908,7 @@ async def api_generate_improvement_proposal(req: ImprovementGenerateRequest, aut
         candidate = await asyncio.to_thread(pipeline.code_writer.propose_fix, file_path, current, issue)
         if not isinstance(candidate, str) or not candidate.strip() or len(candidate.encode("utf-8")) > 40000:
             raise ImprovementProposalError("Yerel model boş veya çok büyük bir kod önerisi döndürdü.")
-        diff = "\\n".join(difflib.unified_diff(
+        diff = "\n".join(difflib.unified_diff(
             current.splitlines(), candidate.strip().splitlines(),
             fromfile="a/" + file_path, tofile="b/" + file_path, lineterm=""
         ))
