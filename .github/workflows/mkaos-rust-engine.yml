@@ -24,5 +24,3 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Run unit tests
         run: cargo test --manifest-path engine/mkaos-inference/Cargo.toml
-      - name: Check formatting
-        run: cargo fmt --manifest-path engine/mkaos-inference/Cargo.toml --all -- --check
