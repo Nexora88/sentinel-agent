@@ -20,7 +20,8 @@ def validate_local_ollama_url(base_url: str) -> str:
     if parsed.scheme != "http" or not parsed.hostname or parsed.username or parsed.password:
         raise ValueError("OLLAMA_BASE_URL must be a local http:// endpoint without credentials.")
     host = parsed.hostname.lower().rstrip(".")
-    if host == "host.docker.internal":
+    # These exact hostnames are service-local DNS names inside the supplied Docker network.
+    if host in {"host.docker.internal", "ollama"}:
         return base_url.rstrip("/")
     try:
         address = ipaddress.ip_address(host)

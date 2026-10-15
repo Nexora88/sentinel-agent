@@ -18,6 +18,10 @@ class LocalModelEndpointTests(unittest.TestCase):
             validate_local_ollama_url("http://host.docker.internal:11434"),
             "http://host.docker.internal:11434",
         )
+        self.assertEqual(
+            validate_local_ollama_url("http://ollama:11434"),
+            "http://ollama:11434",
+        )
         for endpoint in (
             "https://api.example.com",
             "http://192.168.1.20:11434",
