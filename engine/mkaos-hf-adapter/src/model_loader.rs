@@ -38,8 +38,10 @@ fn matrix(tensors: &SafeTensors<'_>, name: &str, transpose: bool) -> LoadResult<
     let view = tensors.tensor(name)?;
     let shape = view.shape();
     if shape.len() != 2 { return Err(format!("{name}: expected rank 2, got {shape:?}").into()); }
+    let rows = shape[0];
+    let cols = shape[1];
     let values = tensor_f32(view)?;
-    let tensor = Tensor2::new(shape[0], shape[1], values)?;
+    let tensor = Tensor2::new(rows, cols, values)?;
     if transpose { Ok(tensor.transpose()?) } else { Ok(tensor) }
 }
 fn vector(tensors: &SafeTensors<'_>, name: &str) -> LoadResult<Vec<f32>> {
