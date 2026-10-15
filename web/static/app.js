@@ -1122,3 +1122,45 @@ $("#forget-memory-btn")?.addEventListener("click",async()=>{
     const data=await response.json(); out.textContent=JSON.stringify(data,null,2);
   } catch(_) { out.textContent="Silme işlemi tamamlanamadı; yerel veriler otomatik sıfırlanmadı."; }
 });
+
+let mkaosApprovalPrivateKey = null;
+let mkaosApprovalPublicKeyB64 = "";
+function bytesToB64(bytes) {
+  let binary = "";
+  new Uint8Array(bytes).forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
+}
+function canonicalJson(value) {
+  if (Array.isArray(value)) return "[" + value.map(canonicalJson).join(",") + "]";
+  if (value && typeof value === "object") {
+    return "{" + Object.keys(value).sort().map((key) => JSON.stringify(key) + ":" + canonicalJson(value[key])).join(",") + "}";
+  }
+  return JSON.stringify(value);
+}
+$("#approval-keygen-btn")?.addEventListener("click",async()=>{
+  const box=$("#approval-public-key");
+  if(!window.crypto?.subtle){box.textContent="Bu tarayıcı WebCrypto desteklemiyor; anahtar üretilemedi.";return;}
+  try {
+    const pair=await crypto.subtle.generateKey({name:"Ed25519"},true,["sign","verify"]);
+    const privateDer=await crypto.subtle.exportKey("pkcs8",pair.privateKey);
+    const publicRaw=await crypto.subtle.exportKey("raw",pair.publicKey);
+    mkaosApprovalPrivateKey=pair.privateKey;
+    mkaosApprovalPublicKeyB64=bytesToB64(publicRaw);
+    const blob=new Blob([privateDer],{type:"application/octet-stream"});
+    const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="mkaos-approval-private.pk8"; link.click();
+    setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+    box.textContent="Açık anahtar (Base64):\n"+mkaosApprovalPublicKeyB64+"\n\nÖzel anahtar indirildi. Dosyayı paylaşma. Açık anahtarı sunucu .env ayarına ekle ve servisi yeniden başlat. Sayfa yenilenirse özel anahtar belleği kaybolur.";
+  } catch(error) { box.textContent="Ed25519 üretimi bu tarayıcıda desteklenmiyor: "+String(error.name||"hata"); }
+});
+$("#approval-sign-btn")?.addEventListener("click",async()=>{
+  const out=$("#approval-verify-result");
+  if(!mkaosApprovalPrivateKey){out.textContent="Önce bu tarayıcı oturumunda Ed25519 anahtarı üret.";return;}
+  try {
+    const payload=JSON.parse($("#approval-payload").value);
+    const signature=await crypto.subtle.sign({name:"Ed25519"},mkaosApprovalPrivateKey,new TextEncoder().encode(canonicalJson(payload)));
+    const signatureB64=bytesToB64(signature);
+    $("#approval-signature").value=signatureB64;
+    const response=await fetch("/api/approval/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({payload,signature_b64:signatureB64})});
+    const data=await response.json(); out.textContent=JSON.stringify(data,null,2);
+  } catch(error) { out.textContent="İmza işlemi başarısız. Payload ve sunucu açık anahtarını denetle."; }
+});
