@@ -1,6 +1,45 @@
 //! Deterministic sampling primitives for language-model logits.
 use crate::KernelError;
 
+/// Apply the standard repetition penalty once per previously generated token.
+/// A penalty of 1.0 disables the operation. Prompt tokens are deliberately not
+/// included by the CLI so short answers do not suppress common prompt vocabulary.
+pub fn apply_repetition_penalty(
+    logits: &mut [f32],
+    previous_tokens: &[usize],
+    penalty: f32,
+) -> Result<(), KernelError> {
+    if !penalty.is_finite() || !(1.0..=2.0).contains(&penalty) {
+        return Err(KernelError::InvalidConfig);
+    }
+    if logits.is_empty() {
+        return Err(KernelError::EmptyTensor);
+    }
+    if logits.iter().any(|x| !x.is_finite()) {
+        return Err(KernelError::NonFiniteInput);
+    }
+    if previous_tokens.iter().any(|&token| token >= logits.len()) {
+        return Err(KernelError::InvalidConfig);
+    }
+    if penalty == 1.0 {
+        return Ok(());
+    }
+    // A token repeated several times should be penalized once, not exponentially.
+    let mut seen = vec![false; logits.len()];
+    for &token in previous_tokens {
+        if seen[token] {
+            continue;
+        }
+        seen[token] = true;
+        if logits[token] > 0.0 {
+            logits[token] /= penalty;
+        } else {
+            logits[token] *= penalty;
+        }
+    }
+    Ok(())
+}
+
 pub fn greedy_sample(logits: &[f32]) -> Result<usize, KernelError> {
     if logits.is_empty() { return Err(KernelError::EmptyTensor); }
     if logits.iter().any(|x| !x.is_finite()) { return Err(KernelError::NonFiniteInput); }
@@ -77,4 +116,16 @@ mod tests {
         }
     }
     #[test] fn rejects_nan_logits() { assert!(greedy_sample(&[f32::NAN]).is_err()); }
+    #[test] fn repetition_penalty_suppresses_positive_repeated_token() {
+        let mut logits = [4.0, 3.0, -2.0];
+        apply_repetition_penalty(&mut logits, &[0, 0, 2], 1.2).unwrap();
+        assert!((logits[0] - (4.0 / 1.2)).abs() < 1e-6);
+        assert_eq!(logits[1], 3.0);
+        assert_eq!(logits[2], -2.4);
+    }
+    #[test] fn repetition_penalty_validates_bounds_and_token_ids() {
+        assert!(apply_repetition_penalty(&mut [1.0, 2.0], &[2], 1.1).is_err());
+        assert!(apply_repetition_penalty(&mut [1.0], &[0], 0.9).is_err());
+        assert!(apply_repetition_penalty(&mut [1.0], &[0], f32::NAN).is_err());
+    }
 }
