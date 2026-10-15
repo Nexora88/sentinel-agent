@@ -65,3 +65,13 @@ Uzun vadeli hedef, MKAOS'un kendi model dosya biçimi, tokenizer'ı, CPU çıkar
 - Model/tokenizer dosyalarının SHA-256 değerleri CI indirmesinde ölçüldü ve model kilit dosyasına yazıldı.
 - Bu kanıtlar **test edilen forward-pass uyumluluğunu** gösterir; Türkçe genel kalite, hız, bellek, uzun süreli kararlılık, eğitimle kendi ağırlıklarını üretme veya üretim güvenliği kanıtı değildir.
 - Ollama ile aynı cihaz karşılaştırması ve ağsız konteyner testi ayrı kabul kapılarıdır; tamamlanana kadar Ollama'yı kaldırmayın.
+
+
+## 2026-10-16 veri ve değerlendirme kapısı
+- [x] Türkçe model eğitimi için kaynak/lisans/izin/PII/split kurallarını tanımlayan bağımsız değerlendirme protokolü eklendi.
+- [x] Örnek başına menşe, içerik SHA-256, insan incelemesi ve train/validation/test ayrımı denetleyen metadata doğrulayıcısı eklendi: `tools/validate_mkaos_training_manifest.py`.
+- [ ] Yetkili kişilerce onaylanmış gerçek veri manifesti henüz sağlanmadı; gerçek eğitim checkpoint'i üretilmedi.
+- [ ] Ayrı tutulmuş, insan tarafından puanlanmış Türkçe held-out test sonuçları henüz yok.
+- [ ] Fiziksel GPU/HPU cihaz testleri, ortak kalıcı dağıtık durum katmanı ve canlı mTLS peer taşıması ayrı kabul kapıları olarak açık kalıyor.
+
+Doğrulayıcı yalnızca metadata tutarlılığı kontrol eder; lisans iznini, kaynağın doğruluğunu veya modelin niteliğini sertifikalandırmaz.
