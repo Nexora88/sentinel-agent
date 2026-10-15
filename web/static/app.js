@@ -637,7 +637,7 @@ async function loadApprovals() {
       <div class="details"><div class="action-name">${item.action}</div><div>${item.details}</div></div>
       <div class="approval-actions">
         <button class="approve" data-id="${item.id}">Onayla</button>
-        <button class="reject" data-idx="${idx}">Reddet</button>
+        <button class="reject" data-id="${item.id}">Reddet</button>
       </div>`;
     box.appendChild(card);
   });
