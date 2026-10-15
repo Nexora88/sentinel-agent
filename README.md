@@ -36,7 +36,7 @@ docker compose -f docker-compose.bootstrap.yml exec ollama-bootstrap ollama pull
 
 ## Docker ilk açılış ve RAG sınırları
 
-`docker compose up --build -d` web panelini ve yerel Ollama hizmetini başlatır. Panel sağlık denetimi Ollama modelinin hazır olmasına bağlı değildir; `/health` web sürecini, `Durum` paneli ise yerel Ollama bağlantısını ayrıca raporlar. Varsayılan `seka_isolated` ağı çalışma sırasında internet çıkışını engeller; bu yüzden model dosyaları önceden hazırlanmalıdır. Model ilk kurulumda otomatik indirilmez.
+`docker compose up --build -d` web panelini ve yerel Ollama hizmetini başlatır. `OWNER_PASSWORD` ayarlamadıysan ilk çalıştırmada rastgele parola `/app/memory/first-run-password.txt` içine yerel olarak yazılır; görmek için `docker compose exec sentinel cat /app/memory/first-run-password.txt` çalıştır. Parola uygulama günlüğüne yazılmaz. Panel sağlık denetimi Ollama modelinin hazır olmasına bağlı değildir; `/health` web sürecini, `Durum` paneli ise yerel Ollama bağlantısını ayrıca raporlar. Varsayılan `seka_isolated` ağı çalışma sırasında internet çıkışını engeller; bu yüzden model dosyaları önceden hazırlanmalıdır. Model ilk kurulumda otomatik indirilmez.
 
 İlk kurulumda model hazırlama komutlarını yukarıdaki **Kesin çevrimdışı çalışma profili** bölümünden uygula; ardından `docker compose up --build -d` ile paneli ve Ollama'yı başlat.
 
@@ -77,7 +77,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-4. `.env` dosyasında **uzun, benzersiz bir `OWNER_PASSWORD`** belirle. GitHub/WhatsApp anahtarlarını yerel-only kullanım için boş bırak. `.env` dosyasını Git'e ekleme.
+4. `.env` dosyasında **uzun, benzersiz bir `OWNER_PASSWORD`** belirle. GitHub/WhatsApp anahtarlarını yerel-only kullanım için boş bırak. `.env` dosyasını Git'e ekleme. Docker için `OLLAMA_BASE_URL=http://ollama:11434` kullan; ana makinede Python ile çalıştırırken `OLLAMA_BASE_URL=http://localhost:11434` ayarla.
 5. Başlat:
 
 ```bash

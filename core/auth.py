@@ -30,14 +30,41 @@ class AuthManager:
         if not self._users:
             owner_pass = os.getenv("OWNER_PASSWORD", "").strip()
             if not owner_pass:
-                # Dev-only fallback — log a clear warning
-                owner_pass = secrets.token_urlsafe(16)
+                # Generate a local first-run secret without writing it to logs.
+                owner_pass = secrets.token_urlsafe(24)
+                self._store_bootstrap_password(owner_pass)
                 logger.warning(
-                    "OWNER_PASSWORD not set. Generated a one-time random owner password for this process. "
-                    "Set OWNER_PASSWORD in .env for a stable login."
+                    "OWNER_PASSWORD not set. A random owner password was stored in the local memory volume. "
+                    "Read it with: docker compose exec sentinel cat /app/memory/first-run-password.txt"
                 )
-                # Do not print the password to logs in full for safety in shared environments
             self.create_user("owner", owner_pass, role="owner", display_name="Owner")
+
+    def _store_bootstrap_password(self, password: str) -> None:
+        """Persist the generated first-run password locally with owner-only file permissions."""
+        path = self.users_file.parent / "first-run-password.txt"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temp_name = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=str(path.parent),
+                prefix=".first-run-password-", suffix=".tmp", delete=False
+            ) as temp:
+                temp.write(password + "\n")
+                temp.flush()
+                os.fsync(temp.fileno())
+                temp_name = temp.name
+            try:
+                os.chmod(temp_name, 0o600)
+            except OSError:
+                pass
+            os.replace(temp_name, path)
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
+        finally:
+            if temp_name and os.path.exists(temp_name):
+                os.unlink(temp_name)
 
     def _load(self) -> Dict:
         if self.users_file.exists():
