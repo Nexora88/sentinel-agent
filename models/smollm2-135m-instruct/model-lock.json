@@ -34,12 +34,12 @@
   },
   "architecture": {
     "transformers_architecture": "LlamaForCausalLM",
-    "note": "Rust SafeTensors loader, GQA decoder, and BPE adapter are implemented but not yet validated against real pinned artifacts; compatibility is not established until tokenizer and logits parity scripts pass."
+    "note": "Real pinned artifacts passed tokenizer ID and chat-template parity plus two real-weight logits comparisons in GitHub Actions run https://github.com/Nexora88/sentinel-agent/actions/runs/38778224914. This validates forward-pass numerical compatibility for the tested prompts, not general generation quality, performance, safety, or complete production readiness."
   },
   "safety": "Only safetensors and JSON files are in scope. Never load pickle-based training_args.bin.",
   "hash_measurement": {
     "status": "measured_in_github_actions",
-    "workflow_run": "https://github.com/Nexora88/sentinel-agent/actions/runs/38777075969",
+    "workflow_run": "https://github.com/Nexora88/sentinel-agent/actions/runs/38778224914",
     "revision": "12fd25f77366fa6b3b4b768ec3050bf629380bac",
     "note": "SHA-256 values were measured after downloading the exact pinned revision. This establishes byte integrity only, not tokenizer/runtime compatibility or model quality."
   }
