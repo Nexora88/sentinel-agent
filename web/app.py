@@ -88,19 +88,27 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 pipelines: dict[str, SentinelPipeline] = {}
 night_scheduler: Optional[NightScheduler] = None
 auth = AuthManager()
-CHAT_HISTORY_FILE = Path("./memory/chat_history.json")
+_encrypt_memory_files = os.getenv("MKAOS_ENCRYPT_MEMORY_FILES", "").strip().lower() in {"1", "true", "yes", "on"}
+CHAT_HISTORY_FILE = Path("./memory/chat_history.enc" if _encrypt_memory_files else "./memory/chat_history.json")
+LEGACY_CHAT_HISTORY_FILE = Path("./memory/chat_history.json")
 
 
 def _load_chat_history() -> dict:
+    if _encrypt_memory_files and LEGACY_CHAT_HISTORY_FILE.exists() and not CHAT_HISTORY_FILE.exists():
+        raise RuntimeError("Plaintext chat history exists while encrypted memory is enabled; migrate it explicitly.")
     if not CHAT_HISTORY_FILE.exists():
         return {}
     try:
-        data = json.loads(CHAT_HISTORY_FILE.read_text(encoding="utf-8"))
+        if _encrypt_memory_files:
+            from core.encrypted_store import EncryptedFileStore
+            raw = EncryptedFileStore(CHAT_HISTORY_FILE).read_bytes()
+            data = json.loads(raw.decode("utf-8"))
+        else:
+            data = json.loads(CHAT_HISTORY_FILE.read_text(encoding="utf-8"))
         if not isinstance(data, dict) or any(not isinstance(v, list) for v in data.values()):
             raise ValueError("chat history must be a user-to-list mapping")
         return data
     except Exception as exc:
-        # Preserve user data and stop rather than silently resetting corrupted history.
         raise RuntimeError(
             f"Chat history is unreadable; preserve and recover {CHAT_HISTORY_FILE} before restarting."
         ) from exc
@@ -108,6 +116,11 @@ def _load_chat_history() -> dict:
 
 def _save_chat_history() -> None:
     CHAT_HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if _encrypt_memory_files:
+        from core.encrypted_store import EncryptedFileStore
+        payload = json.dumps(chat_history, ensure_ascii=False, indent=2).encode("utf-8")
+        EncryptedFileStore(CHAT_HISTORY_FILE).write_bytes(payload)
+        return
     temp_name = None
     try:
         with tempfile.NamedTemporaryFile(
