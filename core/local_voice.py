@@ -15,6 +15,7 @@ VOICE_DIR = Path(os.getenv("SEKA_VOICE_MODEL_DIR", "./models/voices")).resolve()
 PIPER_BIN = os.getenv("PIPER_EXECUTABLE", "piper")
 WHISPER_BIN = os.getenv("WHISPER_CPP_BIN", "whisper-cli")
 WHISPER_MODEL = os.getenv("WHISPER_MODEL_PATH", "").strip()
+FASTER_WHISPER_MODEL = os.getenv("FASTER_WHISPER_MODEL_PATH", "./models/whisper-small").strip()
 VOICE_MODELS = {
     "male": os.getenv("SEKA_VOICE_MALE_MODEL", "tr_TR-fettah-medium.onnx"),
     "female": os.getenv("SEKA_VOICE_FEMALE_MODEL", "tr_TR-dfki-medium.onnx"),
@@ -41,7 +42,9 @@ def voice_status() -> dict:
     return {
         "mode": "local-only",
         "piper_available": shutil.which(PIPER_BIN) is not None,
-        "whisper_available": shutil.which(WHISPER_BIN) is not None and bool(WHISPER_MODEL and Path(WHISPER_MODEL).is_file()),
+        "whisper_cpp_available": shutil.which(WHISPER_BIN) is not None and bool(WHISPER_MODEL and Path(WHISPER_MODEL).is_file()),
+        "faster_whisper_available": __import__("importlib.util").util.find_spec("faster_whisper") is not None and Path(FASTER_WHISPER_MODEL).is_dir(),
+        "whisper_available": (shutil.which(WHISPER_BIN) is not None and bool(WHISPER_MODEL and Path(WHISPER_MODEL).is_file())) or (__import__("importlib.util").util.find_spec("faster_whisper") is not None and Path(FASTER_WHISPER_MODEL).is_dir()),
         "voices": {
             key: {"configured": (VOICE_DIR / filename).is_file(), "file": filename}
             for key, filename in VOICE_MODELS.items()
@@ -92,18 +95,40 @@ def synthesize(text: str, voice: str = "male", cat_mode: bool = False) -> bytes:
 
 
 def transcribe(audio: bytes, suffix: str = ".webm") -> str:
-    executable = shutil.which(WHISPER_BIN)
-    model = Path(WHISPER_MODEL).expanduser().resolve() if WHISPER_MODEL else None
-    if not executable or not model or not model.is_file():
-        raise LocalVoiceError(
-            "Yerel Türkçe konuşma tanıma hazır değil. whisper.cpp ve yerel model yolunu yapılandır."
-        )
     if not audio or len(audio) > 15 * 1024 * 1024:
         raise LocalVoiceError("Ses dosyası boş veya 15 MB sınırını aşıyor.")
     safe_suffix = suffix if suffix in {".webm", ".wav", ".mp3", ".m4a", ".ogg"} else ".webm"
     with tempfile.TemporaryDirectory(prefix="seka-stt-") as temp_dir:
         audio_path = Path(temp_dir) / ("input" + safe_suffix)
         audio_path.write_bytes(audio)
+        faster_model = Path(FASTER_WHISPER_MODEL).expanduser().resolve()
+        if faster_model.is_dir():
+            try:
+                from faster_whisper import WhisperModel
+            except ImportError:
+                pass
+            else:
+                try:
+                    # local_files_only prevents downloading a model at runtime.
+                    model = WhisperModel(
+                        str(faster_model), device="cpu", compute_type="int8",
+                        local_files_only=True,
+                    )
+                    segments, _info = model.transcribe(
+                        str(audio_path), language="tr", vad_filter=True,
+                        beam_size=3, condition_on_previous_text=False,
+                    )
+                    text = " ".join(segment.text.strip() for segment in segments).strip()
+                    if text:
+                        return text[:8000]
+                except Exception as exc:
+                    raise LocalVoiceError("Yerel faster-whisper modeli çözümlenemedi; model dosyalarını denetle.") from exc
+        executable = shutil.which(WHISPER_BIN)
+        model = Path(WHISPER_MODEL).expanduser().resolve() if WHISPER_MODEL else None
+        if not executable or not model or not model.is_file():
+            raise LocalVoiceError(
+                "Yerel Türkçe konuşma tanıma hazır değil. faster-whisper model klasörünü veya whisper.cpp model yolunu yapılandır."
+            )
         result = subprocess.run(
             [executable, "-m", str(model), "-f", str(audio_path), "-l", "tr", "-nt", "-np"],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120, check=False,
