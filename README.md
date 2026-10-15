@@ -1,8 +1,12 @@
-# SEKA v6.3 — Sentinel Agent
+# MKAOS v6.4 — Mustafa Kemal Atatürk Operating System
 
-**Yerel Türkçe ajan altyapısı.** Ollama üzerinden yerel çıkarım; bulut model API'si zorunlu değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
+**Yerel Türkçe ajan işletim sistemi altyapısı.** Ollama üzerinden yerel çıkarım; bulut model API'si zorunlu değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
-SEKA; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. “Kendi kararlarını vermek”, hedefler için plan önermek ve güvenli yerel işleri yürütmek anlamına gelir. Dosya değiştirme, commit, push, bildirim veya harici sisteme veri gönderme gibi etkiler açık onay gerektirir.
+MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. “Kendi kararlarını vermek”, hedefler için plan önermek ve güvenli yerel işleri yürütmek anlamına gelir. Dosya değiştirme, commit, push, bildirim veya harici sisteme veri gönderme gibi etkiler açık onay gerektirir.
+
+## Marka ve tasarım ilkesi
+
+MKAOS, *Mustafa Kemal Atatürk Operating System* anlamıyla yerel egemenlik, bilim ve üretim hedefini temsil eder. Arayüz sloganı: **“İstikbal Siber Göklerdedir.”** Marka veya ağ durumu tek başına güvenlik kanıtı değildir; “TAM EGEMEN / AIR-GAPPED” yalnızca ağ çıkışı gerçekten sınırlandırılıp doğrulandığında kullanılmalıdır.
 
 ## Gizlilik modeli ve sınırlar
 
@@ -13,13 +17,20 @@ SEKA; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik ta
 - **Savunmacı tarama:** web tarayıcısı yerel/özel IP'leri ve doğrulanmayan yönlendirmeleri engeller. Yalnızca sahibi olduğun veya tarama iznin olan hedeflerde kullan.
 - **Güvenlik dürüstlüğü:** uygulama tek başına “veri asla dışarı çıkamaz” garantisi veremez. Bu; uygulama ayarlarına, işletim sistemi/firewall'a, model endpoint'ine, yedeklemeye ve etkinleştirilen entegrasyonlara bağlıdır.
 
+## Yerel medya stüdyosu
+
+- Görsel üretimi ve düzenleme yalnızca `SD_API_URL` ile açıkça yapılandırılmış, kendi yönettiğin Stable Diffusion WebUI API sunucusuna gider. Kamuya açık görsel API yedeği kaldırılmıştır; sunucu tanımlı değilse işlem başarısız olur ve görsel istemi dışarı gönderilmez.
+- `POST /api/media/edit` yerel `img2img` uç noktasını kullanır. `POST /api/media/background` isteğe bağlı `rembg` + önceden indirilmiş `u2net.onnx` modeliyle arka planı ayırıp yerel renk ile birleştirir. İlk çalıştırmada otomatik model indirme yapılmaz.
+- `POST /api/media/video` yerel `ffmpeg` ile mevcut PNG görseline kısa hareket/zoom efekti verir. Bu, metinden gerçek video üreten bir model değildir; tam video üretimi daha sonra kendi barındırılan video model adaptörüyle eklenebilir.
+- Görseller 12 MB ve 20 MP sınırlarıyla doğrulanır; çıktılar yerel `memory/generated_images/` içinde tutulur. `SD_API_URL` boşsa üretim kapalıdır.
+
 ## Kesin çevrimdışı çalışma profili
 
-`docker-compose.yml` varsayılan olarak SEKA ve Ollama'yı internet çıkışı olmayan `seka_isolated` Docker ağına bağlar. `docker-compose.offline.yml` bu tercihi ayrıca açıkça belirtir. GitHub token'ı, web araştırması, dış bildirim ve harici görsel üretimi bu profilde kapalıdır. Bu nedenle canlı finans verisi, GitHub yazma ve web taraması çevrimdışı profilde çalışmaz; bu beklenen bir gizlilik sınırıdır.
+`docker-compose.yml` varsayılan olarak MKAOS ve Ollama'yı internet çıkışı olmayan `seka_isolated` Docker ağına bağlar. `docker-compose.offline.yml` bu tercihi ayrıca açıkça belirtir. GitHub token'ı, web araştırması, dış bildirim ve harici görsel üretimi bu profilde kapalıdır. Bu nedenle canlı finans verisi, GitHub yazma ve web taraması çevrimdışı profilde çalışmaz; bu beklenen bir gizlilik sınırıdır.
 
 **Model/imaç hazırlığı çevrimiçi yapılır; ardından uygulama izole edilir:**
 
-1. Gerekli Docker imajını önceden indir ve SEKA imajını oluştur: `docker compose -f docker-compose.yml build sentinel`.
+1. Gerekli Docker imajını önceden indir ve MKAOS imajını oluştur: `docker compose -f docker-compose.yml build sentinel`.
 2. Ollama modelleri için hazırlık servisini başlat: `docker compose -f docker-compose.bootstrap.yml up -d`.
 3. Modelleri indir:
 
