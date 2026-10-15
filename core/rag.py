@@ -49,16 +49,22 @@ class MemoryStore:
         self.tenant_id = str(tenant_id).strip().lower() if tenant_id else None
         self.persist_directory = Path(persist_directory)
         self.persist_directory.mkdir(parents=True, exist_ok=True)
-        self.ollama = ollama or OllamaClient()
-        self.embedding_provider = os.getenv("SEKA_EMBEDDINGS_PROVIDER", "ollama").strip().lower()
+        # Offline lexical retrieval is the default. Ollama embeddings are explicit opt-in.
+        self.embedding_provider = os.getenv("SEKA_EMBEDDINGS_PROVIDER", "mkaos-native").strip().lower()
         if self.embedding_provider == "mkaos-native":
             from core.native_embeddings import NativeHashEmbeddings
             embedding_function = NativeHashEmbeddings()
+            self.ollama = ollama  # Do not construct or contact a model server in native mode.
         elif self.embedding_provider == "ollama":
+            self.ollama = ollama or OllamaClient()
             embedding_function = self.ollama.embeddings
         else:
             raise ValueError("SEKA_EMBEDDINGS_PROVIDER must be ollama or mkaos-native")
         self.collection_name = collection_name
+        # Never mix vectors produced by different embedding spaces, even if dimensions match.
+        provider_suffix = "_native_hash_v1" if self.embedding_provider == "mkaos-native" else "_ollama"
+        base_name = collection_name[:63 - len(provider_suffix)].rstrip("-_") or "seka"
+        self.storage_collection_name = base_name + provider_suffix
         self.max_documents = _limit(max_documents, "SEKA_RAG_MAX_DOCUMENTS", 10000, 100000)
         self.max_chunks_per_ingest = _limit(
             max_chunks_per_ingest, "SEKA_RAG_MAX_CHUNKS_PER_INGEST", 500, 10000
@@ -68,7 +74,7 @@ class MemoryStore:
         )
         self._lock = threading.RLock()
         self.vectorstore = Chroma(
-            collection_name=collection_name,
+            collection_name=self.storage_collection_name,
             embedding_function=embedding_function,
             persist_directory=str(self.persist_directory),
         )

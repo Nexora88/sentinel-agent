@@ -28,7 +28,7 @@ MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik t
 
    `docker compose exec sentinel python -c "import urllib.request; print(urllib.request.urlopen('http://mkaos:11435/health').read().decode())"`
 
-Ollama sohbetine geri dönüş yolu kaldırılmıştır. MKAOS hizmeti kapalıysa sohbet isteği açık hata verir; önce MKAOS servisini düzeltin. İlk model yüklemesi birkaç saniye veya daha uzun sürebilir; sonraki isteklerde süreç yeniden başlatılmadıkça ağırlıklar bellekte kalır. API şu an token-token streaming sağlamaz ve istekleri sıralı işler.
+Ollama sohbetine geri dönüş yolu kaldırılmıştır. MKAOS hizmeti kapalıysa sohbet isteği açık hata verir; önce MKAOS servisini düzeltin. İlk model yüklemesi birkaç saniye veya daha uzun sürebilir; sonraki isteklerde süreç yeniden başlatılmadıkça ağırlıklar bellekte kalır. `stream: true` ile NDJSON token akışı desteklenir. İstekler sınırlı worker havuzuyla eşzamanlı işlenir; varsayılan sınır 4 olup `MKAOS_MAX_CONCURRENT_REQUESTS` ile 1–64 aralığında ayarlanır. Kapasite dolduğunda sınırsız kuyruk yerine `503 Service Unavailable` döner.
 
 **Hedef cihazda kalite ve sürekli-istek ölçümü (TTFT testi bu aşamada çalıştırılmaz):**
 
@@ -236,9 +236,9 @@ python tools/fetch_model.py
 cargo run --release --manifest-path engine/mkaos-hf-adapter/Cargo.toml --bin mkaos_server -- models/smollm2-135m-instruct
 ```
 
-Varsayılan adres `http://127.0.0.1:11435` şeklindedir. `/health`, `/api/chat`, `/api/generate` ve `/api/tags` uç noktaları desteklenir. Sohbet yanıtı uyumluluk amacıyla tek NDJSON yanıtı olarak gönderilir; token token canlı akış henüz uygulanmamıştır.
+Varsayılan adres `http://127.0.0.1:11435` şeklindedir. `/health`, `/api/chat`, `/api/generate` ve `/api/tags` uç noktaları desteklenir. İstek gövdesinde `stream: true` kullanıldığında yanıt token parçaları halinde NDJSON akışıyla gönderilir. Sunucu varsayılan olarak aynı anda 4 isteği işler; `MKAOS_MAX_CONCURRENT_REQUESTS` 1–64 aralığında ayarlanabilir. Kapasite dolduğunda sınırsız bellek kuyruğu yerine `503 Service Unavailable` döner.
 
-Uygulamayı MKAOS'a yönlendirmek için `.env` içinde `MKAOS_BASE_URL=http://127.0.0.1:11435` ayarlanır; `MKAOS_ENABLED` sohbet için artık geçersizdir. **Geri alma yok:** sohbet üretimi yalnızca MKAOS'a gider. MKAOS kapalıysa hata görünür; Ollama sohbet sağlayıcısı olarak kullanılmaz. Embedding işlemleri Ollama'da kalır. MKAOS sunucusu çalışmıyorsa uygulama otomatik olarak Ollama'ya geçmez; sessiz sağlayıcı değişimi yerine açık hata davranışı korunur.
+Uygulamayı MKAOS'a yönlendirmek için `.env` içinde `MKAOS_BASE_URL=http://127.0.0.1:11435` ayarlanır; `MKAOS_ENABLED` sohbet için artık geçersizdir. **Geri alma yok:** sohbet üretimi yalnızca MKAOS'a gider. MKAOS kapalıysa hata görünür; Ollama sohbet sağlayıcısı olarak kullanılmaz. RAG embedding varsayılanı çevrimdışı `mkaos-native` sözcük/karakter n-gram taban çizgisidir; bu eğitilmiş anlamsal bir model değildir. İsteğe bağlı Ollama embedding için `SEKA_EMBEDDINGS_PROVIDER=ollama` ayarlanır; eski koleksiyonlar farklı vektör uzayları arasında karıştırılmamalıdır. MKAOS sunucusu çalışmıyorsa uygulama otomatik olarak Ollama'ya geçmez; sessiz sağlayıcı değişimi yerine açık hata davranışı korunur.
 
 Bu özellik deneysel durumdadır. Mevcut aday ağırlıklar üçüncü taraf SmolLM2'dir; bu sunucu kendi ağırlıklarımızı eğitmez. Türkçe kalite, semantik doğruluk ve hedef cihaz performansı sabit değerlendirme kümesiyle ölçülmeden varsayılan yapılmamalıdır. Kalite raporu:
 
