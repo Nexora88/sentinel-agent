@@ -56,7 +56,7 @@ class SentinelPipeline:
         self.ollama = self.router.default
         self.memory = MemoryStore(ollama=self.ollama, persist_directory=str(self.storage_root / 'rag'), tenant_id=self.tenant_id)
         self.personal_memory = PersonalMemory(ollama=self.ollama, persist_directory=str(self.storage_root / 'personal'), tenant_id=self.tenant_id)
-        self.permissions = PermissionManager()
+        self.permissions = PermissionManager(store_path=str(self.storage_root / 'approvals.json'))
         self.git = GitTools()
         self.notifier = Notifier()
         self.code_writer = CodeWriter(ollama=self.ollama, permissions=self.permissions)
@@ -64,7 +64,7 @@ class SentinelPipeline:
 
         self.github = GitHubClient(permissions=self.permissions)
         self.finance = FinanceEngine(ollama=self.ollama)
-        self.auto_finance = AutonomousFinance(ollama=self.ollama)
+        self.auto_finance = AutonomousFinance(ollama=self.ollama, state_dir=str(self.storage_root / 'finance'))
         self.image_gen = ImageGenerator()
         self.media_bridge = GenerationBridge([ImageGeneratorAdapter(self.image_gen)])
         self.media_engine = MediaEngine(self.media_bridge, state_path=str(self.storage_root / 'media_jobs.json'))
