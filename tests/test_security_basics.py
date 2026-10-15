@@ -4,7 +4,28 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from core.permission_manager import Action, PermissionManager
+from core.ollama_client import validate_local_ollama_url
 from tools.website_scanner import UnsafeTarget, WebsiteScanner, validate_public_url
+
+
+class LocalModelEndpointTests(unittest.TestCase):
+    def test_only_loopback_and_local_docker_endpoint_are_allowed(self):
+        self.assertEqual(
+            validate_local_ollama_url("http://localhost:11434"),
+            "http://localhost:11434",
+        )
+        self.assertEqual(
+            validate_local_ollama_url("http://host.docker.internal:11434"),
+            "http://host.docker.internal:11434",
+        )
+        for endpoint in (
+            "https://api.example.com",
+            "http://192.168.1.20:11434",
+            "http://user:password@localhost:11434",
+        ):
+            with self.subTest(endpoint=endpoint):
+                with self.assertRaises(ValueError):
+                    validate_local_ollama_url(endpoint)
 
 
 class PublicUrlValidationTests(unittest.TestCase):
