@@ -57,25 +57,41 @@ def main() -> int:
 
     # Verify every declared special token resolves as a single dedicated token.
     config = json.loads(tokenizer_config.read_text(encoding="utf-8"))
-    special_values = []
-    for key in ("bos_token", "eos_token", "unk_token", "pad_token"):
-        value = config.get(key)
+    def token_content(value):
         if isinstance(value, str):
-            special_values.append(value)
-        elif isinstance(value, dict) and isinstance(value.get("content"), str):
-            special_values.append(value["content"])
-    special_values += ["<|im_start|>", "<|im_end|>", "<|im_sep|>"]
-    for token in dict.fromkeys(special_values):
+            return value
+        if isinstance(value, dict) and isinstance(value.get("content"), str):
+            return value["content"]
+        return None
+
+    special_values = []
+    for key in ("bos_token", "eos_token", "unk_token", "pad_token",
+                "sep_token", "cls_token", "mask_token"):
+        token = token_content(config.get(key))
+        if token:
+            special_values.append(token)
+    for value in config.get("added_tokens_decoder", {}).values():
+        token = token_content(value)
+        if token and isinstance(value, dict) and value.get("special", False):
+            special_values.append(token)
+    for value in config.get("additional_special_tokens", []):
+        token = token_content(value)
+        if token:
+            special_values.append(token)
+    special_values = list(dict.fromkeys(special_values))
+    if not special_values:
+        raise SystemExit("Tokenizer config declares no special tokens to validate.")
+    for token in special_values:
         ids = reference.encode(token, add_special_tokens=False).ids
         if len(ids) != 1:
-            raise SystemExit(f"Special token is not one ID: {token!r} -> {ids}")
-        print(f"PASS special token: {token!r} -> {ids[0]}")
+            raise SystemExit(f"Declared special token is not one ID: {token!r} -> {ids}")
+        print(f"PASS declared special token: {token!r} -> {ids[0]}")
 
     rust_template = subprocess.run(
         ["cargo", "run", "--quiet", "--manifest-path", str(rust_manifest),
          "--bin", "tokenizer_probe", "--", str(tokenizer_json), "--chat-template"],
         check=True, capture_output=True, text=True,
-    ).stdout
+    ).stdout.removesuffix("\n")
     hf_tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
     messages = [
         {"role": "system", "content": "Answer briefly and accurately."},
@@ -92,7 +108,7 @@ def main() -> int:
         print("HF CHAT TEMPLATE:  ", repr(hf_template), file=sys.stderr)
         raise SystemExit("Chat-template mismatch; do not mark tokenizer integration compatible.")
     print("PASS chat template: Rust rendering matches Hugging Face apply_chat_template output")
-    print(f"PASS: {len(SAMPLES)} multilingual/token-special text cases; {len(set(special_values))} special-token spellings.")
+    print(f"PASS: {len(SAMPLES)} multilingual/token-special text cases; {len(set(special_values))} declared special-token spellings.")
     return 0
 
 
