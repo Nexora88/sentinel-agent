@@ -32,6 +32,21 @@ class LocalModelEndpointTests(unittest.TestCase):
                     validate_local_ollama_url(endpoint)
 
 
+
+    def test_crewai_adapter_uses_only_local_ollama_provider(self):
+        from unittest.mock import patch
+        from core.ollama_client import OllamaClient
+
+        client = OllamaClient(model="qwen2.5:7b", base_url="http://ollama:11434")
+        with patch("crewai.LLM") as local_llm:
+            client.get_crew_llm()
+        local_llm.assert_called_once_with(
+            model="ollama/qwen2.5:7b",
+            base_url="http://ollama:11434",
+            temperature=0.2,
+        )
+
+
 class PublicUrlValidationTests(unittest.TestCase):
     def test_blocks_loopback_and_private_addresses(self):
         for url in (

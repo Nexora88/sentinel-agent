@@ -104,5 +104,13 @@ class OllamaClient:
         return response.content
 
     def get_crew_llm(self):
-        """Return LLM compatible with CrewAI."""
-        return self.llm
+        """Return CrewAI's local Ollama adapter; never fall back to a hosted provider."""
+        from crewai import LLM
+
+        # CrewAI's current Agent schema does not accept LangChain ChatOllama directly.
+        # The explicit ollama/ provider and validated local base_url keep inference local.
+        return LLM(
+            model=f"ollama/{self.model_name}",
+            base_url=self.base_url,
+            temperature=self.temperature,
+        )
