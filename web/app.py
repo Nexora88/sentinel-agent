@@ -17,7 +17,7 @@ import requests
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, Request, Header, HTTPException, UploadFile, File
+from fastapi import FastAPI, Request, Header, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -40,7 +40,7 @@ from core.night_scheduler import NightScheduler
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("seka.web")
 
-app = FastAPI(title="SEKA", version="6.3", description="Sentinel Egemen Kişisel Ajan")
+app = FastAPI(title="MKAOS", version="6.4", description="Mustafa Kemal Atatürk Operating System — yerel ajan işletim sistemi")
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -101,11 +101,13 @@ def _save_chat_history() -> None:
 chat_history = _load_chat_history()
 
 MANIFESTO = {
-    "name": "SEKA",
+    "name": "MKAOS",
     "version": "6.3",
-    "tagline": "Yerel Türkçe ajan — ağ özellikleri varsayılan olarak kapalı",
+    "tagline": "Mustafa Kemal Atatürk Operating System · İstikbal Siber Göklerdedir · yerel egemenlik",
     "pillars": [
-        "Ollama ile tamamen yerel zeka",
+        "Yerel model çekirdeği ve denetlenebilir ajan planları",
+        "Ağ çıkışı engellendiğinde AIR-GAPPED; doğrulanmadıysa egemenlik iddiası yok",
+        "İstikbal Siber Göklerdedir — bilgi, üretim ve bağımsızlık",
         "Bilgi evreni: sanitize + güven skoru ile büyür",
         "İzin modeli: yazma/push asla otomatik değil",
         "Paper finans: sanal para, kilitli risk kuralları",
@@ -156,6 +158,8 @@ class LoginRequest(BaseModel):
 
 class ImageRequest(BaseModel):
     prompt: str
+    width: int = 768
+    height: int = 768
 
 class FinanceRequest(BaseModel):
     query: str
@@ -181,7 +185,7 @@ async def startup():
     # Keep the web process available even if Ollama/models are temporarily offline.
     # Nightly maintenance writes reports/proposals only; it never edits or pushes code.
     global night_scheduler
-    logger.info("SEKA Web v6.3 — lazy local model initialization")
+    logger.info("MKAOS v6.4 — lazy local model initialization")
     enabled = os.getenv("SEKA_NIGHT_AUTORUN", "true").strip().lower() in {"1", "true", "yes", "on"}
     try:
         night_scheduler = NightScheduler(
@@ -209,7 +213,7 @@ async def shutdown():
 @app.get("/health")
 async def health():
     # Container health must not depend on the Ollama model being loaded.
-    return {"status": "ok", "service": "SEKA", "version": "6.3", "model_checked": False}
+    return {"status": "ok", "service": "MKAOS", "version": "6.4", "model_checked": False}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -308,7 +312,7 @@ async def api_status(authorization: Optional[str] = Header(None)):
     except Exception as exc:
         logger.warning("SEKA bileşenleri başlatılamadı (%s).", type(exc).__name__)
         return {
-            "brand": "SEKA", "version": "6.3", "status": "degraded", "user": user,
+            "brand": "MKAOS", "version": "6.4", "status": "degraded", "user": user,
             "assistant": {"status": "degraded", "message": "SEKA paneli açık; yerel bellek veya model bileşeni başlatılamadı. Veriler otomatik silinmedi."},
             "ollama": {"status": "unavailable", "message": "Ollama bağlantısı hazır değil. Ollama hizmetini, model kurulumunu ve yerel bellek dizinini kontrol et."},
             "privacy": {"web_research": False, "external_finance_data": False, "site_scanning": False, "external_notifications": False, "github_network_access": False},
@@ -318,7 +322,7 @@ async def api_status(authorization: Optional[str] = Header(None)):
     fin = p.finance_status()
     cur = p.curiosity.get_status()
     return {
-        "brand": "SEKA",
+        "brand": "MKAOS",
         "version": "6.3",
         "status": "ok",
         "ollama": _ollama_status(p),
@@ -655,7 +659,64 @@ async def api_finance_cycle(authorization: Optional[str] = Header(None)):
 @app.post("/api/image")
 async def api_image(req: ImageRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
-    return get_pipeline().image_gen.generate(req.prompt)
+    try:
+        return get_pipeline().image_gen.generate(req.prompt, width=req.width, height=req.height)
+    except Exception as exc:
+        from tools.image_gen import MediaToolError
+        if isinstance(exc, MediaToolError):
+            raise HTTPException(503, str(exc))
+        logger.exception("MKAOS local image generation failed")
+        raise HTTPException(500, "Yerel görsel üretimi başarısız oldu.")
+
+
+@app.post("/api/media/edit")
+async def api_media_edit(prompt: str = Form(...), file: UploadFile = File(...), authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    raw = await file.read(12 * 1024 * 1024 + 1)
+    if len(raw) > 12 * 1024 * 1024:
+        raise HTTPException(413, "Görsel en fazla 12 MB olabilir.")
+    try:
+        return get_pipeline().image_gen.edit(prompt, raw)
+    except Exception as exc:
+        from tools.image_gen import MediaToolError
+        if isinstance(exc, MediaToolError):
+            raise HTTPException(503, str(exc))
+        logger.exception("MKAOS local image editing failed")
+        raise HTTPException(500, "Görsel düzenleme başarısız oldu.")
+
+
+@app.post("/api/media/background")
+async def api_media_background(file: UploadFile = File(...), color: str = Form("#172033"), authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    raw = await file.read(12 * 1024 * 1024 + 1)
+    if len(raw) > 12 * 1024 * 1024:
+        raise HTTPException(413, "Görsel en fazla 12 MB olabilir.")
+    try:
+        return get_pipeline().image_gen.replace_background(raw, color)
+    except Exception as exc:
+        from tools.image_gen import MediaToolError
+        if isinstance(exc, MediaToolError):
+            raise HTTPException(503, str(exc))
+        logger.exception("MKAOS local background replacement failed")
+        raise HTTPException(500, "Arka plan değiştirme başarısız oldu.")
+
+
+class VideoRequest(BaseModel):
+    filename: str
+    duration: float = 4.0
+
+
+@app.post("/api/media/video")
+async def api_media_video(req: VideoRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    try:
+        return get_pipeline().image_gen.create_video(req.filename, req.duration)
+    except Exception as exc:
+        from tools.image_gen import MediaToolError
+        if isinstance(exc, MediaToolError):
+            raise HTTPException(503, str(exc))
+        logger.exception("MKAOS local video rendering failed")
+        raise HTTPException(500, "Video oluşturma başarısız oldu.")
 
 
 @app.get("/api/images/{filename}")
