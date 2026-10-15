@@ -297,6 +297,12 @@
             <textarea id="approval-payload" rows="4" placeholder='{"request_id":"...","action":"git_push"}'></textarea>
             <label for="approval-signature">Ed25519 imzası (Base64)</label>
             <input id="approval-signature" type="text" placeholder="İmza Base64" />
+            <div class="control-actions">
+              <button id="approval-keygen-btn" type="button">Tarayıcıda Ed25519 anahtarı üret</button>
+              <button id="approval-sign-btn" type="button" class="primary">Payload'ı imzala + doğrula</button>
+            </div>
+            <p>Özel anahtar yalnızca tarayıcıda üretilir ve indirilen dosyada saklanır; sunucuya gönderilmez. Açık anahtarı MKAOS_APPROVAL_ED25519_PUBLIC_KEY ortam değişkenine ekleyip servisi yeniden başlatmalısın.</p>
+            <pre id="approval-public-key" class="status-box">Henüz anahtar üretilmedi.</pre>
             <button id="verify-approval-btn" class="primary">İmzayı doğrula</button>
             <pre id="approval-verify-result" class="status-box">İşlem başlatılmaz; yalnızca imza doğrulanır.</pre>
           </div>
