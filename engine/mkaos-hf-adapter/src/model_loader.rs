@@ -93,10 +93,12 @@ pub fn load_smollm2(config_path: impl AsRef<Path>, weights_path: impl AsRef<Path
         });
     }
     let final_norm = vector(&tensors, "model.norm.weight")?;
-    let lm_head = match matrix(&tensors, "lm_head.weight", true) {
-        Ok(head) => head,
-        Err(_) if config.get("tie_word_embeddings").and_then(Value::as_bool) == Some(true) => embedding.transpose()?,
-        Err(error) => return Err(error),
+    let lm_head = if tensors.tensor("lm_head.weight").is_ok() {
+        matrix(&tensors, "lm_head.weight", true)?
+    } else if config.get("tie_word_embeddings").and_then(Value::as_bool) == Some(true) {
+        embedding.transpose()?
+    } else {
+        return Err("lm_head.weight is missing and config does not tie embeddings".into());
     };
     GqaDecoder::new(GqaConfig {
         query_heads, kv_heads, rms_epsilon: epsilon, rope_theta: theta, max_sequence_len: max_seq,
@@ -114,6 +116,6 @@ mod tests {
         fs::write(&path, r#"{"model_type":"gpt2"}"#).unwrap();
         let result = load_smollm2(&path, path.with_extension("missing.safetensors"));
         let _ = fs::remove_file(path);
-        assert!(result.unwrap_err().to_string().contains("only LlamaForCausalLM"));
+        assert!(result.err().unwrap().to_string().contains("only LlamaForCausalLM"));
     }
 }
