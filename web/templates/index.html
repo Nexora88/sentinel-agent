@@ -28,7 +28,8 @@
         <button class="nav-btn" data-panel="finance">Finans</button>
         <button class="nav-btn" data-panel="discover">Keşif</button>
         <button class="nav-btn" data-panel="legacy">Yedek</button>
-        <button class="nav-btn" data-panel="image">Görsel</button>
+        <button class="nav-btn" data-panel="image">Medya Stüdyosu</button>
+        <button class="nav-btn" data-panel="control">Egemenlik Kontrol Odası</button>
         <button class="nav-btn" data-panel="github">GitHub</button>
         <button class="nav-btn" data-panel="approvals">Onaylar</button>
         <button class="nav-btn" data-panel="status">Durum</button>
@@ -269,6 +270,43 @@
         <div id="approvals-list" class="approvals-list"><p class="empty">Yok</p></div>
         <h3 class="section-h">İşlem geçmişi</h3>
         <div id="approval-history" class="approvals-list"><p class="empty">Geçmiş yükleniyor…</p></div>
+      </section>
+
+
+      <section id="panel-control" class="panel">
+        <header class="panel-header">
+          <h1>Egemenlik ve Plan Kontrol Odası</h1>
+          <p>Yerel-first denetim paneli · imzalı onay · medya görev kuyruğu · lisans hijyeni. Gösterilen durum kanıta dayanır.</p>
+        </header>
+        <div id="sovereignty-status-card" class="control-card">Egemenlik kanıtları denetleniyor…</div>
+        <div class="control-grid">
+          <div class="control-card">
+            <h3>Yerel model ve kaynaklar</h3>
+            <pre id="media-capabilities" class="status-box">Yükleniyor…</pre>
+            <div class="control-actions">
+              <input id="queue-media-prompt" type="text" placeholder="Kuyruğa görsel görevi ekle" />
+              <button id="queue-media-btn" class="primary">Kuyruğa ekle</button>
+              <button id="refresh-media-btn">Kuyruğu yenile</button>
+            </div>
+            <div id="media-jobs-list" class="approvals-list"></div>
+          </div>
+          <div class="control-card">
+            <h3>İmzalı insan onayı</h3>
+            <p>Ed25519 imzası doğrulanır ve audit kaydı yazılır. İmza tek başına push/merge yapmaz; açık anahtar sunucuda yapılandırılmalıdır.</p>
+            <label for="approval-payload">İmzalanmış JSON payload</label>
+            <textarea id="approval-payload" rows="4" placeholder='{"request_id":"...","action":"git_push"}'></textarea>
+            <label for="approval-signature">Ed25519 imzası (Base64)</label>
+            <input id="approval-signature" type="text" placeholder="İmza Base64" />
+            <button id="verify-approval-btn" class="primary">İmzayı doğrula</button>
+            <pre id="approval-verify-result" class="status-box">İşlem başlatılmaz; yalnızca imza doğrulanır.</pre>
+          </div>
+        </div>
+        <div class="control-card">
+          <h3>Temiz kod / lisans uyarı taraması</h3>
+          <p>SPDX ve lisans bildirimi ipuçlarını yerelde arar. Semantik benzerlik ölçmez; yasal karar veya telif garantisi değildir.</p>
+          <button id="clean-room-audit-btn">Yerel lisans denetimini çalıştır</button>
+          <pre id="clean-room-audit-result" class="status-box">Denetim isteğe bağlıdır.</pre>
+        </div>
       </section>
 
       <section id="panel-status" class="panel">
