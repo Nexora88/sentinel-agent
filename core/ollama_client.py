@@ -46,7 +46,7 @@ class OllamaClient:
         temperature: float = 0.2,
     ):
         self.base_url = validate_local_ollama_url(base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
-        self.model_name = model or os.getenv("OLLAMA_MODEL", "qwen2.5-coder:32b")
+        self.model_name = model or os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
         self.embed_model_name = embed_model or os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
         self.temperature = temperature
 

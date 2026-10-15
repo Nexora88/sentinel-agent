@@ -6,8 +6,8 @@ services:
       - "127.0.0.1:${WEB_PORT:-8000}:8000"
     environment:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5-coder:7b}
-      - OLLAMA_MODEL_FAST=${OLLAMA_MODEL_FAST:-qwen2.5-coder:7b}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b}
+      - OLLAMA_MODEL_FAST=${OLLAMA_MODEL_FAST:-qwen2.5:7b}
       - OLLAMA_MODEL_DEEP=${OLLAMA_MODEL_DEEP:-qwen2.5-coder:7b}
       - OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
