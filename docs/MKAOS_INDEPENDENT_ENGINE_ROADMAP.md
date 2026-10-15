@@ -4,7 +4,7 @@
 
 MKAOS'un uzun vadeli hedefi, model çalışma zamanı üzerinde mimari kontrolü artırmak ve Ollama gibi harici çalışma zamanlarına zorunlu bağımlılığı zaman içinde azaltmaktır. Bu, tek bir PR ile tamamlanmış değildir. İlk adım olarak `engine/mkaos-inference` altında harici crate bağımlılığı olmayan, `unsafe` kodu yasaklayan Rust CPU tensör çekirdeği başlatıldı.
 
-**Mevcut kapsam:** temel matris çarpımı, satır bazlı kararlı softmax ve RMS normalizasyonu. Bu kod henüz tokenizer, transformer decoder, model ağırlığı yükleyicisi, KV cache, kuantizasyon, GPU sürücüsü veya sohbet üretim hattı içermez; mevcut Ollama yolunun yerine geçmez.
+**Mevcut kapsam:** temel matris çarpımı, transpoz, satır bazlı kararlı softmax, RMS normalizasyonu ve referans scaled dot-product attention. Bu kod henüz tokenizer, transformer decoder, model ağırlığı yükleyicisi, KV cache, kuantizasyon, GPU sürücüsü veya sohbet üretim hattı içermez; mevcut Ollama yolunun yerine geçmez.
 
 ## Aşamalı plan
 
