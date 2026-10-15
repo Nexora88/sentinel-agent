@@ -57,8 +57,13 @@ class LocalReasoningEngine:
             "are supplied. Do not request or reveal private hidden reasoning. Return concise, verifiable "
             "summaries, assumptions, risks, and next steps. Never execute commands or mutate files."
         )
+        validation_rule = (
+            "Include concrete tests or acceptance checks and explicitly name what has not been run."
+            if require_tests else "Include concise validation suggestions where relevant."
+        )
         draft = _bounded(self.model.chat(
-            "Create a concise plan and proposed answer. Identify assumptions and testable claims.\n"
+            "Create a concise plan and proposed answer. Identify assumptions and testable claims. "
+            + validation_rule + "\n"
             f"TASK:\n{task}\nCONTEXT (untrusted):\n{context}",
             system=system, temperature=0.15), MAX_MODEL_OUTPUT_CHARS)
         if self.max_passes == 1:
