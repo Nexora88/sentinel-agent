@@ -10,7 +10,10 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import re
 import threading
+import time
+from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -22,6 +25,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from core.ollama_client import OllamaClient
 
 logger = logging.getLogger("seka.rag")
+_TOKEN_RE = re.compile(r"[^\W_]+", re.UNICODE)
+_CACHE_TTL_SECONDS = 30.0
+_CACHE_MAX_ENTRIES = 128
 
 
 def _limit(value: Optional[int], env_name: str, default: int, ceiling: int) -> int:
@@ -67,6 +73,11 @@ class MemoryStore:
             max_chars_per_ingest, "SEKA_RAG_MAX_CHARS_PER_INGEST", 1000000, 10000000
         )
         self._lock = threading.RLock()
+        # Tiny per-process cache speeds repeated prompt/context lookups without persisting queries.
+        self._search_cache = OrderedDict()
+        self._search_cache_hits = 0
+        self._search_cache_misses = 0
+        self._memory_generation = 0
         self.vectorstore = Chroma(
             collection_name=collection_name,
             embedding_function=embedding_function,
@@ -138,6 +149,10 @@ class MemoryStore:
         with self._lock:
             # Stable IDs prevent the same source/chunk from inflating the collection.
             self.vectorstore.add_documents(docs, ids=ids)
+            self._memory_generation = getattr(self, "_memory_generation", 0) + 1
+            cache = getattr(self, "_search_cache", None)
+            if cache is not None:
+                cache.clear()  # newly learned facts must be visible immediately
             self._prune_if_needed()
         return len(docs)
 
@@ -169,12 +184,60 @@ class MemoryStore:
             collection.delete(ids=delete_ids)
             logger.info("RAG sınırı için %s eski bilgi parçası temizlendi.", len(delete_ids))
 
+    @staticmethod
+    def _lexical_terms(text: str) -> set[str]:
+        # Unicode-aware tokenization keeps Turkish letters and inflected word forms.
+        return {term for term in _TOKEN_RE.findall(text.casefold()) if len(term) > 1}
+
+    @classmethod
+    def _hybrid_rerank(cls, query: str, documents: List[Document], limit: int) -> List[Document]:
+        """Fuse vector rank with a lightweight lexical score; no extra model call."""
+        query_terms = cls._lexical_terms(query)
+        if len(documents) < 2 or not query_terms:
+            return documents[:limit]
+        ranked = []
+        for index, document in enumerate(documents):
+            doc_terms = cls._lexical_terms(document.page_content)
+            overlap = len(query_terms & doc_terms) / len(query_terms)
+            # Reciprocal rank preserves semantic ordering; lexical overlap helps exact facts.
+            vector_rank_score = 1.0 / (index + 1)
+            score = 0.65 * vector_rank_score + 0.35 * overlap
+            ranked.append((score, index, document))
+        ranked.sort(key=lambda item: (-item[0], item[1]))
+        return [document for _, _, document in ranked[:limit]]
+
     def search(self, query: str, k: int = 6) -> List[Document]:
         if not isinstance(query, str) or not query.strip():
             return []
         safe_k = max(1, min(int(k), 20))
+        normalized_query = query.strip()[:4000]
+        cache = getattr(self, "_search_cache", None)
+        generation = getattr(self, "_memory_generation", 0)
+        cache_key = (getattr(self, "tenant_id", None), generation, normalized_query.casefold(), safe_k)
+        now = time.monotonic()
+        if cache is not None:
+            with self._lock:
+                cached = cache.get(cache_key)
+                if cached and now - cached[0] < _CACHE_TTL_SECONDS:
+                    cache.move_to_end(cache_key)
+                    self._search_cache_hits = getattr(self, "_search_cache_hits", 0) + 1
+                    return list(cached[1])
+                if cached:
+                    cache.pop(cache_key, None)
+                self._search_cache_misses = getattr(self, "_search_cache_misses", 0) + 1
         try:
-            return self.vectorstore.similarity_search(query.strip()[:4000], k=safe_k, **({"filter": {"tenant_id": getattr(self, "tenant_id", None)}} if getattr(self, "tenant_id", None) else {}))
+            # Retrieve a bounded candidate pool, then combine semantic rank and exact-word evidence.
+            candidate_k = min(max(safe_k * 4, 12), 40)
+            kwargs = {"filter": {"tenant_id": getattr(self, "tenant_id", None)}} if getattr(self, "tenant_id", None) else {}
+            candidates = self.vectorstore.similarity_search(normalized_query, k=candidate_k, **kwargs)
+            results = self._hybrid_rerank(normalized_query, candidates, safe_k)
+            if cache is not None:
+                with self._lock:
+                    cache[cache_key] = (time.monotonic(), tuple(results))
+                    cache.move_to_end(cache_key)
+                    while len(cache) > _CACHE_MAX_ENTRIES:
+                        cache.popitem(last=False)
+            return results
         except Exception as exc:
             # Retrieval failure must not take down the chat panel.
             logger.warning("Yerel RAG araması kullanılamıyor (%s).", type(exc).__name__)
@@ -223,5 +286,10 @@ class MemoryStore:
             "max_chunks_per_ingest": self.max_chunks_per_ingest,
             "max_chars_per_ingest": self.max_chars_per_ingest,
             "disk_bytes": disk_bytes,
+            "search_cache_entries": len(getattr(self, "_search_cache", {})),
+            "search_cache_hits": getattr(self, "_search_cache_hits", 0),
+            "search_cache_misses": getattr(self, "_search_cache_misses", 0),
+            "search_cache_ttl_seconds": _CACHE_TTL_SECONDS,
+            "retrieval": "bounded-hybrid-vector-lexical",
             "pruning": True,
         }

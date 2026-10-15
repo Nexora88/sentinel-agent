@@ -91,6 +91,10 @@ jobs:
         env:
           SEKA_EMBEDDINGS_PROVIDER: mkaos-native
         run: python -m scripts.benchmark_mkaos_retrieval
+      - name: Evaluate Turkish memory ranking and repeat-query latency
+        env:
+          SEKA_EMBEDDINGS_PROVIDER: mkaos-native
+        run: python tools/evaluate_mkaos_memory.py --k 3 --output /tmp/mkaos-memory-evaluation.json
       - name: Scan repository for likely hardcoded secrets
         run: |
           python - <<'PY'
