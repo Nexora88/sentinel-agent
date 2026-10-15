@@ -70,8 +70,8 @@ class AuthManager:
                 os.unlink(temp_name)
 
     def _load(self) -> Dict:
-        if self.encrypt_store and self.legacy_users_file.exists() and not self.users_file.exists():
-            raise RuntimeError("Plaintext users.json exists while encrypted memory is enabled; migrate it explicitly.")
+        if self.encrypt_store and self.legacy_users_file.exists():
+            raise RuntimeError("Plaintext users.json remains while encrypted memory is enabled; verify the encrypted copy, then move the plaintext file to protected offline storage or remove it explicitly.")
         if self.users_file.exists():
             try:
                 if self.encrypt_store:
