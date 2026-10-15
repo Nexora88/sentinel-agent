@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 pub mod checkpoint;
+pub mod generation;
 pub mod sampling;
 pub mod sha256;
 pub mod tokenizer;
