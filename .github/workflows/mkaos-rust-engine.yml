@@ -5,7 +5,6 @@ on:
     paths:
       - "engine/mkaos-inference/**"
       - "engine/mkaos-hf-adapter/**"
-      - "engine/mkaos-hf-adapter/**"
       - ".github/workflows/mkaos-rust-engine.yml"
       - "tools/fetch_model.py"
       - "tools/convert_safetensors_to_mkaosw1.py"
@@ -33,7 +32,7 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Check Python tool syntax
-        run: python -m py_compile tools/fetch_model.py tools/convert_safetensors_to_mkaosw1.py
+        run: python -m py_compile tools/fetch_model.py tools/convert_safetensors_to_mkaosw1.py tools/validate_tokenizer.py
       - name: Run core unit tests
         run: cargo test --manifest-path engine/mkaos-inference/Cargo.toml
       - name: Run Hugging Face adapter tests
