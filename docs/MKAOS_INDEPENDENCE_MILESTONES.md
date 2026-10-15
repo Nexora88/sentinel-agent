@@ -18,8 +18,11 @@ Uzun vadeli hedef, MKAOS'un kendi model dosya biçimi, tokenizer'ı, CPU çıkar
 ### B — Model sözleşmesi
 - [x] Sürümlü model manifesti şeması
 - [x] Ağırlık ve tokenizer hash alanları
-- [ ] Güvenli ağırlık okuyucu ve yol geçişi koruması
-- [ ] Tokenizer implementasyonu ve test vektörleri
+- [x] Boyut sınırları ve SHA-256 doğrulaması olan güvenli özel checkpoint okuyucusu
+- [x] Checkpoint tensor ad/şekillerini manifest ile karşılaştıran doğrulayıcı
+- [ ] Model dosyası dışa açılan bir API'ye bağlanmadan önce path traversal/symlink tehdit modelinin test edilmesi
+- [x] Altyapı için UTF-8 byte tokenizer ve test vektörleri (BPE/SentencePiece uyumlu değildir)
+- [x] Greedy ve top-k örnekleme yardımcıları
 
 ### C — Uçtan uca küçük model
 - [x] Temel embedding, RoPE ve causal mask
@@ -28,7 +31,8 @@ Uzun vadeli hedef, MKAOS'un kendi model dosya biçimi, tokenizer'ı, CPU çıkar
 - [ ] Final norm, LM head/logits ve greedy decoding
 - [ ] Tokenizer ile uçtan uca metin üretimi
 - [ ] Küçük, açık lisanslı gerçek model ağırlıklarıyla deterministik smoke test
-- [ ] Kötü biçimlendirilmiş model dosyası testleri
+- [x] Hash uyuşmazlığı, hatalı hash formatı ve tensor manifest uyuşmazlığı testleri
+- [ ] Geçerli checkpoint round-trip ve fuzz/property testleri
 
 ### D — Kullanılabilirlik ve performans
 - [ ] Komut satırı aracı ve yerel HTTP API
