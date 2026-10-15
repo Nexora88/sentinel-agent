@@ -32,6 +32,11 @@ class AuthManager:
 
         if not self._users:
             owner_pass = os.getenv("OWNER_PASSWORD", "").strip()
+            if not owner_pass and self.encrypt_store:
+                raise RuntimeError(
+                    "MKAOS_ENCRYPT_MEMORY_FILES is enabled. Set OWNER_PASSWORD explicitly; "
+                    "a plaintext first-run password file would violate the encrypted-store policy."
+                )
             if not owner_pass:
                 # Generate a local first-run secret without writing it to logs.
                 owner_pass = secrets.token_urlsafe(24)
