@@ -44,7 +44,7 @@ from tools.clean_room_audit import scan_code_cleanliness
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("seka.web")
 
-app = FastAPI(title="MKAOS", version="6.4", description="Mustafa Kemal Atatürk Operating System — yerel ajan işletim sistemi")
+app = FastAPI(title="MKAOS", version="6.5", description="Mustafa Kemal Atatürk Operating System — yerel ajan işletim sistemi")
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
