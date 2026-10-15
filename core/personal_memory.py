@@ -125,7 +125,7 @@ class PersonalMemory:
                     page_content=fact,
                     metadata={
                         "type": "fact",
-                        **({"tenant_id": self.tenant_id} if self.tenant_id else {}),
+                        **({"tenant_id": getattr(self, "tenant_id", None)} if getattr(self, "tenant_id", None) else {}),
                         "category": category,
                         "timestamp": datetime.utcnow().isoformat(),
                     },
@@ -162,7 +162,7 @@ class PersonalMemory:
         )
 
     def search(self, query: str, k: int = 8) -> List[Document]:
-        return self.vectorstore.similarity_search(query, k=max(1, min(int(k), 20)), **({"filter": {"tenant_id": self.tenant_id}} if self.tenant_id else {}))
+        return self.vectorstore.similarity_search(query, k=max(1, min(int(k), 20)), **({"filter": {"tenant_id": getattr(self, "tenant_id", None)}} if getattr(self, "tenant_id", None) else {}))
 
     def get_context_for_prompt(self, query: str = "", k: int = 6) -> str:
         """Build a rich context string about the user for the LLM."""
