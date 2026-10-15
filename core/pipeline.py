@@ -1,5 +1,5 @@
 """
-Main orchestration — SEKA: yerel, apisiz, panelli süper ajan.
+SEKA Pipeline — yerel süper ajan orkestrasyonu.
 """
 
 from __future__ import annotations
@@ -13,6 +13,8 @@ from core.rag import MemoryStore
 from core.personal_memory import PersonalMemory
 from core.permission_manager import PermissionManager, Action
 from core.energy_policy import should_run_heavy_job, policy_status
+from core.action_planner import ActionPlanner
+from core.model_router import ModelRouter
 from tools.git_tools import GitTools
 from tools.notifier import Notifier
 from tools.code_writer import CodeWriter
@@ -27,6 +29,7 @@ from tools.license_checker import LicenseChecker
 from tools.local_discovery import LocalDiscovery
 from tools.document_assistant import DocumentAssistant
 from tools.legacy_backup import LegacyBackup
+from tools.knowledge_pack import KnowledgePack
 from agents.code_reviewer import CodeReviewerAgent
 from agents.security_scanner import SecurityScannerAgent
 from agents.learner import LearnerAgent
@@ -38,12 +41,13 @@ from agents.night_researcher import NightResearcher
 from agents.curiosity import CuriosityEngine
 from agents.podcast_draft import PodcastDraft
 
-logger = logging.getLogger("sentinel.pipeline")
+logger = logging.getLogger("seka.pipeline")
 
 
 class SentinelPipeline:
     def __init__(self):
-        self.ollama = OllamaClient()
+        self.router = ModelRouter()
+        self.ollama = self.router.default
         self.memory = MemoryStore(ollama=self.ollama)
         self.personal_memory = PersonalMemory(ollama=self.ollama)
         self.permissions = PermissionManager()
@@ -62,7 +66,9 @@ class SentinelPipeline:
         self.local_discovery = LocalDiscovery()
         self.doc_assistant = DocumentAssistant(ollama=self.ollama)
         self.legacy = LegacyBackup()
-        self.podcast = PodcastDraft(ollama=self.ollama)
+        self.podcast = PodcastDraft(ollama=self.router.for_task("podcast"))
+        self.packs = KnowledgePack()
+        self.planner = ActionPlanner(ollama=self.router.for_task("plan"))
 
         self.reviewer = CodeReviewerAgent(ollama=self.ollama, memory=self.memory)
         self.security = SecurityScannerAgent(ollama=self.ollama, memory=self.memory)
@@ -72,14 +78,14 @@ class SentinelPipeline:
 
         self.expander = KnowledgeExpander(ollama=self.ollama, memory=self.memory)
         self.night = NightResearcher(
-            ollama=self.ollama,
+            ollama=self.router.for_task("night"),
             expander=self.expander,
             permissions=self.permissions,
         )
         self.curiosity = CuriosityEngine(ollama=self.ollama, expander=self.expander)
 
         self.assistant = PersonalAssistant(
-            ollama=self.ollama,
+            ollama=self.router.for_task("chat"),
             memory=self.personal_memory,
             permissions=self.permissions,
             pipeline=self,
@@ -94,16 +100,15 @@ class SentinelPipeline:
         fin = self.auto_finance.get_status()
         cur = self.curiosity.get_status()
         energy = policy_status()
+        models = self.router.info()
         gh = "bağlı" if self.github.enabled else "token yok"
         return (
             f"{base}\n\n"
-            f"🌌 Bilgi Evreni: {uni.get('total_pages', 0)} parça\n"
-            f"🔭 Merak: son={cur.get('last_run') or '—'} | keşfedilen={cur.get('explored_count', 0)}\n"
-            f"⚡ Enerji: off-peak={energy.get('off_peak_now')} ({energy.get('off_peak_window')})\n"
+            f"◈ SEKA | modeller: hızlı={models['fast']} derin={models['deep']}\n"
+            f"🌌 Bilgi: {uni.get('total_pages', 0)} · Merak: {cur.get('explored_count', 0)}\n"
+            f"⚡ Enerji off-peak={energy.get('off_peak_now')}\n"
             f"🐙 GitHub: {gh}\n"
-            f"💰 Paper Portfolio: ${fin.get('equity', 0):.2f} "
-            f"(PnL {fin.get('pnl_total_pct', 0):+.1f}%) | "
-            f"Açık: {len(fin.get('open_positions', []))}"
+            f"💰 Paper: ${fin.get('equity', 0):.2f} ({fin.get('pnl_total_pct', 0):+.1f}%)"
         )
 
     def expand_knowledge(self, topic: Optional[str] = None) -> dict:
@@ -128,6 +133,15 @@ class SentinelPipeline:
 
     def podcast_from_night(self) -> dict:
         return self.podcast.from_latest_night_report()
+
+    def create_plan(self, goal: str) -> dict:
+        return self.planner.create_plan(goal)
+
+    def run_plan_safe(self, plan_id: str) -> dict:
+        return self.planner.execute_safe_steps(plan_id, self)
+
+    def export_knowledge_pack(self, title: str = "SEKA Araştırma Paketi") -> dict:
+        return self.packs.export_pack(title=title)
 
     def run_finance_cycle(self, context: str = "") -> dict:
         if not context:
@@ -167,11 +181,10 @@ class SentinelPipeline:
         return f"Legacy yedek yazıldı: {path}"
 
     def ingest_document(self, file_path: str) -> dict:
-        """Structured ingest: RAG + belge analizi."""
         return self.doc_ingester.ingest_file(file_path, analyze=True)
 
     def run_on_repo(self, repo_url: str, branch: str = "main", max_files: int = 8) -> str:
-        logger.info(f"Starting pipeline on {repo_url}")
+        logger.info(f"Pipeline on {repo_url}")
         repo_path = self.git.clone_or_update(repo_url, branch=branch)
         repo_name = repo_path.name
         changed = self.git.get_changed_files(repo_path)
@@ -221,12 +234,12 @@ class SentinelPipeline:
 
     def debug_error(self, error_message: str, code: str = "", file_path: str = "") -> str:
         result = self.debugger.debug(error_message, code=code, file_path=file_path)
-        self.notifier.notify(f"Debug Result:\n{result}", whatsapp=True)
+        self.notifier.notify(f"Debug:\n{result}", whatsapp=True)
         return result
 
     def scan_website(self, url: str) -> str:
         if not self.permissions.can_perform(Action.SCAN_WEBSITE):
-            return self.permissions.request_approval(Action.SCAN_WEBSITE, f"Scan website: {url}")
+            return self.permissions.request_approval(Action.SCAN_WEBSITE, f"Scan: {url}")
         result = self.website_scanner.scan(url)
         report = self.website_scanner.format_report(result)
         self.notifier.notify(report, whatsapp=True)
