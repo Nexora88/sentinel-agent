@@ -4,6 +4,7 @@
 services:
   sentinel:
     environment:
+      SEKA_EMBEDDINGS_PROVIDER: ${SEKA_EMBEDDINGS_PROVIDER:-mkaos-native}
       OLLAMA_BASE_URL: http://ollama:11434
       GITHUB_TOKEN: ""
       GH_TOKEN: ""
@@ -14,8 +15,6 @@ services:
       WHATSAPP_PHONE: ""
       WHATSAPP_APIKEY: ""
       SD_API_URL: ${SD_API_URL:-}
-    depends_on:
-      - ollama
     networks:
       - offline_internal
   ollama:
