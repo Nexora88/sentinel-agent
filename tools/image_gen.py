@@ -46,9 +46,13 @@ class ImageGenerator:
     def _save_b64_image(self, encoded: str, prefix: str, prompt: str = "") -> dict:
         try:
             raw = base64.b64decode(encoded, validate=True)
+            if not raw or len(raw) > 25 * 1024 * 1024:
+                raise MediaToolError("Model çıktısı boş veya 25 MB sınırını aşıyor.")
             from PIL import Image
             import io
             with Image.open(io.BytesIO(raw)) as im:
+                if im.width * im.height > 20_000_000:
+                    raise MediaToolError("Model çıktısı 20 megapiksel sınırını aşıyor.")
                 im.verify()
         except Exception as exc:
             raise MediaToolError("Model geçerli bir görsel döndürmedi.") from exc
@@ -58,7 +62,9 @@ class ImageGenerator:
 
     def _image_response(self, endpoint: str, payload: dict, prefix: str, prompt: str = "") -> dict:
         try:
-            response = requests.post(self._require_backend() + endpoint, json=payload, timeout=(5, 180), allow_redirects=False)
+            with requests.Session() as session:
+                session.trust_env = False
+                response = session.post(self._require_backend() + endpoint, json=payload, timeout=(5, 180), allow_redirects=False)
             response.raise_for_status()
             images = response.json().get("images", [])
             if not images or not isinstance(images[0], str):
