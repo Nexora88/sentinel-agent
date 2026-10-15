@@ -1,8 +1,16 @@
 # MKAOS v6.5 — Mustafa Kemal Atatürk Operating System
 
-**Yerel Türkçe ajan işletim sistemi altyapısı.** Ollama üzerinden yerel çıkarım; bulut model API'si zorunlu değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
+**Yerel Türkçe ajan işletim sistemi altyapısı.** Uzun vadeli hedef; kendi model biçimi, tokenizer'ı ve çıkarım motoruyla harici çalışma zamanı bağımlılığını kaldırmaktır. Bu geçiş aşamalıdır: `engine/mkaos-inference/` altında bağımsız Rust CPU çekirdeği başlatılmıştır; mevcut uygulama henüz Ollama üzerinden model çalıştırır ve bu entegrasyon geçici uyumluluk katmanıdır. Yerine geçecek motor uçtan uca model çalıştırıp testleri geçmeden Ollama'yı silmek mevcut yerel sohbet işlevini kırar, bağımsızlık sağlamaz. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
 MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. “Kendi kararlarını vermek”, hedefler için plan önermek ve güvenli yerel işleri yürütmek anlamına gelir. Dosya değiştirme, commit, push, bildirim veya harici sisteme veri gönderme gibi etkiler açık onay gerektirir.
+
+## Bağımsız çıkarım motoru — aktif geliştirme
+
+- Yeni çekirdek: [`engine/mkaos-inference/`](engine/mkaos-inference/) — harici crate bağımlılığı olmadan Rust CPU tensör işlemleri ve referans attention kernel'i.
+- Model biçimi ve bütünlük sözleşmesi: [`model-manifest.schema.json`](engine/mkaos-inference/model-manifest.schema.json).
+- Aşamalı geçiş ve Ollama'yı kaldırma kabul ölçütleri: [`MKAOS_INDEPENDENCE_MILESTONES.md`](docs/MKAOS_INDEPENDENCE_MILESTONES.md).
+- Türkçe/tarihî veri menşei ve eğitim politikası: [`MKAOS_TURKISH_DATA_GOVERNANCE.md`](docs/MKAOS_TURKISH_DATA_GOVERNANCE.md).
+- Şimdiki Rust çekirdeği henüz tam LLM runtime değildir; tokenizer, ağırlık okuyucu, Transformer decoder, KV cache ve sohbet API'si eksiktir. Bu nedenle mevcut Ollama entegrasyonu şimdilik yalnızca geçiş yolu olarak tutulur.
 
 ## Marka ve tasarım ilkesi
 
