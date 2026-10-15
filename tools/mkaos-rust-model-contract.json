@@ -47,6 +47,6 @@
   "compatibility_limits": [
     "This contract matches the current Rust GqaDecoder math, not the external SmolLM2 BPE/SentencePiece tokenizer or checkpoint format.",
     "A successful export proves serialization and shape compatibility only; it does not prove trained-model quality or numerical parity.",
-    "The current Rust library exposes tensor primitives and a GQA decoder but still needs a production assembly/loader layer to turn this checkpoint into GqaDecoderWeights."
+    "The Rust library includes a bounded MKAOSW1 loader and GqaDecoder::from_checkpoint assembly; a production generation/service layer and parity on an approved real Turkish dataset are not yet established."
   ]
 }
