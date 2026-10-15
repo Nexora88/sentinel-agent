@@ -41,7 +41,7 @@ class EncryptedProfileTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "profile.json").write_text('{"name":"legacy"}', encoding="utf-8")
-            with self.assertRaisesRegex(RuntimeError, "migrate it explicitly"):
+            with self.assertRaisesRegex(RuntimeError, "Plaintext"):
                 self.make_memory(root, True)._load_profile()
 
     def test_plaintext_mode_remains_compatible(self):
