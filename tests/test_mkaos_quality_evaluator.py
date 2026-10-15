@@ -33,7 +33,7 @@ class MkaosQualityEvaluatorTests(unittest.TestCase):
         self.assertFalse(MODULE.evaluate(task, "- İnternet yararı")["heuristic_pass"])
 
     def test_repeated_fourgram_is_flagged(self):
-        result = MODULE.repeated_fourgrams("bilgi üretim sistemi bilgi üretim sistemi bilgi üretim sistemi")
+        result = MODULE.repeated_fourgrams("bilgi üretim sistemi bilgi üretim sistemi bilgi üretim sistemi bilgi üretim sistemi")
         self.assertGreater(result["repeated_fourgram_count"], 0)
 
     def test_remote_ollama_endpoint_is_rejected(self):
