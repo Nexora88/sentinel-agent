@@ -141,6 +141,12 @@ class NightResearcher:
         knowledge_info = ""
         if context.get("knowledge") and not context["knowledge"].get("error"):
             knowledge_info = f"Yeni öğrenilen konu: {context['knowledge'].get('topic')}"
+        checks_info = ""
+        checks = context.get("checks") or {}
+        if checks:
+            checks_info = f"Yerel kod/test kontrolü: {checks.get('status')}. " + "; ".join(
+                f"{name}={item.get('status')}" for name, item in checks.items() if isinstance(item, dict)
+            )
 
         prompt = f"""Sen bir kişisel AI ajanın gece araştırma modundasın.
 Sadece ÖNERİ üret. Hiçbir komut çalıştırma, dosya silme, para harcama, sunucu kiralama yok.
