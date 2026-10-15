@@ -46,7 +46,17 @@ class OllamaClient:
         temperature: float = 0.2,
     ):
         self.base_url = validate_local_ollama_url(base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
-        self.model_name = model or os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
+        self.mkaos_enabled = os.getenv("MKAOS_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+        self.chat_base_url = (
+            validate_local_ollama_url(os.getenv("MKAOS_BASE_URL", "http://127.0.0.1:11435"))
+            if self.mkaos_enabled else self.base_url
+        )
+        # MKAOS only replaces chat generation. Embeddings deliberately remain on the
+        # configured local Ollama endpoint until MKAOS has a separately validated embedder.
+        self.model_name = (
+            os.getenv("MKAOS_MODEL_NAME", "mkaos-local")
+            if self.mkaos_enabled else (model or os.getenv("OLLAMA_MODEL", "qwen2.5:7b"))
+        )
         self.embed_model_name = embed_model or os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
         self.temperature = temperature
 
@@ -58,7 +68,7 @@ class OllamaClient:
         if self._llm is None:
             self._llm = ChatOllama(
                 model=self.model_name,
-                base_url=self.base_url,
+                base_url=self.chat_base_url,
                 temperature=self.temperature,
             )
         return self._llm
@@ -111,6 +121,6 @@ class OllamaClient:
         # The explicit ollama/ provider and validated local base_url keep inference local.
         return LLM(
             model=f"ollama/{self.model_name}",
-            base_url=self.base_url,
+            base_url=self.chat_base_url,
             temperature=self.temperature,
         )
