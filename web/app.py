@@ -494,6 +494,7 @@ async def api_execute_approved(request_id: str, authorization: Optional[str] = H
         raise HTTPException(400, "Bu işlem türü henüz güvenli yürütücüde desteklenmiyor.")
     if not p.permissions.begin_execution(request_id):
         raise HTTPException(409, "İşlem zaten yürütülüyor veya daha önce tüketildi.")
+    request = p.permissions.get_request(request_id) or {}
     try:
         result = p.github.execute_approved_request(request)
         p.permissions.finish_execution(request_id, True, result)
