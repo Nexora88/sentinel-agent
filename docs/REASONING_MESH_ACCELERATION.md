@@ -20,7 +20,7 @@ A mixture-of-experts model is a trained architecture with expert sub-networks an
 
 The Kubernetes manifests intentionally deploy one replica. Before horizontal scaling, move sessions, WebAuthn challenges, idempotency, approval records, job state and encrypted storage to services designed for concurrent access. Add quotas, leases, cancellation, health-based scheduling, audit trails and tenant isolation.
 
-The signed task envelope provides message integrity/authenticity only. It does not encrypt traffic. A real inter-office mesh needs peer identity enrollment, mutual TLS, key rotation/revocation, replay protection, network segmentation, explicit peer allowlists and an operator-controlled enrollment process. Do not enable open peer discovery or remote code execution by default. The first supported messages should remain data-only plans, summaries, test requests and code-review requests.
+The signed task envelope provides message integrity/authenticity only. Its replay cache is currently in-memory and resets on restart, so durable idempotency must be added before production. It does not encrypt traffic. A real inter-office mesh needs peer identity enrollment, mutual TLS, key rotation/revocation, replay protection, network segmentation, explicit peer allowlists and an operator-controlled enrollment process. Do not enable open peer discovery or remote code execution by default. The first supported messages should remain data-only plans, summaries, test requests and code-review requests.
 
 ## Hardware portability
 
