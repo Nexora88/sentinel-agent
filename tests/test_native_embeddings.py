@@ -104,6 +104,24 @@ class NativeHashEmbeddingTests(unittest.TestCase):
             self.assertIn("bob-private", bob_sources)
             self.assertNotIn("alice-private", bob_sources)
 
+
+    def test_native_and_ollama_embedding_spaces_use_separate_collections(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with patch.dict(os.environ, {"SEKA_EMBEDDINGS_PROVIDER": "mkaos-native"}):
+                native = MemoryStore(
+                    persist_directory=str(Path(temp) / "native"),
+                    collection_name="shared_logical_memory",
+                )
+            with patch.dict(os.environ, {"SEKA_EMBEDDINGS_PROVIDER": "ollama"}):
+                legacy = MemoryStore(
+                    persist_directory=str(Path(temp) / "ollama"),
+                    collection_name="shared_logical_memory",
+                    ollama=Mock(),
+                )
+            self.assertNotEqual(native.storage_collection_name, legacy.storage_collection_name)
+            self.assertTrue(native.storage_collection_name.endswith("_native_hash_v1"))
+            self.assertTrue(legacy.storage_collection_name.endswith("_ollama"))
+
     def test_unknown_embedding_provider_fails_closed(self):
         with tempfile.TemporaryDirectory() as temp:
             with patch.dict(os.environ, {"SEKA_EMBEDDINGS_PROVIDER": "remote-api"}):
