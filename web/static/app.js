@@ -21,7 +21,7 @@ async function requestLogin() {
       const overlay = document.createElement("div");
       overlay.id = "seka-auth-overlay";
       overlay.style.cssText = "position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(3,8,18,.88);padding:20px";
-      overlay.innerHTML = '<form id="seka-auth-form" style="width:min(420px,100%);box-sizing:border-box;background:#111827;color:#f8fafc;border:1px solid #334155;border-radius:16px;padding:24px;font:14px system-ui;box-shadow:0 20px 70px #0009"><h2 style="margin:0 0 8px">SEKA güvenli oturum</h2><p style="color:#94a3b8;margin:0 0 18px">Kimlik bilgileri bu cihazda doğrulanır.</p><label style="display:block;margin:10px 0 6px">Kullanıcı adı</label><input id="seka-auth-user" autocomplete="username" required value="owner" style="box-sizing:border-box;width:100%;padding:12px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff"><label style="display:block;margin:14px 0 6px">Parola</label><input id="seka-auth-password" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff"><p id="seka-auth-error" role="alert" style="color:#fca5a5;min-height:18px"></p><div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" id="seka-auth-cancel" style="padding:10px 14px;border-radius:8px">İptal</button><button type="submit" style="padding:10px 16px;border-radius:8px;background:#14b8a6;color:#042f2e;font-weight:700;border:0">Giriş yap</button></div></form>';
+      overlay.innerHTML = '<form id="seka-auth-form" style="width:min(420px,100%);box-sizing:border-box;background:#111827;color:#f8fafc;border:1px solid #334155;border-radius:16px;padding:24px;font:14px system-ui;box-shadow:0 20px 70px #0009"><h2 style="margin:0 0 8px">MKAOS güvenli oturum</h2><p style="color:#94a3b8;margin:0 0 18px">Kimlik bilgileri bu cihazda doğrulanır. MKAOS yerel ajan işletim sistemi.</p><label style="display:block;margin:10px 0 6px">Kullanıcı adı</label><input id="seka-auth-user" autocomplete="username" required value="owner" style="box-sizing:border-box;width:100%;padding:12px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff"><label style="display:block;margin:14px 0 6px">Parola</label><input id="seka-auth-password" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff"><p id="seka-auth-error" role="alert" style="color:#fca5a5;min-height:18px"></p><div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" id="seka-auth-cancel" style="padding:10px 14px;border-radius:8px">İptal</button><button type="submit" style="padding:10px 16px;border-radius:8px;background:#14b8a6;color:#042f2e;font-weight:700;border:0">Giriş yap</button></div></form>';
       document.body.appendChild(overlay);
       const form = overlay.querySelector("#seka-auth-form");
       overlay.querySelector("#seka-auth-cancel").addEventListener("click", () => finish(false));
@@ -86,6 +86,7 @@ function switchPanel(name) {
   if (name === "universe") loadUniverse();
   if (name === "approvals") loadApprovals();
   if (name === "status") loadStatus();
+  if (name === "control") loadControlRoom();
   if (name === "github") loadGithub();
   if (name === "finance") loadPortfolio();
   if (name === "curiosity") loadCuriosity();
@@ -325,7 +326,7 @@ async function exportPack() {
   const res = await fetch("/api/pack", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: "SEKA Araştırma Paketi" }),
+    body: JSON.stringify({ title: "MKAOS Araştırma Paketi" }),
   });
   const data = await res.json();
   const out = $("#pack-out");
@@ -434,10 +435,10 @@ async function speakText(text) {
 
 $("#voice-test-btn")?.addEventListener("click", () => {
   const text = catDubToggle?.checked
-    ? "Merhaba! Ben SEKA. Bu yerel kedi dublajı denemesidir."
+    ? "Merhaba! Ben MKAOS. Bu yerel kedi dublajı denemesidir."
     : voiceSelect?.value === "female"
-      ? "Merhaba, ben SEKA. Türkçe konuşma kalitemi yerel ses motoruyla test ediyoruz."
-      : "Merhaba. Ben SEKA. Sakin, tok ve anlaşılır Türkçe ses denemesi.";
+      ? "Merhaba, ben MKAOS. Türkçe konuşma kalitemi yerel ses motoruyla test ediyoruz."
+      : "Merhaba. Ben MKAOS. Sakin, tok ve anlaşılır Türkçe ses denemesi.";
   speakText(text);
 });
 
@@ -758,25 +759,74 @@ $("#finance-btn").addEventListener("click", async () => {
   $("#finance-result").textContent = data.result || "";
 });
 
-$("#image-btn").addEventListener("click", async () => {
-  const prompt = $("#image-prompt").value.trim();
-  if (!prompt) return;
-  $("#image-result").textContent = "Üretiliyor...";
-  const res = await fetch("/api/image", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
-  });
-  const data = await res.json();
-  if (data.success && /^[A-Za-z0-9._-]+$/.test(String(data.filename || ""))) {
+let lastMediaFilename = "";
+function renderMediaResult(data) {
+  const box = $("#image-result");
+  if (data.status === "queued" && data.id) {
+    box.textContent = "Donanım eşiği nedeniyle görev kuyruğa alındı (" + data.id + "). Egemenlik Kontrol Odası'ndan kaynaklar uygun olduğunda çalıştırabilirsin.";
+    loadControlRoom();
+    return;
+  }
+  if (!data.success || !/^[A-Za-z0-9._-]+$/.test(String(data.filename || ""))) {
+    box.textContent = data.detail || data.error || "İşlem tamamlanamadı.";
+    return;
+  }
+  lastMediaFilename = data.filename;
+  const url = "/api/images/" + encodeURIComponent(data.filename);
+  if (data.filename.endsWith(".mp4")) {
+    const video = document.createElement("video");
+    video.src = url; video.controls = true; video.preload = "metadata";
+    video.style.maxWidth = "100%"; video.style.borderRadius = "12px";
+    box.replaceChildren(video);
+  } else {
     const image = document.createElement("img");
-    image.src = "/api/images/" + encodeURIComponent(data.filename);
-    image.alt = "SEKA tarafından üretilen görsel";
-    image.loading = "lazy";
-    image.style.maxWidth = "100%";
-    image.style.borderRadius = "12px";
-    $("#image-result").replaceChildren(image);
-  } else $("#image-result").textContent = data.error || "Görsel üretilemedi.";
+    image.src = url; image.alt = "MKAOS tarafından yerel olarak işlenen görsel";
+    image.loading = "lazy"; image.style.maxWidth = "100%"; image.style.borderRadius = "12px";
+    const save = document.createElement("a");
+    save.href = url; save.download = data.filename; save.textContent = "Görseli indir";
+    save.className = "media-download";
+    box.replaceChildren(image, save);
+  }
+}
+$("#image-btn").addEventListener("click", async () => {
+  const mode = $("#media-mode").value;
+  const prompt = $("#image-prompt").value.trim();
+  const file = $("#media-file").files?.[0];
+  const box = $("#image-result");
+  box.textContent = "Yerel işlem hazırlanıyor…";
+  try {
+    let res;
+    if (mode === "generate") {
+      if (!prompt) { box.textContent = "Önce görsel tarifini yaz."; return; }
+      res = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
+    } else {
+      if (!file) { box.textContent = "Düzenlemek için bir görsel seç."; return; }
+      const form = new FormData(); form.append("file", file);
+      if (mode === "edit") {
+        if (!prompt) { box.textContent = "Düzenleme talimatını yaz."; return; }
+        form.append("prompt", prompt);
+        res = await fetch("/api/media/edit", { method: "POST", body: form });
+      } else {
+        form.append("color", $("#background-color").value);
+        res = await fetch("/api/media/background", { method: "POST", body: form });
+      }
+    }
+    const data = await res.json();
+    renderMediaResult(res.ok ? data : { error: data.detail || "Yerel medya işlemi başarısız." });
+  } catch (_) { box.textContent = "MKAOS medya servisine ulaşılamadı."; }
+});
+$("#video-btn")?.addEventListener("click", async () => {
+  const box = $("#image-result");
+  if (!lastMediaFilename || !lastMediaFilename.endsWith(".png")) {
+    box.textContent = "Önce bir PNG görsel üret veya düzenle.";
+    return;
+  }
+  box.textContent = "Yerel video hazırlanıyor…";
+  try {
+    const res = await fetch("/api/media/video", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filename: lastMediaFilename, duration: 4 }) });
+    const data = await res.json();
+    renderMediaResult(res.ok ? data : { error: data.detail || "Video oluşturulamadı." });
+  } catch (_) { box.textContent = "Yerel video servisine ulaşılamadı."; }
 });
 async function loadGithub() {
   const box = $("#gh-repos");
@@ -964,6 +1014,9 @@ async function loadStatus() {
     const ollama = data.ollama || {};
     const rag = data.rag || {};
     const night = data.night_scheduler || {};
+    const sovereign = data.sovereignty || {};
+    const miniSovereignty = $("#sovereignty-mini-label");
+    if (miniSovereignty) miniSovereignty.textContent = String(sovereign.label || "MKAOS · EGEMENLİK DOĞRULANMADI");
     const nightState = night.last_run || {};
     const nightBox = $("#night-scheduler-status");
     if (nightBox) {
@@ -977,7 +1030,7 @@ async function loadStatus() {
     const ollamaLabel = ollama.status === "online" ? "hazır" : ollama.status === "model_missing" ? "model eksik" : "bağlantı yok";
     const diskMb = Number(rag.disk_bytes || 0) / (1024 * 1024);
     $("#quick-status").innerHTML = `
-      <strong>SEKA ${data.version || ""}</strong><br>
+      <strong>MKAOS ${data.version || ""}</strong><br>
       Ollama: ${ollamaLabel}<br>
       Bilgi: ${u.total_pages || 0}<br>
       RAG: ${rag.documents ?? 0}/${rag.max_documents ?? "—"} parça · ${diskMb.toFixed(1)} MB<br>
@@ -995,7 +1048,7 @@ loadStatus();
 setInterval(loadStatus, 30000);
 addMessage(
   "assistant",
-  "SEKA v6.3 online · yerel Türkçe ajan.\n" +
+  "MKAOS v6.5 online · yerel ajan işletim sistemi.\n" +
     "• Canlı iş kuyruğu (SSE)\n" +
     "• Plan motoru → planla: hedef\n" +
     "• Bilgi paketi dışa aktar (paylaşılabilir)\n" +
@@ -1003,3 +1056,122 @@ addMessage(
     "• Paper finans · merak · gece · podcast taslağı\n\n" +
     "Ağ özellikleri varsayılan kapalıdır; çevrimdışı profil internet çıkışını sınırlar."
 );
+
+
+async function loadControlRoom() {
+  const statusBox = $("#sovereignty-status-card");
+  const capsBox = $("#media-capabilities");
+  if (!statusBox || !capsBox) return;
+  try {
+    const [sr, mr, jr] = await Promise.all([
+      fetch("/api/sovereignty"), fetch("/api/media/capabilities"), fetch("/api/media/jobs")
+    ]);
+    const sovereignty = await sr.json(), media = await mr.json(), jobs = await jr.json();
+    statusBox.replaceChildren();
+    const title = document.createElement("h3");
+    title.textContent = String(sovereignty.label || "Egemenlik doğrulanamadı");
+    const state = document.createElement("p");
+    state.textContent = "Durum: " + String(sovereignty.state || "unknown") +
+      " · Tam egemen: " + (sovereignty.fully_sovereign ? "evet" : "doğrulanmadı") +
+      " · AIR-GAPPED: " + (sovereignty.air_gapped_verified ? "evet" : "doğrulanmadı");
+    const limits = document.createElement("ul");
+    (sovereignty.limitations || []).forEach((line) => { const li=document.createElement("li"); li.textContent=String(line); limits.appendChild(li); });
+    statusBox.append(title, state, limits);
+    capsBox.textContent = JSON.stringify({bridge:media.bridge,engine:media.engine,video_mode:media.video_mode}, null, 2);
+    const list=$("#media-jobs-list"); list.replaceChildren();
+    if (!(jobs.jobs || []).length) { const empty=document.createElement("p"); empty.className="empty"; empty.textContent="Henüz medya görevi yok."; list.appendChild(empty); }
+    (jobs.jobs || []).forEach((job) => {
+      const card=document.createElement("div"); card.className="approval-card";
+      const detail=document.createElement("div"); detail.className="details";
+      const name=document.createElement("div"); name.className="action-name"; name.textContent=job.operation+" · "+job.id;
+      const desc=document.createElement("div"); desc.textContent=job.status+" — "+(job.reason||"");
+      detail.append(name,desc); card.appendChild(detail);
+      if (job.status === "done" && /^[A-Za-z0-9_-]{1,80}\\.(png|jpg|jpeg|webp|mp4)$/i.test(String(job.result?.filename || ""))) {
+        const link=document.createElement("a"); link.href="/api/images/"+encodeURIComponent(job.result.filename); link.target="_blank"; link.rel="noopener noreferrer"; link.textContent="Üretilen dosyayı aç"; link.className="media-download"; card.appendChild(link);
+      }
+      if (job.status==="queued") {
+        const run=document.createElement("button"); run.textContent="Kaynak uygunsa çalıştır";
+        run.addEventListener("click", async()=>{ const res=await fetch("/api/media/jobs/"+encodeURIComponent(job.id)+"/run",{method:"POST"}); const d=await res.json(); desc.textContent=d.status+" — "+(d.reason||d.result?.error||""); loadControlRoom(); });
+        card.appendChild(run);
+      }
+      list.appendChild(card);
+    });
+  } catch (_) { statusBox.textContent="Egemenlik/medya durumu alınamadı."; }
+}
+$("#queue-media-btn")?.addEventListener("click", async () => {
+  const prompt=$("#queue-media-prompt").value.trim();
+  const out=$("#media-capabilities");
+  if(!prompt){out.textContent="Önce bir görsel tarifi yaz.";return;}
+  const response=await fetch("/api/media/queue",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({operation:"generate",prompt})});
+  const data=await response.json();
+  out.textContent=response.ok ? "Görev kuyruğa eklendi: "+data.id+" · durum: "+data.status : (data.detail||"Görev eklenemedi.");
+  loadControlRoom();
+});
+$("#refresh-media-btn")?.addEventListener("click",loadControlRoom);
+$("#verify-approval-btn")?.addEventListener("click",async()=>{
+  const out=$("#approval-verify-result");
+  try {
+    const payload=JSON.parse($("#approval-payload").value);
+    const response=await fetch("/api/approval/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({payload,signature_b64:$("#approval-signature").value.trim()})});
+    const data=await response.json(); out.textContent=JSON.stringify(data,null,2);
+  } catch(error){out.textContent="Payload JSON geçersiz veya doğrulama başarısız.";}
+});
+$("#clean-room-audit-btn")?.addEventListener("click",async()=>{
+  const out=$("#clean-room-audit-result"); out.textContent="Yerel lisans ipuçları taranıyor…";
+  try{const response=await fetch("/api/audit/clean-room");const data=await response.json();out.textContent=JSON.stringify(data,null,2);}
+  catch(_){out.textContent="Denetim çalıştırılamadı.";}
+});
+
+$("#forget-memory-btn")?.addEventListener("click",async()=>{
+  const out=$("#forget-memory-result");
+  if(!confirm("Seçilen konuya ait eşleşen kişisel hafıza ve sohbet kayıtları silinsin mi?")) return;
+  out.textContent="Yerel eşleşmeler taranıyor…";
+  try {
+    const response=await fetch("/api/privacy/forget",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      topic:$("#forget-topic").value, last_hours:Number($("#forget-hours").value||24), confirmation:$("#forget-confirm").value
+    })});
+    const data=await response.json(); out.textContent=JSON.stringify(data,null,2);
+  } catch(_) { out.textContent="Silme işlemi tamamlanamadı; yerel veriler otomatik sıfırlanmadı."; }
+});
+
+let mkaosApprovalPrivateKey = null;
+let mkaosApprovalPublicKeyB64 = "";
+function bytesToB64(bytes) {
+  let binary = "";
+  new Uint8Array(bytes).forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
+}
+function canonicalJson(value) {
+  if (Array.isArray(value)) return "[" + value.map(canonicalJson).join(",") + "]";
+  if (value && typeof value === "object") {
+    return "{" + Object.keys(value).sort().map((key) => JSON.stringify(key) + ":" + canonicalJson(value[key])).join(",") + "}";
+  }
+  return JSON.stringify(value);
+}
+$("#approval-keygen-btn")?.addEventListener("click",async()=>{
+  const box=$("#approval-public-key");
+  if(!window.crypto?.subtle){box.textContent="Bu tarayıcı WebCrypto desteklemiyor; anahtar üretilemedi.";return;}
+  try {
+    const pair=await crypto.subtle.generateKey({name:"Ed25519"},true,["sign","verify"]);
+    const privateDer=await crypto.subtle.exportKey("pkcs8",pair.privateKey);
+    const publicRaw=await crypto.subtle.exportKey("raw",pair.publicKey);
+    mkaosApprovalPrivateKey=pair.privateKey;
+    mkaosApprovalPublicKeyB64=bytesToB64(publicRaw);
+    const blob=new Blob([privateDer],{type:"application/octet-stream"});
+    const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="mkaos-approval-private.pk8"; link.click();
+    setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+    box.textContent="Açık anahtar (Base64):\n"+mkaosApprovalPublicKeyB64+"\n\nÖzel anahtar indirildi. Dosyayı paylaşma. Açık anahtarı sunucu .env ayarına ekle ve servisi yeniden başlat. Sayfa yenilenirse özel anahtar belleği kaybolur.";
+  } catch(error) { box.textContent="Ed25519 üretimi bu tarayıcıda desteklenmiyor: "+String(error.name||"hata"); }
+});
+$("#approval-sign-btn")?.addEventListener("click",async()=>{
+  const out=$("#approval-verify-result");
+  if(!mkaosApprovalPrivateKey){out.textContent="Önce bu tarayıcı oturumunda Ed25519 anahtarı üret.";return;}
+  try {
+    const payload=JSON.parse($("#approval-payload").value);
+    const signature=await crypto.subtle.sign({name:"Ed25519"},mkaosApprovalPrivateKey,new TextEncoder().encode(canonicalJson(payload)));
+    const signatureB64=bytesToB64(signature);
+    $("#approval-signature").value=signatureB64;
+    const response=await fetch("/api/approval/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({payload,signature_b64:signatureB64})});
+    const data=await response.json(); out.textContent=JSON.stringify(data,null,2);
+  } catch(error) { out.textContent="İmza işlemi başarısız. Payload ve sunucu açık anahtarını denetle."; }
+});

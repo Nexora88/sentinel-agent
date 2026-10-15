@@ -528,3 +528,35 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .voice-controls select, .voice-controls input { min-height: 38px; }
 .voice-status { line-height: 1.45; }
 @media (max-width: 700px) { .voice-controls { align-items: stretch; } #voice-pace { width: 100%; } }
+
+
+/* MKAOS local-first media studio */
+.media-studio { display: grid; gap: 12px; max-width: 900px; padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: var(--bg-panel); }
+.media-studio label { color: var(--text-muted); font-size: .9rem; }
+.media-studio input:not([type="color"]), .media-studio select, .media-studio textarea { width: 100%; box-sizing: border-box; padding: 11px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }
+.media-mode-row, .media-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.media-mode-row select { flex: 1; min-width: 180px; }
+.media-studio input[type="color"] { width: 54px; height: 40px; padding: 3px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.media-note { color: var(--text-muted); font-size: .85rem; line-height: 1.5; }
+.image-result { display: grid; justify-items: start; gap: 12px; overflow-wrap: anywhere; }
+.image-result img, .image-result video { display: block; max-width: 100%; max-height: 70vh; object-fit: contain; border: 1px solid var(--border); }
+.media-download { color: var(--accent); padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; text-decoration: none; }
+
+
+/* Truthful sovereignty indicator: green status is never assumed from branding alone. */
+.sovereignty-status { display:flex; align-items:center; gap:8px; margin:14px 0 10px; padding:9px 10px; border:1px solid rgba(251,191,36,.32); border-radius:9px; color:#fbbf24; font-size:.68rem; font-weight:700; letter-spacing:.04em; line-height:1.4; }
+.sovereignty-dot { width:8px; height:8px; flex:0 0 8px; border-radius:50%; background:#f59e0b; box-shadow:0 0 10px #f59e0b66; }
+
+
+/* MKAOS sovereignty and plan control room */
+.control-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:16px 0; }
+.control-card { min-width:0; margin:12px 0; padding:18px; border:1px solid rgba(91,116,155,.35); border-radius:16px; background:linear-gradient(145deg,rgba(21,33,55,.9),rgba(9,16,30,.88)); box-shadow:0 14px 38px rgba(0,0,0,.16); overflow-wrap:anywhere; }
+.control-card h3 { margin-top:0; }
+.control-card p,.control-card li { color:var(--text-muted); line-height:1.55; font-size:.9rem; }
+.control-card textarea,.control-card input { width:100%; box-sizing:border-box; margin:8px 0 12px; padding:11px; border:1px solid var(--border); border-radius:9px; background:var(--bg); color:var(--text); }
+.control-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.control-actions input { flex:1; min-width:170px; }
+.control-card pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:360px; overflow:auto; }
+@media (max-width:850px) { .control-grid { grid-template-columns:1fr; } }
+
+#forget-memory-result { color:var(--text-muted); }

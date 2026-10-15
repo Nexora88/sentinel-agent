@@ -13,7 +13,7 @@ services:
       ALLOW_EXTERNAL_NOTIFICATIONS: "false"
       WHATSAPP_PHONE: ""
       WHATSAPP_APIKEY: ""
-      SD_API_URL: ""
+      SD_API_URL: ${SD_API_URL:-}
     depends_on:
       - ollama
     networks:

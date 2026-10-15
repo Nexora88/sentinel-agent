@@ -208,3 +208,46 @@ class PersonalMemory:
         if any(w in lower for w in ["adım", "ismim", "benim adım", "bana "]):
             # Let the LLM decide later; for now just store raw
             pass
+
+    def forget_matching(self, phrase: str, last_hours: int = 24) -> dict:
+        """Delete exact-topic matches from personal vector memory and profile facts."""
+        import time
+        phrase = str(phrase or "").strip().casefold()
+        if len(phrase) < 3:
+            raise ValueError("Silme konusu en az 3 karakter olmalı.")
+        hours = max(1, min(int(last_hours), 8760))
+        cutoff = time.time() - hours * 3600
+        collection = getattr(self.vectorstore, "_collection", None)
+        deleted_vectors = 0
+        if collection is not None:
+            snapshot = collection.get(include=["documents", "metadatas"])
+            ids = snapshot.get("ids", [])
+            docs = snapshot.get("documents") or ["" for _ in ids]
+            metas = snapshot.get("metadatas") or [{} for _ in ids]
+            remove = []
+            for item_id, body, metadata in zip(ids, docs, metas):
+                metadata = metadata or {}
+                stamp = metadata.get("timestamp") or metadata.get("created_at")
+                try:
+                    from datetime import datetime, timezone
+                    parsed = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+                    if parsed.tzinfo is None:
+                        parsed = parsed.replace(tzinfo=timezone.utc)
+                    recent = parsed.timestamp() >= cutoff
+                except (TypeError, ValueError, OverflowError):
+                    recent = False
+                if recent and phrase in str(body or "").casefold():
+                    remove.append(item_id)
+            if remove:
+                collection.delete(ids=remove)
+                deleted_vectors = len(remove)
+        # Profile facts have no per-fact timestamp in the existing schema. Preserve them
+        # during bounded-window deletion because their age cannot be established.
+        deleted_facts = 0
+        preserved_facts = sum(1 for fact in self._profile.get("facts", []) if phrase in str(fact).casefold())
+        return {"deleted_vector_records": deleted_vectors, "deleted_profile_facts": deleted_facts,
+                "unscoped_profile_facts_preserved": preserved_facts,
+                "scope": "timestamped personal vector records; exact phrase match; requested time window",
+                "limitations": ["Zaman damgası olmayan profil gerçekleri korunur; ayrıca incelenmelidir.",
+                                "Bu işlem yedekleri, dışa aktarımları, sistem günlüklerini veya model ağırlıklarını temizlemez.",
+                                "Bu bir adli veri imha/SSD secure erase garantisi değildir."]}

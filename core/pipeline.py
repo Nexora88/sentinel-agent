@@ -1,5 +1,5 @@
 """
-SEKA Pipeline — yerel süper ajan orkestrasyonu.
+MKAOS Pipeline — yerel ajan işletim sistemi orkestrasyonu.
 """
 
 from __future__ import annotations
@@ -23,6 +23,8 @@ from tools.github_client import GitHubClient
 from tools.finance_engine import FinanceEngine
 from tools.autonomous_finance import AutonomousFinance
 from tools.image_gen import ImageGenerator
+from core.media.generation_bridge import GenerationBridge, ImageGeneratorAdapter
+from core.media.engine import MediaEngine
 from tools.secret_scanner import SecretScanner
 from tools.document_ingester import DocumentIngester
 from tools.license_checker import LicenseChecker
@@ -60,6 +62,8 @@ class SentinelPipeline:
         self.finance = FinanceEngine(ollama=self.ollama)
         self.auto_finance = AutonomousFinance(ollama=self.ollama)
         self.image_gen = ImageGenerator()
+        self.media_bridge = GenerationBridge([ImageGeneratorAdapter(self.image_gen)])
+        self.media_engine = MediaEngine(self.media_bridge)
         self.secret_scanner = SecretScanner()
         self.doc_ingester = DocumentIngester(ollama=self.ollama, memory=self.memory)
         self.license_checker = LicenseChecker()
@@ -104,7 +108,7 @@ class SentinelPipeline:
         gh = "bağlı" if self.github.enabled else "token yok"
         return (
             f"{base}\n\n"
-            f"◈ SEKA | modeller: hızlı={models['fast']} derin={models['deep']}\n"
+            f"◈ MKAOS | modeller: hızlı={models['fast']} derin={models['deep']}\n"
             f"🌌 Bilgi: {uni.get('total_pages', 0)} · Merak: {cur.get('explored_count', 0)}\n"
             f"⚡ Enerji off-peak={energy.get('off_peak_now')}\n"
             f"🐙 GitHub: {gh}\n"
@@ -140,7 +144,7 @@ class SentinelPipeline:
     def run_plan_safe(self, plan_id: str) -> dict:
         return self.planner.execute_safe_steps(plan_id, self)
 
-    def export_knowledge_pack(self, title: str = "SEKA Araştırma Paketi") -> dict:
+    def export_knowledge_pack(self, title: str = "MKAOS Araştırma Paketi") -> dict:
         return self.packs.export_pack(title=title)
 
     def run_finance_cycle(self, context: str = "") -> dict:

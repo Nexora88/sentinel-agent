@@ -42,6 +42,8 @@ services:
       - FASTER_WHISPER_MODEL_PATH=${FASTER_WHISPER_MODEL_PATH:-/app/models/whisper-small}
       - WHISPER_CPP_BIN=${WHISPER_CPP_BIN:-whisper-cli}
       - WHISPER_MODEL_PATH=${WHISPER_MODEL_PATH:-}
+      - SD_API_URL=${SD_API_URL:-}
+      - U2NET_HOME=${U2NET_HOME:-/app/models/u2net}
     volumes:
       # Persistent local knowledge and memory. Keep this volume backed up.
       - sentinel_memory:/app/memory

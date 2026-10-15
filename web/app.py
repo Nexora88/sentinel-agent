@@ -1,5 +1,5 @@
 """
-SEKA v6 — Sentinel Egemen Kişisel Ajan
+MKAOS v6 — Mustafa Kemal Atatürk Operating System
 Canlı işler · plan motoru · bilgi paketleri · Ollama
 """
 
@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import queue
+import re
 import shutil
 import tempfile
 import uuid
@@ -17,7 +18,7 @@ import requests
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, Request, Header, HTTPException, UploadFile, File
+from fastapi import FastAPI, Request, Header, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -36,11 +37,14 @@ from core.energy_policy import policy_status
 from core.job_bus import job_bus
 from core.local_voice import LocalVoiceError, voice_status, synthesize as synthesize_local_voice, transcribe as transcribe_local_voice
 from core.night_scheduler import NightScheduler
+from core.safety.sovereignty import sovereignty_status
+from core.approval_protocol import SignedApprovalProtocol, ApprovalProtocolError
+from tools.clean_room_audit import scan_code_cleanliness
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("seka.web")
 
-app = FastAPI(title="SEKA", version="6.3", description="Sentinel Egemen Kişisel Ajan")
+app = FastAPI(title="MKAOS", version="6.5", description="Mustafa Kemal Atatürk Operating System — yerel ajan işletim sistemi")
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -101,11 +105,13 @@ def _save_chat_history() -> None:
 chat_history = _load_chat_history()
 
 MANIFESTO = {
-    "name": "SEKA",
-    "version": "6.3",
-    "tagline": "Yerel Türkçe ajan — ağ özellikleri varsayılan olarak kapalı",
+    "name": "MKAOS",
+    "version": "6.5",
+    "tagline": "Mustafa Kemal Atatürk Operating System · İstikbal Siber Göklerdedir · yerel egemenlik",
     "pillars": [
-        "Ollama ile tamamen yerel zeka",
+        "Yerel model çekirdeği ve denetlenebilir ajan planları",
+        "Ağ çıkışı engellendiğinde AIR-GAPPED; doğrulanmadıysa egemenlik iddiası yok",
+        "İstikbal Siber Göklerdedir — bilgi, üretim ve bağımsızlık",
         "Bilgi evreni: sanitize + güven skoru ile büyür",
         "İzin modeli: yazma/push asla otomatik değil",
         "Paper finans: sanal para, kilitli risk kuralları",
@@ -156,6 +162,8 @@ class LoginRequest(BaseModel):
 
 class ImageRequest(BaseModel):
     prompt: str
+    width: int = 768
+    height: int = 768
 
 class FinanceRequest(BaseModel):
     query: str
@@ -167,7 +175,22 @@ class PlanRequest(BaseModel):
     goal: str
 
 class PackRequest(BaseModel):
-    title: Optional[str] = "SEKA Araştırma Paketi"
+    title: Optional[str] = "MKAOS Araştırma Paketi"
+
+class MediaQueueRequest(BaseModel):
+    operation: str = "generate"
+    prompt: str
+    width: int = 768
+    height: int = 768
+
+class ForgetRequest(BaseModel):
+    topic: str
+    last_hours: int = 24
+    confirmation: str
+
+class ApprovalVerifyRequest(BaseModel):
+    payload: dict
+    signature_b64: str
 
 class VoiceRequest(BaseModel):
     text: str
@@ -176,16 +199,29 @@ class VoiceRequest(BaseModel):
     pace: float = 1.0
 
 
+
+def _run_night_with_infographic() -> dict:
+    result = get_pipeline().run_night_research()
+    summary = result.get("summary") if isinstance(result, dict) else str(result)
+    visual = get_pipeline().media_engine.render_report_infographic(str(summary or result)[:4000])
+    if isinstance(result, dict):
+        result["infographic"] = visual
+        if visual.get("success"):
+            result["summary"] = (str(summary or "Gece denetimi tamamlandı.") + " · Yerel infografik: " + visual["filename"])[:800]
+        return result
+    return {"summary": str(result)[:800], "infographic": visual}
+
+
 @app.on_event("startup")
 async def startup():
     # Keep the web process available even if Ollama/models are temporarily offline.
     # Nightly maintenance writes reports/proposals only; it never edits or pushes code.
     global night_scheduler
-    logger.info("SEKA Web v6.3 — lazy local model initialization")
+    logger.info("MKAOS v6.5 — lazy local model initialization")
     enabled = os.getenv("SEKA_NIGHT_AUTORUN", "true").strip().lower() in {"1", "true", "yes", "on"}
     try:
         night_scheduler = NightScheduler(
-            runner=lambda: get_pipeline().run_night_research(),
+            runner=lambda: _run_night_with_infographic(),
             enabled=enabled,
             hour=int(os.getenv("SEKA_NIGHT_HOUR", "3")),
             minute=int(os.getenv("SEKA_NIGHT_MINUTE", "0")),
@@ -193,7 +229,7 @@ async def startup():
             state_path=os.getenv("SEKA_NIGHT_STATE_PATH", "./memory/night_scheduler.json"),
         )
         night_scheduler.start()
-        logger.info("SEKA nightly audit enabled=%s schedule=%s", enabled, night_scheduler.status()["scheduled_time"])
+        logger.info("MKAOS nightly audit enabled=%s schedule=%s", enabled, night_scheduler.status()["scheduled_time"])
     except Exception as exc:
         # Scheduler configuration failure must not take down the web panel.
         logger.exception("Night scheduler unavailable (%s).", type(exc).__name__)
@@ -209,7 +245,7 @@ async def shutdown():
 @app.get("/health")
 async def health():
     # Container health must not depend on the Ollama model being loaded.
-    return {"status": "ok", "service": "SEKA", "version": "6.3", "model_checked": False}
+    return {"status": "ok", "service": "MKAOS", "version": "6.4", "model_checked": False}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -306,21 +342,23 @@ async def api_status(authorization: Optional[str] = Header(None)):
     try:
         p = get_pipeline()
     except Exception as exc:
-        logger.warning("SEKA bileşenleri başlatılamadı (%s).", type(exc).__name__)
+        logger.warning("MKAOS bileşenleri başlatılamadı (%s).", type(exc).__name__)
         return {
-            "brand": "SEKA", "version": "6.3", "status": "degraded", "user": user,
-            "assistant": {"status": "degraded", "message": "SEKA paneli açık; yerel bellek veya model bileşeni başlatılamadı. Veriler otomatik silinmedi."},
+            "brand": "MKAOS", "version": "6.5", "status": "degraded", "user": user,
+            "assistant": {"status": "degraded", "message": "MKAOS paneli açık; yerel bellek veya model bileşeni başlatılamadı. Veriler otomatik silinmedi."},
             "ollama": {"status": "unavailable", "message": "Ollama bağlantısı hazır değil. Ollama hizmetini, model kurulumunu ve yerel bellek dizinini kontrol et."},
             "privacy": {"web_research": False, "external_finance_data": False, "site_scanning": False, "external_notifications": False, "github_network_access": False},
             "night_scheduler": night_scheduler.status() if night_scheduler else {"enabled": False, "running": False},
+            "sovereignty": sovereignty_status(),
         }
     uni = p.expander.get_status()
     fin = p.finance_status()
     cur = p.curiosity.get_status()
     return {
-        "brand": "SEKA",
-        "version": "6.3",
+        "brand": "MKAOS",
+        "version": "6.5",
         "status": "ok",
+        "sovereignty": sovereignty_status(),
         "ollama": _ollama_status(p),
         "rag": p.memory.stats(),
         "user": user,
@@ -397,13 +435,14 @@ async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)
     except Exception as exc:
         # Keep FastAPI alive and never return raw exception/traceback to the browser.
         logger.warning("Yerel yanıt üretilemedi (%s).", type(exc).__name__)
-        reply = ("SEKA paneli çalışıyor ancak yerel Ollama/model bağlantısı hazır değil. "
+        reply = ("MKAOS paneli çalışıyor ancak yerel Ollama/model bağlantısı hazır değil. "
                  "Ollama hizmetinin açık olduğunu, OLLAMA_BASE_URL değerini ve OLLAMA_MODEL "
                  "modelinin yerel olarak yüklü olduğunu kontrol et. Yerel verilerin silinmedi.")
     history = chat_history.setdefault(user["username"], [])
+    from datetime import datetime
     history.extend([
-        {"role": "user", "content": message},
-        {"role": "assistant", "content": reply},
+        {"role": "user", "content": message, "timestamp": datetime.now().astimezone().isoformat()},
+        {"role": "assistant", "content": reply, "timestamp": datetime.now().astimezone().isoformat()},
     ])
     if len(history) > 300:
         del history[:-300]
@@ -534,7 +573,7 @@ async def api_plans(authorization: Optional[str] = Header(None)):
 @app.post("/api/pack")
 async def api_pack(req: PackRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
-    return get_pipeline().export_knowledge_pack(title=req.title or "SEKA Araştırma Paketi")
+    return get_pipeline().export_knowledge_pack(title=req.title or "MKAOS Araştırma Paketi")
 
 
 @app.post("/api/ingest")
@@ -655,15 +694,202 @@ async def api_finance_cycle(authorization: Optional[str] = Header(None)):
 @app.post("/api/image")
 async def api_image(req: ImageRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
-    return get_pipeline().image_gen.generate(req.prompt)
+    try:
+        p = get_pipeline()
+        if p.media_engine.should_defer_heavy():
+            return p.media_engine.submit("generate", {"prompt": req.prompt[:2000], "width": req.width, "height": req.height})
+        return await asyncio.to_thread(p.media_bridge.execute, "generate", {"prompt": req.prompt, "width": req.width, "height": req.height})
+    except Exception as exc:
+        from tools.image_gen import MediaToolError
+        if isinstance(exc, MediaToolError):
+            raise HTTPException(503, str(exc))
+        logger.exception("MKAOS local image generation failed")
+        raise HTTPException(500, "Yerel görsel üretimi başarısız oldu.")
+
+
+@app.post("/api/media/edit")
+async def api_media_edit(prompt: str = Form(...), file: UploadFile = File(...), authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    raw = await file.read(12 * 1024 * 1024 + 1)
+    if len(raw) > 12 * 1024 * 1024:
+        raise HTTPException(413, "Görsel en fazla 12 MB olabilir.")
+    try:
+        p = get_pipeline()
+        if p.media_engine.should_defer_heavy():
+            saved = UPLOAD_DIR / ("media_" + uuid.uuid4().hex + ".upload")
+            saved.write_bytes(raw)
+            return p.media_engine.submit("edit", {"prompt": prompt[:2000], "image_path": str(saved.resolve())})
+        return await asyncio.to_thread(p.media_bridge.execute, "edit", {"prompt": prompt, "image_bytes": raw})
+    except Exception as exc:
+        from tools.image_gen import MediaToolError
+        if isinstance(exc, MediaToolError):
+            raise HTTPException(503, str(exc))
+        logger.exception("MKAOS local image editing failed")
+        raise HTTPException(500, "Görsel düzenleme başarısız oldu.")
+
+
+@app.post("/api/media/background")
+async def api_media_background(file: UploadFile = File(...), color: str = Form("#172033"), authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    raw = await file.read(12 * 1024 * 1024 + 1)
+    if len(raw) > 12 * 1024 * 1024:
+        raise HTTPException(413, "Görsel en fazla 12 MB olabilir.")
+    try:
+        p = get_pipeline()
+        if p.media_engine.should_defer_heavy():
+            saved = UPLOAD_DIR / ("media_" + uuid.uuid4().hex + ".upload")
+            saved.write_bytes(raw)
+            return p.media_engine.submit("background", {"image_path": str(saved.resolve()), "color": color})
+        return await asyncio.to_thread(p.media_bridge.execute, "background", {"image_bytes": raw, "color": color})
+    except Exception as exc:
+        from tools.image_gen import MediaToolError
+        if isinstance(exc, MediaToolError):
+            raise HTTPException(503, str(exc))
+        logger.exception("MKAOS local background replacement failed")
+        raise HTTPException(500, "Arka plan değiştirme başarısız oldu.")
+
+
+class VideoRequest(BaseModel):
+    filename: str
+    duration: float = 4.0
+
+
+@app.post("/api/media/video")
+async def api_media_video(req: VideoRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    try:
+        p = get_pipeline()
+        if p.media_engine.should_defer_heavy():
+            return p.media_engine.submit("video", {"filename": req.filename, "duration": req.duration})
+        return await asyncio.to_thread(p.media_bridge.execute, "video", {"filename": req.filename, "duration": req.duration})
+    except Exception as exc:
+        from tools.image_gen import MediaToolError
+        if isinstance(exc, MediaToolError):
+            raise HTTPException(503, str(exc))
+        logger.exception("MKAOS local video rendering failed")
+        raise HTTPException(500, "Video oluşturma başarısız oldu.")
 
 
 @app.get("/api/images/{filename}")
 async def serve_image(filename: str):
-    path = Path("./memory/generated_images") / filename
-    if path.exists():
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}\.(png|jpg|jpeg|webp|mp4)", filename, re.IGNORECASE):
+        raise HTTPException(404)
+    root = Path("./memory/generated_images").resolve()
+    path = (root / filename).resolve()
+    if root in path.parents and path.is_file():
         return FileResponse(path)
     raise HTTPException(404)
+
+
+@app.get("/api/sovereignty")
+async def api_sovereignty(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return sovereignty_status()
+
+
+@app.get("/api/media/capabilities")
+async def api_media_capabilities(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    p = get_pipeline()
+    return {"bridge": p.media_bridge.capabilities(), "engine": p.media_engine.capabilities(),
+            "jobs": p.media_engine.list_jobs(20), "video_mode": "local ffmpeg motion effect, not text-to-video"}
+
+
+@app.post("/api/media/queue")
+async def api_media_queue(req: MediaQueueRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    if req.operation != "generate":
+        raise HTTPException(400, "Kuyruğa şu an yalnızca metinden görsel üretim görevi alınır.")
+    try:
+        return get_pipeline().media_engine.submit("generate", {"prompt": req.prompt[:2000],
+            "width": req.width, "height": req.height})
+    except Exception as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/media/jobs/{job_id}/run")
+async def api_media_run_job(job_id: str, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    try:
+        return await asyncio.to_thread(get_pipeline().media_engine.run_job, job_id)
+    except Exception as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.get("/api/media/jobs")
+async def api_media_jobs(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return {"jobs": get_pipeline().media_engine.list_jobs(30)}
+
+
+@app.post("/api/approval/verify")
+async def api_approval_verify(req: ApprovalVerifyRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    try:
+        result = SignedApprovalProtocol().verify(req.payload, req.signature_b64)
+        return {**result, "execution": "not_started", "message": "İmza doğrulandı; bu uç nokta push/merge yürütmez."}
+    except ApprovalProtocolError as exc:
+        raise HTTPException(400, str(exc))
+
+
+
+@app.post("/api/privacy/forget")
+async def api_privacy_forget(req: ForgetRequest, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    if req.confirmation != "DELETE_MATCHING_MEMORY":
+        raise HTTPException(400, "Açık onay gerekli: DELETE_MATCHING_MEMORY")
+    if len(req.topic.strip()) < 3:
+        raise HTTPException(400, "Silme konusu en az 3 karakter olmalı.")
+    p = get_pipeline()
+    try:
+        memory_result = p.personal_memory.forget_matching(req.topic, req.last_hours)
+    except Exception as exc:
+        logger.warning("Personal memory deletion failed: %s", type(exc).__name__)
+        raise HTTPException(500, "Kişisel vektör hafızası temizlenemedi; veri otomatik sıfırlanmadı.")
+    history = chat_history.get(user["username"], [])
+    phrase = req.topic.strip().casefold()
+    from datetime import datetime, timezone
+    cutoff = datetime.now(timezone.utc).timestamp() - max(1, min(req.last_hours, 8760)) * 3600
+    def is_recent_match(row):
+        if phrase not in str(row.get("content", "")).casefold():
+            return False
+        stamp = row.get("timestamp")
+        if not stamp:
+            return False
+        try:
+            parsed = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.timestamp() >= cutoff
+        except (TypeError, ValueError, OverflowError):
+            return False
+    before = len(history)
+    chat_history[user["username"]] = [row for row in history if not is_recent_match(row)]
+    deleted_chat_turns = before - len(chat_history[user["username"]])
+    if deleted_chat_turns:
+        _save_chat_history()
+    audit = Path("./memory/privacy_deletion_audit.jsonl")
+    audit.parent.mkdir(parents=True, exist_ok=True)
+    from datetime import datetime
+    import hashlib
+    record = {"timestamp": datetime.now().astimezone().isoformat(),
+              "username": str(user.get("username", "owner")),
+              "topic_sha256": hashlib.sha256(req.topic.strip().encode()).hexdigest(),
+              "last_hours": max(1, min(req.last_hours, 8760)),
+              "deleted_chat_turns": deleted_chat_turns, "result": "local_match_delete_attempted"}
+    fd = os.open(str(audit), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    return {"success": True, **memory_result, "deleted_chat_turns": deleted_chat_turns,
+            "audit_recorded": True, "limitations": memory_result["limitations"]}
+
+
+@app.get("/api/audit/clean-room")
+async def api_clean_room_audit(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return scan_code_cleanliness(os.getenv("MKAOS_AUDIT_ROOT", "."), max_files=300)
 
 
 @app.get("/api/users")
