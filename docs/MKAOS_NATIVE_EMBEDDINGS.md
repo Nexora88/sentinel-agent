@@ -53,8 +53,7 @@ also be measured on target hardware before claiming performance parity.
    production isolation.
 4. Verify offline operation with network-level controls/packet capture on a
    target deployment; a configuration flag alone is insufficient.
-5. Existing Chroma collections created with another embedding space must be
-   re-indexed; never silently mix incompatible vectors.
+5. Provider-specific Chroma collection names keep vectors from different embedding spaces isolated. Existing collections remain available under their original provider namespace; migrate/re-index deliberately rather than mixing incompatible vectors.
 6. Only then decide whether a trained MKAOS-owned embedding model is needed.
    This hashing baseline alone is not evidence of parity.
 
