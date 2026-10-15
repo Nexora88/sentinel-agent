@@ -316,9 +316,17 @@ fn main() {
     }
     let bind: SocketAddr = args.get(1).map(String::as_str).unwrap_or("127.0.0.1:11435")
         .parse().unwrap_or_else(|_| { eprintln!("invalid bind address"); process::exit(2) });
-    if !bind.ip().is_loopback() {
-        eprintln!("MKAOS server binds only to a loopback address; refusing network exposure");
+    // Default is loopback-only. Container deployments may opt in to a private,
+    // non-published Docker network using MKAOS_ALLOW_PRIVATE_BIND=true.
+    let allow_private_bind = env::var("MKAOS_ALLOW_PRIVATE_BIND")
+        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false);
+    if !bind.ip().is_loopback() && !(allow_private_bind && bind.ip().is_unspecified()) {
+        eprintln!("MKAOS server binds only to loopback by default; non-loopback bind requires MKAOS_ALLOW_PRIVATE_BIND=true");
         process::exit(2);
+    }
+    if !bind.ip().is_loopback() {
+        eprintln!("WARNING: MKAOS is bound to a container interface. Do not publish its port; use only on a trusted private Docker network.");
     }
     let model_dir = &args[0];
     let load_start = Instant::now();
