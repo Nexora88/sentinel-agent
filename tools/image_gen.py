@@ -5,7 +5,7 @@ There is no public image API fallback. Background removal is optional (rembg wit
 pre-downloaded local model); video rendering uses local ffmpeg.
 """
 from __future__ import annotations
-import base64, ipaddress, logging, os, re, shutil, subprocess, uuid
+import base64, ipaddress, logging, os, re, shutil, subprocess, tempfile, uuid
 from pathlib import Path
 from urllib.parse import urlparse
 import requests
