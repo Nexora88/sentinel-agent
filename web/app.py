@@ -62,7 +62,7 @@ async def security_headers_and_https(request: Request, call_next):
         forwarded = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
         if forwarded in {"https", "http"}:
             scheme = forwarded
-    require_https = os.getenv("REQUIRE_HTTPS", "").strip().lower() in {"1", "true", "yes", "on"}
+    require_https = os.getenv("REQUIRE_HTTPS", "true").strip().lower() in {"1", "true", "yes", "on"}
     if require_https and not is_local and scheme != "https":
         return Response("HTTPS is required for this deployment.", status_code=426)
     response = await call_next(request)
