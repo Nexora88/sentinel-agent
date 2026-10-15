@@ -4,7 +4,7 @@
 
 Amaç, Ollama gibi harici runtime'lara bağımlılığı ölçümle ve güvenli biçimde azaltmaktır; tek bir commit ile tam bağımsızlık iddiası yapılmaz.
 
-Rust çekirdeğinde F32 tensör matematiği, embedding lookup, RoPE, causal attention, tek bloklu eski referans decoder, SHA-256, sınırlandırılmış MKAOSW1 checkpoint okuyucusu, byte tokenizer, greedy/top-k/top-p örnekleme ve EOS/stop-sequence destekli full-prefix üretim sürücüsü bulunur. Yeni `stacked_decoder` modülü ayrıca çok katmanlı GQA, final RMSNorm, LM head/logits ve her katmana ayrı artımlı KV cache için sentetik ağırlıklarla çalışan referans yol sunar. Bu modül henüz SmolLM2'nin gerçek dosyalarından ağırlık yüklemez.
+Rust çekirdeğinde F32 tensör matematiği, embedding lookup, RoPE, causal attention, tek bloklu eski referans decoder, SHA-256, sınırlandırılmış MKAOSW1 checkpoint okuyucusu, byte tokenizer, greedy/top-k/top-p örnekleme ve EOS/stop-sequence destekli full-prefix üretim sürücüsü bulunur. Yeni stacked_decoder modülü çok katmanlı GQA, final RMSNorm, LM head/logits ve katman başına artımlı KV cache sunar. mkaos-hf-adapter artık standart Llama/SmolLM2 SafeTensors adlarını okuyup F32/F16/BF16 ağırlıkları F32 tensörlere dönüştüren bir yükleyici ve gerçek ağırlıklarla çalışan mkaos_generate/mkaos_logits araçları içerir. Ancak gerçek model dosyaları indirilip test edilmediği için bu yol henüz uyumlu/çalışır olarak doğrulanmış sayılmaz.
 
 ## Aşamalar
 
@@ -12,9 +12,9 @@ Rust çekirdeğinde F32 tensör matematiği, embedding lookup, RoPE, causal atte
 2. **Checkpoint güvenliği — kısmi:** dosya boyutu sınırı, SHA-256, sürümlü container ve tensor şekil denetimi mevcut. Hash tek başına kaynak/lisans kanıtı değildir.
 3. **Model kaynağı — kısmi:** SmolLM2-135M-Instruct için Apache-2.0 olarak listelenen model kartı ve değişmez repository revision'ı kaydedildi. Gerçek ağırlık/tokenizer SHA-256 değerleri indirilip ölçülmediği için null; henüz doğrulanmış dosya hash'i iddiası yok. İndirme aracı artık boyut sınırları içinde akışla indirip ölçülen hash'leri kilit dosyasına yazabilir; gerçek indirme henüz burada çalıştırılmadı.
 4. **Safetensors dönüşümü — kısmi:** MKAOSW1 biçimine F32 taşıma dönüşümü var; mimariye özgü parametre eşleme, transpoz ve runtime uyumluluğu sağlamaz.
-5. **Decoder matematiği — yeni referans eklendi, model uyumluluğu bekliyor:** `stacked_decoder` birden fazla katmanı, GQA head eşlemesini, RoPE, katman başına KV cache'i, final RMSNorm ve LM head logits'ini uygular. Sentetik küçük ağırlıklarla tasarlandı. Gerçek checkpoint isim/şekil eşlemesi, BF16 dönüşüm doğrulaması ve Hugging Face referans logits karşılaştırması henüz yok.
-6. **Model tokenizer'ı — kısmi:** ayrı `mkaos-hf-adapter` crate, pinned `tokenizer.json` dosyasını Hugging Face `tokenizers` kütüphanesiyle açan BPE/normalizer/pre-tokenizer/added-token adapter'ı ve SmolLM2 metin chat çerçevesi sunar. Chat framing birim testleri eklendi; gerçek pinned tokenizer dosyasıyla encode/decode karşılaştırması CI'da henüz yapılamadı çünkü model dosyaları depoda yok. Tool-call/multimodal mesajlar bilinçli olarak kapsam dışı.
-7. **Gerçek üretim ve benchmark — bekliyor:** mevcut full-prefix üretim sürücüsü her adımda tüm prefix'i yeniden hesaplar; yeni KV-cache decoder ise tek token adımı sunar fakat henüz generation trait/stop koşullarıyla gerçek model adapter'ına bağlanmadı. Sabit Türkçe/İngilizce prompt seti ve ölçüm protokolü hazır; gerçek model yüklenmeden doğruluk, ilk-token gecikmesi, toplam gecikme, token/s ve tepe RSS ölçülemez.
+5. **Decoder matematiği — gerçek ağırlık yükleyici eklendi, doğrulama bekliyor:** stacked_decoder çok katman, GQA, Llama split-half RoPE, katman başına KV cache, final RMSNorm ve LM head uygular. model_loader.rs HF linear ağırlıklarını [out,in] biçiminden [in,out] biçimine transpoze eder ve F32/F16/BF16 okur. Sentetik testte artımlı logits ile full-prefix referansı karşılaştırılır; bu, gerçek model doğruluğu değildir. tools/validate_model_logits.py gerçek HF logits karşılaştırmasını çalıştırır.
+6. **Model tokenizer'ı — adapter ve karşılaştırma aracı eklendi, çalıştırma bekliyor:** mkaos-hf-adapter pinned tokenizer.json dosyasını upstream Rust tokenizers ile açar. tools/validate_tokenizer.py, İngilizce/Türkçe/özel token ID'lerini Python Hugging Face tokenizer'ıyla ve chat template çıktısını transformers.apply_chat_template ile karşılaştırır. Gerçek dosyalar olmadan bu test geçilmiş sayılamaz. Tool-call/multimodal mesajlar bilinçli olarak kapsam dışı.
+7. **Üretim ve benchmark — koşulabilir araçlar eklendi, gerçek koşu bekliyor:** generate_cached EOS/stop-sequence ve greedy/top-k/top-p akışını artımlı KV cache ile bağlar; sentetik test aynı greedy çıktıyı full-prefix referansıyla karşılaştırır. mkaos_generate gerçek modelde greedy üretim/ilk token/toplam süre/token-s metriklerini verir. tools/benchmark_mkaos_vs_ollama.py aynı Türkçe/İngilizce promptlarda Ollama ve MKAOS ölçümlerini JSON raporuna yazar. Bu araçlar henüz gerçek cihazda çalıştırılmadı; RAM/kalite karşılaştırması ve eşik kararı bekliyor.
 8. **Kademeli geçiş:** MKAOS önce deneysel opt-in yol olur. Ollama ancak aynı donanım/test kümesinde kalite, kararlılık, bellek ve gecikme eşiklerini tekrarlı biçimde geçtikten sonra devreden çıkarılabilir.
 9. **Ölçümlü optimizasyon:** önce F32 referans doğruluğu; ardından quantization/SIMD/GPU, her biri karşılaştırmalı testle.
 10. **Sürekli gelişim:** kullanıcı konuşmaları varsayılan eğitim verisi yapılmaz. Açık izin, lisans, kişisel veri temizliği ve sabit holdout testleri gerekir.
@@ -33,3 +33,16 @@ Her rapor model ve tokenizer SHA-256, lisans/kaynak revision'ı, donanım, OS, d
 - Arşivler ve yayınlar için toplu alma/eğitim izni varsayılmaz.
 - Train/test veri sızıntısı önlenir; tartışmalı iddialar olgu gibi etiketlenmez.
 - Air-gapped iddiası uygulama ayarından ibaret değildir; OS/firewall, DNS/egress denetimi ve ağ testleriyle kanıtlanmalıdır.
+
+
+## Gerçek doğrulama komutları
+
+Model dosyaları önce sabit revision'dan indirilmeli ve gerçek SHA-256 değerleri kilit dosyasına yazılmalıdır. Sonra model dizini üzerinde:
+
+```bash
+python tools/validate_tokenizer.py --model-dir models/smollm2-135m-instruct
+python tools/validate_model_logits.py --model-dir models/smollm2-135m-instruct
+python tools/benchmark_mkaos_vs_ollama.py --model-dir models/smollm2-135m-instruct --ollama-model <yerel-ollama-etiketi> --runs 3
+```
+
+İlk iki komutun geçmesi gerçek tokenizer/chat template ve logits uyumuna dair kapıdır. Benchmark çıktısı olmadan hız, RAM veya kalite üstünlüğü iddia edilmez. model-lock.json içindeki null SHA-256 alanları gerçek dosyalar indirilip ölçülene kadar kasıtlıdır.
