@@ -146,6 +146,8 @@ class GitHubClient:
         """Execute only narrowly supported GitHub actions from a saved approval."""
         if not self.enabled:
             raise RuntimeError("GITHUB_TOKEN tanımlı değil; işlem yürütülmedi.")
+        if request.get("status") != "executing":
+            raise ValueError("GitHub işlemi yürütülmeden önce onaylı istek tek seferlik olarak sahiplenilmelidir.")
         action = request.get("action")
         context = request.get("context") or {}
         owner = str(context.get("owner", ""))
