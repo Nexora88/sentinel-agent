@@ -49,7 +49,7 @@ class MemoryStore:
         self.persist_directory.mkdir(parents=True, exist_ok=True)
         self.ollama = ollama or OllamaClient()
         self.collection_name = collection_name
-        self.max_documents = _limit(max_documents, "SEKA_RAG_MAX_DOCUMENTS", 10000, 1000000)
+        self.max_documents = _limit(max_documents, "SEKA_RAG_MAX_DOCUMENTS", 10000, 100000)
         self.max_chunks_per_ingest = _limit(
             max_chunks_per_ingest, "SEKA_RAG_MAX_CHUNKS_PER_INGEST", 500, 10000
         )

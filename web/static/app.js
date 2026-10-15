@@ -946,6 +946,17 @@ async function loadStatus() {
     const f = data.finance || {};
     const ollama = data.ollama || {};
     const rag = data.rag || {};
+    const night = data.night_scheduler || {};
+    const nightState = night.last_run || {};
+    const nightBox = $("#night-scheduler-status");
+    if (nightBox) {
+      const lastLabel = nightState.status ? "Son çalışma: " + nightState.status + (nightState.finished_at ? " · " + nightState.finished_at : "") : "Henüz çalışma kaydı yok.";
+      if (!night.enabled) {
+        nightBox.textContent = "Otomatik denetim kapalı. .env içinde SEKA_NIGHT_AUTORUN=true ile açabilirsin.\n" + lastLabel;
+      } else {
+        nightBox.textContent = (night.running ? "Zamanlayıcı etkin" : "Zamanlayıcı başlatılamadı") + " · her gece " + (night.scheduled_time || "03:00") + " (" + (night.timezone || "Europe/Istanbul") + ")\n" + lastLabel + "\n" + (night.next_run_at ? "Sonraki çalışma: " + night.next_run_at : "Sonraki çalışma zamanı henüz belirlenmedi.") + "\nKod otomatik değiştirilmez; rapor ve öneriler hazırlanır.";
+      }
+    }
     const ollamaLabel = ollama.status === "online" ? "hazır" : ollama.status === "model_missing" ? "model eksik" : "bağlantı yok";
     const diskMb = Number(rag.disk_bytes || 0) / (1024 * 1024);
     $("#quick-status").innerHTML = `
@@ -967,7 +978,7 @@ loadStatus();
 setInterval(loadStatus, 30000);
 addMessage(
   "assistant",
-  "SEKA v6.1 online · yerel Türkçe ajan.\n" +
+  "SEKA v6.3 online · yerel Türkçe ajan.\n" +
     "• Canlı iş kuyruğu (SSE)\n" +
     "• Plan motoru → planla: hedef\n" +
     "• Bilgi paketi dışa aktar (paylaşılabilir)\n" +

@@ -35,11 +35,12 @@ from core.auth import AuthManager
 from core.energy_policy import policy_status
 from core.job_bus import job_bus
 from core.local_voice import LocalVoiceError, voice_status, synthesize as synthesize_local_voice, transcribe as transcribe_local_voice
+from core.night_scheduler import NightScheduler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("seka.web")
 
-app = FastAPI(title="SEKA", version="6.2", description="Sentinel Egemen Kişisel Ajan")
+app = FastAPI(title="SEKA", version="6.3", description="Sentinel Egemen Kişisel Ajan")
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -51,6 +52,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 pipeline: Optional[SentinelPipeline] = None
+night_scheduler: Optional[NightScheduler] = None
 auth = AuthManager()
 CHAT_HISTORY_FILE = Path("./memory/chat_history.json")
 
@@ -100,7 +102,7 @@ chat_history = _load_chat_history()
 
 MANIFESTO = {
     "name": "SEKA",
-    "version": "6.2",
+    "version": "6.3",
     "tagline": "Yerel Türkçe ajan — ağ özellikleri varsayılan olarak kapalı",
     "pillars": [
         "Ollama ile tamamen yerel zeka",
@@ -176,13 +178,37 @@ class VoiceRequest(BaseModel):
 @app.on_event("startup")
 async def startup():
     # Keep the web process available even if Ollama/models are temporarily offline.
-    logger.info("SEKA Web v6.2 — lazy local model initialization")
+    # Nightly maintenance writes reports/proposals only; it never edits or pushes code.
+    global night_scheduler
+    logger.info("SEKA Web v6.3 — lazy local model initialization")
+    enabled = os.getenv("SEKA_NIGHT_AUTORUN", "true").strip().lower() in {"1", "true", "yes", "on"}
+    try:
+        night_scheduler = NightScheduler(
+            runner=lambda: get_pipeline().run_night_research(),
+            enabled=enabled,
+            hour=int(os.getenv("SEKA_NIGHT_HOUR", "3")),
+            minute=int(os.getenv("SEKA_NIGHT_MINUTE", "0")),
+            timezone_name=os.getenv("SEKA_TIMEZONE", "Europe/Istanbul"),
+            state_path=os.getenv("SEKA_NIGHT_STATE_PATH", "./memory/night_scheduler.json"),
+        )
+        night_scheduler.start()
+        logger.info("SEKA nightly audit enabled=%s schedule=%s", enabled, night_scheduler.status()["scheduled_time"])
+    except Exception as exc:
+        # Scheduler configuration failure must not take down the web panel.
+        logger.exception("Night scheduler unavailable (%s).", type(exc).__name__)
+        night_scheduler = None
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    if night_scheduler:
+        night_scheduler.stop()
 
 
 @app.get("/health")
 async def health():
     # Container health must not depend on the Ollama model being loaded.
-    return {"status": "ok", "service": "SEKA", "version": "6.2", "model_checked": False}
+    return {"status": "ok", "service": "SEKA", "version": "6.3", "model_checked": False}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -281,17 +307,18 @@ async def api_status(authorization: Optional[str] = Header(None)):
     except Exception as exc:
         logger.warning("SEKA bileşenleri başlatılamadı (%s).", type(exc).__name__)
         return {
-            "brand": "SEKA", "version": "6.2", "status": "degraded", "user": user,
+            "brand": "SEKA", "version": "6.3", "status": "degraded", "user": user,
             "assistant": {"status": "degraded", "message": "SEKA paneli açık; yerel bellek veya model bileşeni başlatılamadı. Veriler otomatik silinmedi."},
             "ollama": {"status": "unavailable", "message": "Ollama bağlantısı hazır değil. Ollama hizmetini, model kurulumunu ve yerel bellek dizinini kontrol et."},
             "privacy": {"web_research": False, "external_finance_data": False, "site_scanning": False, "external_notifications": False, "github_network_access": False},
+            "night_scheduler": night_scheduler.status() if night_scheduler else {"enabled": False, "running": False},
         }
     uni = p.expander.get_status()
     fin = p.finance_status()
     cur = p.curiosity.get_status()
     return {
         "brand": "SEKA",
-        "version": "6.2",
+        "version": "6.3",
         "status": "ok",
         "ollama": _ollama_status(p),
         "rag": p.memory.stats(),
@@ -319,6 +346,7 @@ async def api_status(authorization: Optional[str] = Header(None)):
             "external_notifications": os.getenv("ALLOW_EXTERNAL_NOTIFICATIONS", "false").lower() == "true",
             "github_network_access": p.github.enabled,
         },
+        "night_scheduler": night_scheduler.status() if night_scheduler else {"enabled": False, "running": False},
     }
 
 

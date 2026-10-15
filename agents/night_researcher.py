@@ -12,6 +12,10 @@ While you sleep it:
 from __future__ import annotations
 
 import logging
+import os
+import subprocess
+import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -46,6 +50,7 @@ class NightResearcher:
             "started_at": datetime.utcnow().isoformat(),
             "knowledge": None,
             "secrets": None,
+            "checks": None,
             "proposals": [],
             "summary": "",
         }
@@ -70,18 +75,61 @@ class NightResearcher:
         except Exception as e:
             results["secrets"] = {"error": str(e)}
 
-        # 3) Generate improvement proposals (text only — no execution)
+        # 3) Run bounded local syntax/tests; no shell and no network commands.
+        try:
+            results["checks"] = self._run_local_checks()
+        except Exception as e:
+            logger.error("Local code checks failed (%s)", type(e).__name__)
+            results["checks"] = {"status": "error", "error": type(e).__name__}
+
+        # 4) Generate improvement proposals (text only — no execution)
         try:
             proposals = self._generate_proposals(results)
             results["proposals"] = proposals
         except Exception as e:
             logger.error(f"Proposal generation failed: {e}")
 
-        # 4) Write human-readable report
+        # 5) Write human-readable report
         summary = self._write_report(results)
         results["summary"] = summary
         results["finished_at"] = datetime.utcnow().isoformat()
 
+        return results
+
+    def _run_local_checks(self) -> Dict[str, Any]:
+        """Run local syntax and unit tests with timeouts; never invokes a shell."""
+        if os.getenv("SEKA_NIGHT_RUN_TESTS", "true").strip().lower() not in {"1", "true", "yes", "on"}:
+            return {"status": "disabled", "reason": "SEKA_NIGHT_RUN_TESTS=false"}
+
+        commands = [
+            ("python_compile", [sys.executable, "-m", "compileall", "-q", "agents", "core", "scripts", "tools", "web"]),
+            ("unit_tests", [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"]),
+        ]
+        results: Dict[str, Any] = {}
+        timeout = max(30, min(int(os.getenv("SEKA_NIGHT_CHECK_TIMEOUT_SECONDS", "180")), 600))
+        for name, command in commands:
+            try:
+                completed = subprocess.run(
+                    command,
+                    cwd=str(self.project_root),
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    check=False,
+                )
+                results[name] = {
+                    "status": "passed" if completed.returncode == 0 else "failed",
+                    "return_code": completed.returncode,
+                    "output": (completed.stdout + "\n" + completed.stderr)[-4000:],
+                }
+            except subprocess.TimeoutExpired:
+                results[name] = {"status": "timeout", "output": f"{timeout} saniyede tamamlanmadı."}
+            except OSError as exc:
+                results[name] = {"status": "unavailable", "output": type(exc).__name__}
+        results["status"] = "passed" if all(
+            isinstance(results.get(name), dict) and results[name].get("status") == "passed"
+            for name, _ in commands
+        ) else "attention_required"
         return results
 
     def _generate_proposals(self, context: Dict) -> List[str]:
@@ -93,6 +141,12 @@ class NightResearcher:
         knowledge_info = ""
         if context.get("knowledge") and not context["knowledge"].get("error"):
             knowledge_info = f"Yeni öğrenilen konu: {context['knowledge'].get('topic')}"
+        checks_info = ""
+        checks = context.get("checks") or {}
+        if checks:
+            checks_info = f"Yerel kod/test kontrolü: {checks.get('status')}. " + "; ".join(
+                f"{name}={item.get('status')}" for name, item in checks.items() if isinstance(item, dict)
+            )
 
         prompt = f"""Sen bir kişisel AI ajanın gece araştırma modundasın.
 Sadece ÖNERİ üret. Hiçbir komut çalıştırma, dosya silme, para harcama, sunucu kiralama yok.
@@ -100,6 +154,7 @@ Sadece ÖNERİ üret. Hiçbir komut çalıştırma, dosya silme, para harcama, s
 Bağlam:
 {secrets_info}
 {knowledge_info}
+{checks_info}
 
 3-5 kısa, uygulanabilir iyileştirme önerisi yaz:
 - Güvenlik
@@ -137,6 +192,17 @@ Her öneri tek satır, eylem odaklı olsun.
             lines.append(f"- Yeni sayfa: {kn.get('pages_ingested', 0)}")
             lines.append(f"- Toplam bilgi: {kn.get('total_knowledge_pages', 0)}")
 
+        lines.append("\n## Yerel Kod ve Test Kontrolü")
+        checks = results.get("checks") or {}
+        lines.append(f"- Genel durum: {checks.get('status', 'yapılmadı')}")
+        for name in ("python_compile", "unit_tests"):
+            item = checks.get(name) or {}
+            if item:
+                lines.append(f"- {name}: {item.get('status', 'bilinmiyor')} (çıkış: {item.get('return_code', '—')})")
+                detail = str(item.get("output", ""))[-1200:]
+                if detail:
+                    lines.append("~~~text\n" + detail + "\n~~~")
+
         lines.append("\n## Gizli Anahtar Taraması")
         sec = results.get("secrets") or {}
         if sec.get("error"):
@@ -151,6 +217,27 @@ Her öneri tek satır, eylem odaklı olsun.
         lines.append("\n---\nBu rapor sadece öneridir. Hiçbir değişiklik otomatik uygulanmadı.")
 
         text = "\n".join(lines)
-        path.write_text(text, encoding="utf-8")
+        temp_name = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=str(self.report_dir),
+                prefix=".night-report-", suffix=".tmp", delete=False,
+            ) as temp:
+                temp.write(text)
+                temp.flush()
+                os.fsync(temp.fileno())
+                temp_name = temp.name
+            try:
+                os.chmod(temp_name, 0o600)
+            except OSError:
+                pass
+            os.replace(temp_name, path)
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
+        finally:
+            if temp_name and os.path.exists(temp_name):
+                os.unlink(temp_name)
         logger.info(f"Night report written: {path}")
         return text

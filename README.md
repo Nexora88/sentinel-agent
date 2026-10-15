@@ -1,4 +1,4 @@
-# SEKA v6.2 — Sentinel Agent
+# SEKA v6.3 — Sentinel Agent
 
 **Yerel Türkçe ajan altyapısı.** Ollama üzerinden yerel çıkarım; bulut model API'si zorunlu değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
@@ -42,7 +42,13 @@ docker compose -f docker-compose.bootstrap.yml exec ollama-bootstrap ollama pull
 
 `down` komutuna `-v` ekleme; model hacmini silebilir. Bu hazırlık aşamasında model istekleri dış ağa çıkar. Hazırlık tamamlandıktan sonra varsayılan çalışma ağı izoledir. İnternet gerektiren GitHub/web/finans özelliklerini özellikle kullanmak istiyorsan `docker compose -f docker-compose.yml -f docker-compose.networked.yml up --build -d` kullan; bunun yanında ilgili `ALLOW_*` değişkenini de açıkça `true` yapman gerekir. Ağ profilini açmak tek başına entegrasyon izni vermez.
 
-RAG varsayılan olarak en fazla 10.000 parça tutar; bir yüklemede 500 parça ve 1.000.000 karakter sınırı vardır. Tekrarlanan aynı kaynak/parçalar kararlı kimliklerle yinelenmez; sınır aşılırsa en eski parçalar temizlenir. Limitler `SEKA_RAG_MAX_DOCUMENTS`, `SEKA_RAG_MAX_CHUNKS_PER_INGEST` ve `SEKA_RAG_MAX_CHARS_PER_INGEST` ile düşürülebilir/yükseltilebilir (kodun güvenlik tavanları korunur). Durum API’si yaklaşık disk kullanımını ve parça sayısını gösterir.
+RAG varsayılan olarak en fazla 10.000 parça tutar; bir yüklemede 500 parça ve 1.000.000 karakter sınırı vardır. Tekrarlanan aynı kaynak/parçalar kararlı kimliklerle yinelenmez; sınır aşılırsa en eski parçalar temizlenir. Limitler `SEKA_RAG_MAX_DOCUMENTS`, `SEKA_RAG_MAX_CHUNKS_PER_INGEST` ve `SEKA_RAG_MAX_CHARS_PER_INGEST` ile düşürülebilir; güvenlik tavanları sırasıyla 100.000 parça, 10.000 parça/yükleme ve 10.000.000 karakterdir. Koleksiyon budaması embedding vektörlerini belleğe çekmeden yalnızca kimlik/metadata kullanır. Durum API’si yaklaşık disk kullanımını ve parça sayısını gösterir.
+
+## Otomatik gece denetimi
+
+SEKA her gece varsayılan olarak 03:00 (Europe/Istanbul) saatinde yerel bakım döngüsü çalıştırır. Döngü güvenlik taraması yapar, yerel model erişilebiliyorsa iyileştirme önerileri üretir ve sonucu `memory/night_reports/` ile `memory/night_scheduler.json` içinde saklar. Zamanlama ve son çalışma `/api/status` üzerinden görüntülenir. `SEKA_NIGHT_AUTORUN=false` ile kapatılabilir; saat ve saat dilimi `SEKA_NIGHT_HOUR`, `SEKA_NIGHT_MINUTE` ve `SEKA_TIMEZONE` ile ayarlanır.
+
+**Güvenlik sınırı:** Gece döngüsü kodu kendiliğinden değiştirmez, komut çalıştırıp push yapmaz ve onayları atlamaz; rapor ve öneri hazırlar. Web/finans/site taraması ilgili `ALLOW_*` iznine bağlıdır ve varsayılan kapalıdır. Bilgisayar tamamen kapalıyken görev çalışmaz; SEKA'nın çalıştığı makine açık ve Docker çalışır durumda olmalıdır.
 
 ## Yerel Türkçe ses
 
