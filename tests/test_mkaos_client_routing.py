@@ -73,7 +73,8 @@ class MkaosClientRoutingTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "MKAOS is unavailable"):
                 client.chat("test")
         factory.assert_called_once_with(
-            model="mkaos-local", base_url="http://127.0.0.1:11435", temperature=0.2
+            model="mkaos-local", base_url="http://127.0.0.1:11435", temperature=0.15,
+            repeat_penalty=1.1, top_p=0.9
         )
         llm.invoke.assert_called_once()
 
