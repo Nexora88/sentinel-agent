@@ -60,6 +60,15 @@ class ApprovedGitHubExecutionTests(unittest.TestCase):
         self.assertTrue(self.manager.finish_execution(second["id"], True, result))
         self.client._put.assert_called_once()
 
+    def test_github_network_calls_are_blocked_without_token(self):
+        from unittest.mock import patch
+        with patch.dict("os.environ", {"GITHUB_TOKEN": "", "GH_TOKEN": ""}):
+            client = GitHubClient(token="", permissions=self.manager)
+            client.session.get = Mock()
+            with self.assertRaises(RuntimeError):
+                client._get("/user")
+            client.session.get.assert_not_called()
+
     def test_unknown_action_never_dispatches(self):
         request = {
             "status": "executing",
