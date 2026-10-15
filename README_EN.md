@@ -22,10 +22,10 @@ A local-first assistant and agent runtime built around local Ollama inference, e
 The Rust runtime in `engine/mkaos-hf-adapter/` exposes an Ollama-compatible local chat API. It loads the pinned model and tokenizer once at startup, keeps weights resident, and maintains a bounded cache for repeated exact system-prompt prefixes. Requests are currently processed sequentially; token-by-token streaming is not implemented.
 
 The application integration is deliberately opt-in:
-- `MKAOS_ENABLED=false` is the default and preserves the existing local Ollama chat route.
-- `MKAOS_ENABLED=true` routes chat to `MKAOS_BASE_URL`; embeddings remain on Ollama until MKAOS has a validated embedder.
-- Set `MKAOS_ENABLED=false` to roll chat back to Ollama. There is no silent fallback that could hide a failed MKAOS request.
-- The currently pinned weights are third-party SmolLM2-135M-Instruct, not self-trained MKAOS weights. Semantic quality and target-device latency must pass before considering it a default.
+- All chat, coding, planning and agent generation is routed exclusively to `MKAOS_BASE_URL`; `MKAOS_ENABLED=false (ignored for chat; no Ollama rollback)` no longer switches chat back to Ollama.
+- A failed MKAOS request is surfaced and never retried against another chat runtime.
+- Ollama remains temporarily only for RAG embeddings. Full Ollama removal is blocked on a native MKAOS embedder plus retrieval-parity and offline integration tests.
+- The currently pinned weights are third-party SmolLM2-135M-Instruct, not self-trained MKAOS weights. Engine independence and model-weight ownership are separate milestones.
 
 ### Optional Docker Compose deployment
 
