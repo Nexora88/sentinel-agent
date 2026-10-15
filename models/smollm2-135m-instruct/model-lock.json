@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "model_id": "HuggingFaceTB/SmolLM2-135M-Instruct",
+  "revision": "12fd25f77366fa6b3b4b768ec3050bf629380bac",
+  "license": "Apache-2.0",
+  "license_source": "https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/blob/12fd25f77366fa6b3b4b768ec3050bf629380bac/LICENSE",
+  "model_card": "https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/blob/12fd25f77366fa6b3b4b768ec3050bf629380bac/README.md",
+  "model_config": "https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/blob/12fd25f77366fa6b3b4b768ec3050bf629380bac/config.json",
+  "weights": {
+    "path": "model.safetensors",
+    "url": "https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/resolve/12fd25f77366fa6b3b4b768ec3050bf629380bac/model.safetensors",
+    "sha256": null,
+    "sha256_status": "not_measured; do not treat as verified until the exact artifact is downloaded and hashed"
+  },
+  "tokenizer": {
+    "files": [
+      {"path":"tokenizer.json","url":"https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/resolve/12fd25f77366fa6b3b4b768ec3050bf629380bac/tokenizer.json","sha256":null},
+      {"path":"tokenizer_config.json","url":"https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/resolve/12fd25f77366fa6b3b4b768ec3050bf629380bac/tokenizer_config.json","sha256":null},
+      {"path":"special_tokens_map.json","url":"https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/resolve/12fd25f77366fa6b3b4b768ec3050bf629380bac/special_tokens_map.json","sha256":null}
+    ]
+  },
+  "architecture": {
+    "transformers_architecture": "LlamaForCausalLM",
+    "note": "Grouped-query attention and model-native BPE/chat template are not yet supported by the current Rust decoder."
+  },
+  "safety": "Only safetensors and JSON files are in scope. Never load pickle-based training_args.bin."
+}
