@@ -35,10 +35,19 @@ class ImageGeneratorAdapter:
     def execute(self, operation: str, payload: dict) -> dict:
         if operation == "generate":
             return self.generator.generate(payload.get("prompt", ""), width=payload.get("width",768), height=payload.get("height",768))
-        if operation == "edit":
-            return self.generator.edit(payload.get("prompt", ""), payload.get("image_bytes", b""))
-        if operation == "background":
-            return self.generator.replace_background(payload.get("image_bytes", b""), payload.get("color", "#172033"))
+        if operation in {"edit", "background"}:
+            image_bytes = payload.get("image_bytes")
+            image_path = payload.get("image_path")
+            if image_bytes is None and image_path:
+                from pathlib import Path
+                root = Path("./memory/uploads").resolve()
+                source = Path(str(image_path)).resolve()
+                if root not in source.parents or not source.is_file():
+                    raise RuntimeError("Kuyruk görsel dosyası izin verilen yerel yükleme dizininde değil.")
+                image_bytes = source.read_bytes()
+            if operation == "edit":
+                return self.generator.edit(payload.get("prompt", ""), image_bytes or b"")
+            return self.generator.replace_background(image_bytes or b"", payload.get("color", "#172033"))
         if operation == "video":
             return self.generator.create_video(payload.get("filename", ""), payload.get("duration", 4.0))
         if operation == "report_infographic":
