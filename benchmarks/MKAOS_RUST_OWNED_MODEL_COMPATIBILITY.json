@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "owned_training_schema": "mkaos-byte-lm-v1",
+  "owned_training_vocab_size": 256,
+  "owned_training_token_ids": "UTF-8 byte values 0..255",
+  "owned_training_position_encoding": "learned_absolute",
+  "owned_training_normalization": "LayerNorm",
+  "owned_training_feed_forward": "GELU",
+  "owned_training_checkpoint_format": "PyTorch state_dict (.pt)",
+  "rust_decoder": "GqaDecoder",
+  "rust_decoder_vocab_contract": 257,
+  "rust_decoder_tokenizer": "ByteTokenizer with EOS id 256",
+  "rust_decoder_position_encoding": "RoPE",
+  "rust_decoder_normalization": "RMSNorm",
+  "rust_decoder_feed_forward": "SwiGLU",
+  "rust_decoder_checkpoint_format": "MKAOSW1 matrix container",
+  "compatible": false,
+  "replacement_allowed": false,
+  "reason": "Tokenizer vocabulary, positional encoding, normalization, feed-forward activation, and checkpoint format differ. An explicit matching exporter and Rust implementation or architecture-aligned retraining are required."
+}
