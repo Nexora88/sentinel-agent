@@ -58,7 +58,7 @@ class ImageGenerator:
 
     def _image_response(self, endpoint: str, payload: dict, prefix: str, prompt: str = "") -> dict:
         try:
-            response = requests.post(self._require_backend() + endpoint, json=payload, timeout=(5, 180))
+            response = requests.post(self._require_backend() + endpoint, json=payload, timeout=(5, 180), allow_redirects=False)
             response.raise_for_status()
             images = response.json().get("images", [])
             if not images or not isinstance(images[0], str):
