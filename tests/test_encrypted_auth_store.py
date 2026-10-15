@@ -30,7 +30,7 @@ class EncryptedAuthStoreTests(unittest.TestCase):
         ):
             requested = Path(directory) / "users.json"
             requested.write_text('{"owner":{}}', encoding="utf-8")
-            with self.assertRaisesRegex(RuntimeError, "migrate it explicitly"):
+            with self.assertRaisesRegex(RuntimeError, "Plaintext"):
                 AuthManager(str(requested))
 
 
