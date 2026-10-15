@@ -1035,7 +1035,7 @@ async function loadStatus() {
     const memoryCard = $("#dash-memory");
     if (memoryCard) memoryCard.textContent = String(rag.documents ?? "—");
     const memoryNote = $("#dash-memory-note");
-    if (memoryNote) memoryNote.textContent = rag.disk_bytes != null ? (diskMb.toFixed(1) + " MB yerel disk kullanımı") : "Bellek metriği sunulmadı";
+    if (memoryNote) memoryNote.textContent = rag.disk_bytes != null ? ((Number(rag.disk_bytes || 0) / (1024 * 1024)).toFixed(1) + " MB yerel disk kullanımı") : "Bellek metriği sunulmadı";
     const apiState = $("#dash-api-state");
     if (apiState) apiState.textContent = data.status === "ok" ? "Yanıt veriyor" : "Kısıtlı";
     const webState = $("#dash-web-state");
@@ -1096,6 +1096,13 @@ async function loadStatus() {
     renderJobs(data.jobs || []);
   } catch (e) {}
 }
+
+document.addEventListener("click", (event) => {
+  const shortcut = event.target.closest(".shortcut-btn[data-panel]");
+  if (!shortcut) return;
+  const target = document.querySelector('.nav-btn[data-panel="' + shortcut.dataset.panel + '"]');
+  if (target) target.click();
+});
 
 connectSSE();
 loadStatus();
