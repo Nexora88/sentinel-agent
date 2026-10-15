@@ -49,8 +49,10 @@ class CorpusIntegrityTests(unittest.TestCase):
 
     def test_missing_held_out_split_is_rejected(self) -> None:
         manifest = {"records": self.manifest["records"][:2]}
+        # Fail-closed validation detects the unmanifested test sample before split completeness.
+        corpus = {key: value for key, value in self.corpus.items() if key != "test"}
         with self.assertRaisesRegex(ValueError, "Missing non-empty split"):
-            TRAINER.validate_corpus_against_manifest(self.corpus, manifest)
+            TRAINER.validate_corpus_against_manifest(corpus, manifest)
 
     def test_duplicate_manifest_id_is_rejected(self) -> None:
         manifest = {"records": self.manifest["records"] + [self.manifest["records"][0]]}
