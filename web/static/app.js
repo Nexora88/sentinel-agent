@@ -10,23 +10,49 @@ async function requestLogin() {
   if (authPromptActive) return false;
   authPromptActive = true;
   try {
-    const username = prompt("SEKA oturumu — kullanıcı adı", "owner");
-    if (!username) return false;
-    const password = prompt("SEKA oturumu — parola");
-    if (password === null || password === "") return false;
-    const response = await nativeFetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password })
+    return await new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        document.querySelector("#seka-auth-overlay")?.remove();
+        resolve(value);
+      };
+      const overlay = document.createElement("div");
+      overlay.id = "seka-auth-overlay";
+      overlay.style.cssText = "position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(3,8,18,.88);padding:20px";
+      overlay.innerHTML = '<form id="seka-auth-form" style="width:min(420px,100%);box-sizing:border-box;background:#111827;color:#f8fafc;border:1px solid #334155;border-radius:16px;padding:24px;font:14px system-ui;box-shadow:0 20px 70px #0009"><h2 style="margin:0 0 8px">SEKA güvenli oturum</h2><p style="color:#94a3b8;margin:0 0 18px">Kimlik bilgileri bu cihazda doğrulanır.</p><label style="display:block;margin:10px 0 6px">Kullanıcı adı</label><input id="seka-auth-user" autocomplete="username" required value="owner" style="box-sizing:border-box;width:100%;padding:12px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff"><label style="display:block;margin:14px 0 6px">Parola</label><input id="seka-auth-password" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff"><p id="seka-auth-error" role="alert" style="color:#fca5a5;min-height:18px"></p><div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" id="seka-auth-cancel" style="padding:10px 14px;border-radius:8px">İptal</button><button type="submit" style="padding:10px 16px;border-radius:8px;background:#14b8a6;color:#042f2e;font-weight:700;border:0">Giriş yap</button></div></form>';
+      document.body.appendChild(overlay);
+      const form = overlay.querySelector("#seka-auth-form");
+      overlay.querySelector("#seka-auth-cancel").addEventListener("click", () => finish(false));
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const username = overlay.querySelector("#seka-auth-user").value.trim();
+        const password = overlay.querySelector("#seka-auth-password").value;
+        const submit = form.querySelector('button[type="submit"]');
+        submit.disabled = true;
+        try {
+          const response = await nativeFetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+          });
+          if (!response.ok) {
+            overlay.querySelector("#seka-auth-error").textContent = "Giriş başarısız. Bilgileri ve OWNER_PASSWORD ayarını kontrol et.";
+            submit.disabled = false;
+            return;
+          }
+          const data = await response.json();
+          authToken = data.token || "";
+          if (authToken) sessionStorage.setItem("seka.session", authToken);
+          finish(Boolean(authToken));
+        } catch (error) {
+          overlay.querySelector("#seka-auth-error").textContent = "Sunucuya bağlanılamadı.";
+          submit.disabled = false;
+        }
+      });
+      overlay.querySelector("#seka-auth-password").focus();
     });
-    if (!response.ok) {
-      alert("Giriş başarısız. Kullanıcı adı/parolayı ve OWNER_PASSWORD ayarını kontrol et.");
-      return false;
-    }
-    const data = await response.json();
-    authToken = data.token || "";
-    if (authToken) sessionStorage.setItem("seka.session", authToken);
-    return Boolean(authToken);
   } finally {
     authPromptActive = false;
   }
