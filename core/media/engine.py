@@ -59,7 +59,7 @@ class MediaEngine:
             return {"free_ram_mb": None, "ram_known": False, "cpu_count": os.cpu_count() or 1, "gpu_available": False}
 
     def submit(self, operation: str, payload: dict) -> dict:
-        allowed = {"generate", "edit", "background", "video", "report_infographic"}
+        allowed = {"generate", "edit", "background", "video", "story_video", "report_infographic"}
         if operation not in allowed: raise MediaEngineError("Desteklenmeyen medya işlemi.")
         safe_payload = dict(payload)
         # Avoid storing binary upload data or arbitrary large request bodies in queue files.
