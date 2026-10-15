@@ -22,5 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate Compose configuration
         run: docker compose config --quiet
+      - name: Validate strict offline Compose overlay
+        run: docker compose --file docker-compose.yml --file docker-compose.offline.yml --profile mkaos config --quiet
       - name: Build resident MKAOS image
         run: docker build --file Dockerfile.mkaos --tag mkaos-resident:ci .
