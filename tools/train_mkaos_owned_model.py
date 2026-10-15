@@ -19,6 +19,7 @@ from typing import Any
 
 SCHEMA_VERSION = "mkaos-byte-lm-v1"
 BYTE_VOCAB_SIZE = 256
+ALLOWED_LICENSES = {"CC0-1.0", "CC-BY-4.0", "MIT", "Apache-2.0"}
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -46,8 +47,14 @@ def load_governed_manifest(path: Path, min_records_per_split: int = 1) -> tuple[
         for field in ("prompt", "response", "source_id", "source_uri", "license_id", "content_sha256"):
             if not isinstance(record.get(field), str) or not record[field].strip():
                 raise ValueError(f"record {index} missing {field}")
+        if record.get("license_id") not in ALLOWED_LICENSES:
+            raise ValueError(f"record {index} has a non-allowlisted license")
+        if not record["source_uri"].startswith(("https://", "file://", "dataset://")):
+            raise ValueError(f"record {index} has an unauditable source URI")
         if record.get("consent") is not True:
             raise ValueError(f"record {index} lacks explicit permission/consent")
+        if record.get("review_status", "approved") != "approved":
+            raise ValueError(f"record {index} has not passed human review")
         if record.get("personal_data") is True or record.get("sensitive_data") is True:
             raise ValueError(f"record {index} is marked as personal/sensitive")
         split_text[record["split"]].append(
