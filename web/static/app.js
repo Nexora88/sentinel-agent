@@ -760,7 +760,7 @@ $("#finance-btn").addEventListener("click", async () => {
 });
 
 let lastMediaFilename = "";
-function renderMediaResult(data) {
+async function renderMediaResult(data) {
   const box = $("#image-result");
   if (data.status === "queued" && data.id) {
     box.textContent = "Donanım eşiği nedeniyle görev kuyruğa alındı (" + data.id + "). Egemenlik Kontrol Odası'ndan kaynaklar uygun olduğunda çalıştırabilirsin.";
@@ -773,19 +773,27 @@ function renderMediaResult(data) {
   }
   lastMediaFilename = data.filename;
   const url = "/api/images/" + encodeURIComponent(data.filename);
-  if (data.filename.endsWith(".mp4")) {
-    const video = document.createElement("video");
-    video.src = url; video.controls = true; video.preload = "metadata";
-    video.style.maxWidth = "100%"; video.style.borderRadius = "12px";
-    box.replaceChildren(video);
-  } else {
-    const image = document.createElement("img");
-    image.src = url; image.alt = "MKAOS tarafından yerel olarak işlenen görsel";
-    image.loading = "lazy"; image.style.maxWidth = "100%"; image.style.borderRadius = "12px";
-    const save = document.createElement("a");
-    save.href = url; save.download = data.filename; save.textContent = "Görseli indir";
-    save.className = "media-download";
-    box.replaceChildren(image, save);
+  try {
+    // <img>/<video>/<a> cannot attach Authorization headers; fetch through the authenticated API wrapper.
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error("Dosya bu kullanıcı için erişilebilir değil.");
+    const objectUrl = URL.createObjectURL(await response.blob());
+    if (data.filename.endsWith(".mp4")) {
+      const video = document.createElement("video");
+      video.src = objectUrl; video.controls = true; video.preload = "metadata";
+      video.style.maxWidth = "100%"; video.style.borderRadius = "12px";
+      box.replaceChildren(video);
+    } else {
+      const image = document.createElement("img");
+      image.src = objectUrl; image.alt = "MKAOS tarafından yerel olarak işlenen görsel";
+      image.loading = "lazy"; image.style.maxWidth = "100%"; image.style.borderRadius = "12px";
+      const save = document.createElement("a");
+      save.href = objectUrl; save.download = data.filename; save.textContent = "Görseli indir";
+      save.className = "media-download";
+      box.replaceChildren(image, save);
+    }
+  } catch (error) {
+    box.textContent = error.message || "Görsel güvenli biçimde alınamadı.";
   }
 }
 $("#image-btn").addEventListener("click", async () => {
