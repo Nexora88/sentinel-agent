@@ -2,6 +2,16 @@ name: MKAOS real-model validation
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mkaos-real-model-validation.yml"
+      - "engine/mkaos-hf-adapter/**"
+      - "engine/mkaos-inference/**"
+      - "tools/fetch_model.py"
+      - "tools/validate_tokenizer.py"
+      - "tools/validate_model_logits.py"
+      - "models/smollm2-135m-instruct/model-lock.json"
 
 permissions:
   contents: read
