@@ -1,5 +1,5 @@
 """
-SEKA v6 — Sentinel Egemen Kişisel Ajan
+MKAOS v6 — Mustafa Kemal Atatürk Operating System
 Canlı işler · plan motoru · bilgi paketleri · Ollama
 """
 
@@ -172,7 +172,7 @@ class PlanRequest(BaseModel):
     goal: str
 
 class PackRequest(BaseModel):
-    title: Optional[str] = "SEKA Araştırma Paketi"
+    title: Optional[str] = "MKAOS Araştırma Paketi"
 
 class VoiceRequest(BaseModel):
     text: str
@@ -198,7 +198,7 @@ async def startup():
             state_path=os.getenv("SEKA_NIGHT_STATE_PATH", "./memory/night_scheduler.json"),
         )
         night_scheduler.start()
-        logger.info("SEKA nightly audit enabled=%s schedule=%s", enabled, night_scheduler.status()["scheduled_time"])
+        logger.info("MKAOS nightly audit enabled=%s schedule=%s", enabled, night_scheduler.status()["scheduled_time"])
     except Exception as exc:
         # Scheduler configuration failure must not take down the web panel.
         logger.exception("Night scheduler unavailable (%s).", type(exc).__name__)
@@ -539,7 +539,7 @@ async def api_plans(authorization: Optional[str] = Header(None)):
 @app.post("/api/pack")
 async def api_pack(req: PackRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
-    return get_pipeline().export_knowledge_pack(title=req.title or "SEKA Araştırma Paketi")
+    return get_pipeline().export_knowledge_pack(title=req.title or "MKAOS Araştırma Paketi")
 
 
 @app.post("/api/ingest")
