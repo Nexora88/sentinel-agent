@@ -3,7 +3,7 @@
   "model_id": "HuggingFaceTB/SmolLM2-135M-Instruct",
   "revision": "12fd25f77366fa6b3b4b768ec3050bf629380bac",
   "license": "Apache-2.0",
-  "license_source": "https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/blob/12fd25f77366fa6b3b4b768ec3050bf629380bac/LICENSE",
+  "license_source": "https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/blob/12fd25f77366fa6b3b4b768ec3050bf629380bac/README.md (model-card metadata); https://www.apache.org/licenses/LICENSE-2.0.txt (license text)",
   "model_card": "https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/blob/12fd25f77366fa6b3b4b768ec3050bf629380bac/README.md",
   "model_config": "https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct/blob/12fd25f77366fa6b3b4b768ec3050bf629380bac/config.json",
   "weights": {
