@@ -16,6 +16,34 @@ A local-first assistant and agent runtime built around local Ollama inference, e
 - User-specific storage, local approval/audit flows, and explicit opt-in for external research or integrations.
 - WebAuthn/passkey registration and authentication endpoints, with short-lived single-use challenges and server-side public-key credential records.
 
+
+## Resident MKAOS inference service (opt-in)
+
+The Rust runtime in `engine/mkaos-hf-adapter/` exposes an Ollama-compatible local chat API. It loads the pinned model and tokenizer once at startup, keeps weights resident, and maintains a bounded cache for repeated exact system-prompt prefixes. Requests are currently processed sequentially; token-by-token streaming is not implemented.
+
+The application integration is deliberately opt-in:
+- `MKAOS_ENABLED=false` is the default and preserves the existing local Ollama chat route.
+- `MKAOS_ENABLED=true` routes chat to `MKAOS_BASE_URL`; embeddings remain on Ollama until MKAOS has a validated embedder.
+- Set `MKAOS_ENABLED=false` to roll chat back to Ollama. There is no silent fallback that could hide a failed MKAOS request.
+- The currently pinned weights are third-party SmolLM2-135M-Instruct, not self-trained MKAOS weights. Semantic quality and target-device latency must pass before considering it a default.
+
+### Optional Docker Compose deployment
+
+1. Fetch the pinned model files and hash report:
+
+   `python tools/fetch_model.py --output-dir models/smollm2-135m-instruct`
+
+2. Copy `.env.example` to `.env` and set `MKAOS_ENABLED=true`. The embedding model is still served by Ollama.
+3. Start the app and the opt-in resident runtime on the internal Docker network:
+
+   `docker compose --profile mkaos up --build`
+
+The MKAOS port is not published on the host. Container-interface binding is explicitly enabled only for this private Compose network. Check service health from the app container:
+
+`docker compose exec sentinel python -c "import urllib.request; print(urllib.request.urlopen('http://mkaos:11435/health').read().decode())"`
+
+To roll back, set `MKAOS_ENABLED=false` and run `docker compose up -d sentinel`. First startup includes model loading; subsequent requests reuse the resident process unless the service restarts.
+
 ## Local reasoning, hardware and agent-cluster foundations
 
 - `core/reasoning_engine.py` provides a bounded local-model draft → critique → synthesis flow, optionally routing each role to a different local model. It returns concise findings and uncertainty, not hidden chain-of-thought. It does not execute tools, mutate files or merge pull requests.
