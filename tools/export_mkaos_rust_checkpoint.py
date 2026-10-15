@@ -80,7 +80,7 @@ def main():
       "config":cfg,"tokenizer":{"kind":"utf8-byte","vocab_size":257,"eos_token_id":256},
       "container":"MKAOSW1","tensor_dtype":"float32","layout":"row-major","shape_validation":"passed",
       "weights_transposed_for_rust_matmul":True,"production_ready":False,
-      "note":"Serialization/shape contract only; a Rust model assembly loader and numerical parity tests are still required."}
+      "note":"Synthetic CI train/export/Rust-logit parity is tested; independent Turkish quality and production readiness are not established."}
     (a.output_dir/"mkaos-rust-gqa-v1.manifest.json").write_text(json.dumps(report,indent=2)+"\n",encoding="utf-8")
     print(json.dumps(report,indent=2))
 if __name__=="__main__": main()
