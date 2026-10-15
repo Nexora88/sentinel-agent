@@ -65,7 +65,7 @@ class SentinelPipeline:
         self.github = GitHubClient(permissions=self.permissions)
         self.finance = FinanceEngine(ollama=self.ollama)
         self.auto_finance = AutonomousFinance(ollama=self.ollama, state_dir=str(self.storage_root / 'finance'))
-        self.image_gen = ImageGenerator()
+        self.image_gen = ImageGenerator(output_dir=str(self.storage_root / "generated_images"))
         self.media_bridge = GenerationBridge([ImageGeneratorAdapter(self.image_gen)])
         self.media_engine = MediaEngine(self.media_bridge, state_path=str(self.storage_root / 'media_jobs.json'))
         self.secret_scanner = SecretScanner()
