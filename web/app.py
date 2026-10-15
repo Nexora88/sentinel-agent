@@ -505,7 +505,8 @@ async def api_execute_approved(request_id: str, authorization: Optional[str] = H
     request = p.permissions.get_request(request_id) or {}
     try:
         result = p.github.execute_approved_request(request)
-        p.permissions.finish_execution(request_id, True, result)
+        final_status = "staged" if request.get("action") == "modify_files" else "executed"
+        p.permissions.finish_execution(request_id, True, result, final_status=final_status)
         return {"success": True, "result": result}
     except Exception as exc:
         # Do not automatically retry: a network timeout can leave the remote outcome unknown.
