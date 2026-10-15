@@ -87,3 +87,6 @@ Doğrulayıcı yalnızca metadata tutarlılığı kontrol eder; lisans iznini, k
 - [ ] CUDA/ROCm/Metal/Gaudi fiziksel cihaz testi, yatay Kubernetes ve paylaşılan kalıcı durum, canlı mTLS mesh/sertifika iptali ve çok düğümlü güvenlik testleri açık kabul kapıları olarak kalıyor.
 
 Bu adım bir **eğitim altyapısı** ekler; eğitimin gerçekten çalıştırıldığı, modelin iyi Türkçe bildiği veya yüzde yüz yerli üretim sistemine ulaşıldığı iddiası değildir.
+
+- [x] Özel checkpoint hash doğrulamasından sonra `GqaDecoder` ile greedy token üretimi yapan yerel Rust CLI eklendi: `engine/mkaos-inference/src/bin/mkaos-generate.rs`.
+- [x] CI, yeni Python bütünlük testleri ve Rust crate'in tüm hedeflerini derleyip test edecek şekilde genişletildi; yeni CI sonucu henüz gözlenmedi.
