@@ -31,7 +31,7 @@ jobs:
       - name: Download and verify pinned model files
         run: python tools/fetch_model.py --output-dir artifacts/smollm2-135m-instruct --lock-file models/smollm2-135m-instruct/model-lock.json
       - name: Build the native MKAOS CLI before network isolation
-        run: cargo build --release --manifest-path engine/mkaos-hf-adapter/Cargo.toml --bin mkaos_generate
+        run: cargo build --release --manifest-path engine/mkaos-hf-adapter/Cargo.toml --bin mkaos_generate --bin mkaos_server
       - name: Run real-weight inference in a network-disabled container
         run: |
           docker run --rm --network none \
@@ -50,13 +50,29 @@ jobs:
           docker exec ollama ollama pull smollm2:135m-instruct-fp16
       - name: Run same-runner MKAOS vs Ollama benchmark
         run: python tools/benchmark_mkaos_vs_ollama.py --model-dir artifacts/smollm2-135m-instruct --ollama-model smollm2:135m-instruct-fp16 --runs 1 --max-new-tokens 32
+      - name: Start resident MKAOS server for fixed-set evaluation
+        run: |
+          ./engine/mkaos-hf-adapter/target/release/mkaos_server artifacts/smollm2-135m-instruct 127.0.0.1:11435 > mkaos-server.log 2>&1 &
+          echo $! > mkaos-server.pid
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:11435/health >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:11435/health >/dev/null
+      - name: Evaluate resident MKAOS quality and steady-request latency
+        run: python tools/evaluate_mkaos_quality.py --server-url http://127.0.0.1:11435 --max-new-tokens 24 --output mkaos-resident-quality.json
       - name: Upload benchmark report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mkaos-offline-and-ollama-benchmark
           if-no-files-found: warn
-          path: mkaos-ollama-benchmark.json
-      - name: Clean up Ollama container
+          path: |
+            mkaos-ollama-benchmark.json
+            mkaos-resident-quality.json
+            mkaos-server.log
+      - name: Clean up Ollama and MKAOS processes
         if: always()
-        run: docker rm -f ollama >/dev/null 2>&1 || true
+        run: |
+          docker rm -f ollama >/dev/null 2>&1 || true
+          if [ -f mkaos-server.pid ]; then kill "$(cat mkaos-server.pid)" >/dev/null 2>&1 || true; fi
