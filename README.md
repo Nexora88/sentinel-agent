@@ -38,7 +38,7 @@ MKAOS, *Mustafa Kemal Atatürk Operating System* anlamıyla yerel egemenlik, bil
 - Anahtar 32 bayt rastgele veri olmalı ve Base64 olarak veri dizini/depo dışında sağlanmalıdır. Anahtar kaybında şifreli veriler kurtarılamaz.
 - Eski düz metin dosyalar otomatik taşınmaz; açık ve gözden geçirilmiş geçiş gerekir. Chroma/RAG vektörleri, yüklemeler, üretilen medya, günlükler, yedekler ve diğer dosyalar bu ayarla şifrelenmez. Tüm disk/hacim için işletim sistemi veya depolama katmanı şifrelemesi ayrıca gerekir.
 - WebAuthn/passkey rotaları: `/api/webauthn/register/options`, `/api/webauthn/register/verify`, `/api/webauthn/login/options`, `/api/webauthn/login/verify`. Arayüz parola ile girişten sonra kenar menüsünden passkey kaydı ve giriş ekranından passkey ile oturum açma sağlar.
-- Üretimde `WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN`, `REQUIRE_HTTPS=true` değerlerini gerçek HTTPS alan adına göre ayarla. `TRUST_PROXY_HEADERS=true` yalnızca gelen forwarded başlıklarını silip yeniden yazan güvenilir bir ters vekil varsa kullanılmalıdır.
+- HTTPS, localhost dışındaki isteklere varsayılan olarak zorunlu uygulanır. Üretimde `WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN`, `REQUIRE_HTTPS=true` değerlerini gerçek HTTPS alan adına göre ayarla; ters vekil arkasında `TRUST_PROXY_HEADERS=true` yalnızca güvenilir proxy başlıkları yeniden yazıyorsa kullanılmalıdır. `TRUST_PROXY_HEADERS=true` yalnızca gelen forwarded başlıklarını silip yeniden yazan güvenilir bir ters vekil varsa kullanılmalıdır.
 - Uygulama HTTPS ve güvenlik başlıklarını ayarlayabilir; ana bilgisayar güvenlik duvarı, TLS sertifikası, yedekler ve fiziksel cihaz doğrulaması yine dağıtım düzeyinde yapılmalıdır.
 
 ## Denetlenebilir kod geliştirme
