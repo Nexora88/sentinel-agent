@@ -125,6 +125,43 @@ class PermissionManager:
         with self._lock:
             return [dict(r) for r in self.pending_approvals if r["status"] == "pending"]
 
+    def get_request(self, request_id: str) -> Optional[Dict]:
+        with self._lock:
+            for request in self.pending_approvals:
+                if request.get("id") == request_id:
+                    return dict(request)
+        return None
+
+    def list_actionable(self) -> List[Dict]:
+        """Show pending requests and approved requests awaiting explicit execution."""
+        with self._lock:
+            return [
+                dict(r) for r in self.pending_approvals
+                if r.get("status") in {"pending", "approved"}
+            ]
+
+    def begin_execution(self, request_id: str) -> bool:
+        """Claim an approved request once before performing an external side effect."""
+        with self._lock:
+            for request in self.pending_approvals:
+                if request.get("id") == request_id and request.get("status") == "approved":
+                    request["status"] = "executing"
+                    request["execution_started_at"] = datetime.now(timezone.utc).isoformat()
+                    self._save()
+                    return True
+        return False
+
+    def finish_execution(self, request_id: str, success: bool, result: str) -> bool:
+        with self._lock:
+            for request in self.pending_approvals:
+                if request.get("id") == request_id and request.get("status") == "executing":
+                    request["status"] = "executed" if success else "execution_failed"
+                    request["execution_result"] = str(result)[:1000]
+                    request["execution_finished_at"] = datetime.now(timezone.utc).isoformat()
+                    self._save()
+                    return True
+        return False
+
     def approve(self, request_id: str = "") -> bool:
         """Approve a specific request by stable ID; positional indexes fail closed."""
         if not isinstance(request_id, str) or not request_id:
