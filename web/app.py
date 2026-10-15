@@ -173,6 +173,7 @@ class VoiceRequest(BaseModel):
     text: str
     voice: str = "male"
     cat_mode: bool = False
+    pace: float = 1.0
 
 
 @app.on_event("startup")
@@ -239,7 +240,7 @@ async def api_voice_status(authorization: Optional[str] = Header(None)):
 async def api_voice_synthesize(req: VoiceRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
     try:
-        audio = synthesize_local_voice(req.text, req.voice, req.cat_mode)
+        audio = synthesize_local_voice(req.text, req.voice, req.cat_mode, req.pace)
     except LocalVoiceError as exc:
         raise HTTPException(503, str(exc))
     return Response(
