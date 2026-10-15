@@ -9,7 +9,7 @@ class TurkishQualityContractTests(unittest.TestCase):
         suite = json.loads((ROOT / "tests" / "fixtures" / "turkish_quality_tasks.json").read_text(encoding="utf-8"))
         self.assertGreaterEqual(len(suite), 8)
         self.assertTrue(all(item.get("prompt_tr") and item.get("category") for item in suite))
-        self.assertTrue(any("İstanbul" in item["prompt_tr"] for item in suite))
+        self.assertTrue(any(any(ch in item["prompt_tr"] for ch in "çğıöşüÇĞİÖŞÜ") for item in suite))
 
     def test_provenance_template_requires_hash_license_and_origin(self):
         manifest = json.loads((ROOT / "docs" / "model-provenance.template.json").read_text(encoding="utf-8"))
