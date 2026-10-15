@@ -57,10 +57,10 @@ class PersonalMemory:
 
     def _load_profile(self) -> Dict[str, Any]:
         if self.encrypt_profile:
-            if self.legacy_profile_path.exists() and not self.profile_path.exists():
+            if self.legacy_profile_path.exists():
                 raise RuntimeError(
-                    "Plaintext profile.json exists while encrypted profiles are enabled. "
-                    "Back it up and migrate it explicitly; automatic migration is disabled."
+                    "Plaintext profile.json remains while encrypted profiles are enabled. "
+                    "Verify a protected backup and encrypted copy, then move the plaintext file to protected offline storage or remove it explicitly; automatic migration is disabled."
                 )
             if self.profile_path.exists():
                 try:
