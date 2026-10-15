@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentinel-agent
+  namespace: mkaos
+  labels:
+    app.kubernetes.io/name: sentinel-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sentinel-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sentinel-agent
+    spec:
+      serviceAccountName: sentinel-agent
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          # Replace with a published image pinned by immutable digest before deployment.
+          image: ghcr.io/nexora88/sentinel-agent:REPLACE_WITH_PINNED_RELEASE
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: AUTH_REQUIRED
+              value: "true"
+            - name: REQUIRE_APPROVAL
+              value: "true"
+            - name: ALLOW_WEB_RESEARCH
+              value: "false"
+            - name: ALLOW_SITE_SCANNING
+              value: "false"
+            - name: ALLOW_EXTERNAL_NOTIFICATIONS
+              value: "false"
+            - name: REQUIRE_HTTPS
+              value: "true"
+            - name: OLLAMA_BASE_URL
+              value: http://ollama.mkaos.svc.cluster.local:11434
+            - name: OWNER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sentinel-agent-secrets
+                  key: owner-password
+            - name: MKAOS_MEMORY_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sentinel-agent-secrets
+                  key: memory-key
+            - name: MKAOS_ENCRYPT_MEMORY_FILES
+              value: "true"
+            - name: WEBAUTHN_RP_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: sentinel-agent-public-config
+                  key: webauthn-rp-id
+            - name: WEBAUTHN_ORIGIN
+              valueFrom:
+                configMapKeyRef:
+                  name: sentinel-agent-public-config
+                  key: webauthn-origin
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: memory
+              mountPath: /app/memory
+            - name: tmp
+              mountPath: /tmp
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3).read()"
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: memory
+          persistentVolumeClaim:
+            claimName: sentinel-agent-memory
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sentinel-agent
+  namespace: mkaos
+automountServiceAccountToken: false
