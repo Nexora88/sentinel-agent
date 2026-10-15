@@ -127,6 +127,13 @@ class WebAuthnManager:
         issued["publicKey"] = json.loads(options_to_json(options))
         return issued
 
+    def verify_registration_for_user(self, challenge_id: str, credential: dict[str, Any], username: str) -> dict[str, Any]:
+        """Bind passkey registration to the authenticated account that requested options."""
+        with self._lock:
+            item = self._challenges.get(challenge_id)
+            if not item or item["username"] != username.lower().strip() or item["purpose"] != "register":
+                raise WebAuthnError("Registration challenge does not belong to this account.")
+        return self.verify_registration(challenge_id, credential)
     def verify_registration(self, challenge_id: str, credential: dict[str, Any]) -> dict[str, Any]:
         item = self._consume(challenge_id, "register")
         username = item["username"]
