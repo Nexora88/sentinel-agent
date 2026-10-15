@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import FastAPI, Request, Header, HTTPException, UploadFile, File
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -33,6 +33,7 @@ from core.pipeline import SentinelPipeline
 from core.auth import AuthManager
 from core.energy_policy import policy_status
 from core.job_bus import job_bus
+from core.local_voice import LocalVoiceError, voice_status, synthesize as synthesize_local_voice, transcribe as transcribe_local_voice
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("seka.web")
@@ -165,6 +166,11 @@ class PlanRequest(BaseModel):
 class PackRequest(BaseModel):
     title: Optional[str] = "SEKA Araştırma Paketi"
 
+class VoiceRequest(BaseModel):
+    text: str
+    voice: str = "male"
+    cat_mode: bool = False
+
 
 @app.on_event("startup")
 async def startup():
@@ -188,6 +194,41 @@ async def login(req: LoginRequest):
     if not token:
         raise HTTPException(401, "Hatalı kullanıcı veya şifre")
     return {"token": token, "user": auth.validate(token)}
+
+
+@app.get("/api/voice/status")
+async def api_voice_status(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return voice_status()
+
+
+@app.post("/api/voice/synthesize")
+async def api_voice_synthesize(req: VoiceRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    try:
+        audio = synthesize_local_voice(req.text, req.voice, req.cat_mode)
+    except LocalVoiceError as exc:
+        raise HTTPException(503, str(exc))
+    return Response(
+        content=audio,
+        media_type="audio/wav",
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.post("/api/voice/transcribe")
+async def api_voice_transcribe(file: UploadFile = File(...), authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    suffix = Path(file.filename or "speech.webm").suffix.lower()
+    if suffix not in {".webm", ".wav", ".mp3", ".m4a", ".ogg"}:
+        raise HTTPException(400, "Desteklenmeyen ses biçimi.")
+    audio = await file.read(15 * 1024 * 1024 + 1)
+    await file.close()
+    try:
+        transcript = transcribe_local_voice(audio, suffix)
+    except LocalVoiceError as exc:
+        raise HTTPException(503, str(exc))
+    return {"text": transcript, "mode": "local-only"}
 
 
 @app.get("/api/status")
@@ -429,7 +470,7 @@ async def api_ingest(file: UploadFile = File(...), authorization: Optional[str] 
 @app.get("/api/approvals")
 async def api_approvals(authorization: Optional[str] = Header(None)):
     get_user(authorization)
-    return {"pending": get_pipeline().permissions.list_pending()}
+    return {"pending": get_pipeline().permissions.list_actionable()}
 
 
 @app.post("/api/approvals/{request_id}/approve")
@@ -438,6 +479,30 @@ async def api_approve(request_id: str, authorization: Optional[str] = Header(Non
     if user.get("role") != "owner":
         raise HTTPException(403, "Yalnızca sahip onay verebilir.")
     return {"success": get_pipeline().permissions.approve(request_id)}
+
+
+@app.post("/api/approvals/{request_id}/execute")
+async def api_execute_approved(request_id: str, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    if user.get("role") != "owner":
+        raise HTTPException(403, "Yalnızca sahip onaylı işlemi yürütebilir.")
+    p = get_pipeline()
+    request = p.permissions.get_request(request_id)
+    if not request or request.get("status") != "approved":
+        raise HTTPException(409, "İşlem bulunamadı veya yürütme için onaylı değil.")
+    if request.get("action") not in {"open_github_issue", "create_pull_request"}:
+        raise HTTPException(400, "Bu işlem türü henüz güvenli yürütücüde desteklenmiyor.")
+    if not p.permissions.begin_execution(request_id):
+        raise HTTPException(409, "İşlem zaten yürütülüyor veya daha önce tüketildi.")
+    try:
+        result = p.github.execute_approved_request(request)
+        p.permissions.finish_execution(request_id, True, result)
+        return {"success": True, "result": result}
+    except Exception as exc:
+        # Do not automatically retry: a network timeout can leave the remote outcome unknown.
+        message = f"Yürütme başarısız veya sonucu belirsiz ({type(exc).__name__}); tekrar denemeden önce GitHub'ı kontrol et."
+        p.permissions.finish_execution(request_id, False, message)
+        raise HTTPException(502, message)
 
 
 @app.post("/api/approvals/{request_id}/reject")
