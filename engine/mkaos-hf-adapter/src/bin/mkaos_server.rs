@@ -485,9 +485,9 @@ mod tests {
         drop(server);
         let mut response = String::new();
         client.read_to_string(&mut response).unwrap();
-        assert!(response.starts_with("HTTP/1.1 200 OK\\r\\n"));
-        assert!(response.contains("Content-Type: application/x-ndjson\\r\\n"));
-        let body = response.split_once("\\r\\n\\r\\n").unwrap().1;
+        assert!(response.starts_with("HTTP/1.1 200 OK\r\n"));
+        assert!(response.contains("Content-Type: application/x-ndjson\r\n"));
+        let body = response.split_once("\r\n\r\n").unwrap().1;
         let line = body.lines().next().unwrap();
         let parsed: Value = serde_json::from_str(line).unwrap();
         assert_eq!(parsed["response"], "Mer");
