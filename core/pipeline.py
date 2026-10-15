@@ -1,5 +1,5 @@
 """
-Main orchestration pipeline — full power + safety + paper trading + org modules.
+Main orchestration — SEKA: yerel, apisiz, panelli süper ajan.
 """
 
 from __future__ import annotations
@@ -36,6 +36,7 @@ from agents.personal_assistant import PersonalAssistant
 from agents.knowledge_expander import KnowledgeExpander
 from agents.night_researcher import NightResearcher
 from agents.curiosity import CuriosityEngine
+from agents.podcast_draft import PodcastDraft
 
 logger = logging.getLogger("sentinel.pipeline")
 
@@ -61,6 +62,7 @@ class SentinelPipeline:
         self.local_discovery = LocalDiscovery()
         self.doc_assistant = DocumentAssistant(ollama=self.ollama)
         self.legacy = LegacyBackup()
+        self.podcast = PodcastDraft(ollama=self.ollama)
 
         self.reviewer = CodeReviewerAgent(ollama=self.ollama, memory=self.memory)
         self.security = SecurityScannerAgent(ollama=self.ollama, memory=self.memory)
@@ -124,6 +126,9 @@ class SentinelPipeline:
     def run_night_research(self) -> dict:
         return self.night.run_cycle()
 
+    def podcast_from_night(self) -> dict:
+        return self.podcast.from_latest_night_report()
+
     def run_finance_cycle(self, context: str = "") -> dict:
         if not context:
             try:
@@ -147,9 +152,11 @@ class SentinelPipeline:
         result = self.license_checker.scan_tree(path)
         return self.license_checker.format_report(result)
 
-    def discover_local(self) -> str:
-        result = self.local_discovery.scan_localhost()
-        return self.local_discovery.format_report(result)
+    def discover_local(self) -> dict:
+        return self.local_discovery.scan_localhost()
+
+    def discover_local_report(self) -> str:
+        return self.local_discovery.format_report(self.discover_local())
 
     def analyze_document_text(self, text: str) -> str:
         result = self.doc_assistant.analyze_text(text)
@@ -157,11 +164,11 @@ class SentinelPipeline:
 
     def legacy_export(self, passphrase: str, out_path: str = "./memory/legacy_backup.bin") -> str:
         path = self.legacy.export(passphrase, out_path=out_path)
-        return f"Legacy backup written: {path}"
+        return f"Legacy yedek yazıldı: {path}"
 
-    def ingest_document(self, file_path: str) -> str:
-        result = self.doc_ingester.ingest_file(file_path)
-        return result.get("message") or result.get("error", "Bilinmeyen hata")
+    def ingest_document(self, file_path: str) -> dict:
+        """Structured ingest: RAG + belge analizi."""
+        return self.doc_ingester.ingest_file(file_path, analyze=True)
 
     def run_on_repo(self, repo_url: str, branch: str = "main", max_files: int = 8) -> str:
         logger.info(f"Starting pipeline on {repo_url}")
