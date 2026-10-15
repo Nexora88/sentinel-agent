@@ -5,6 +5,7 @@ on:
     paths:
       - "engine/mkaos-inference/**"
       - "engine/mkaos-hf-adapter/**"
+      - "engine/mkaos-hf-adapter/**"
       - ".github/workflows/mkaos-rust-engine.yml"
       - "tools/fetch_model.py"
       - "tools/convert_safetensors_to_mkaosw1.py"
@@ -12,6 +13,7 @@ on:
   pull_request:
     paths:
       - "engine/mkaos-inference/**"
+      - "engine/mkaos-hf-adapter/**"
       - ".github/workflows/mkaos-rust-engine.yml"
       - "tools/fetch_model.py"
       - "tools/convert_safetensors_to_mkaosw1.py"
