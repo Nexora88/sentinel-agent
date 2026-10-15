@@ -6,6 +6,7 @@ Canlı işler · plan motoru · bilgi paketleri · Ollama
 from __future__ import annotations
 
 import asyncio
+import difflib
 import json
 import logging
 import os
@@ -40,6 +41,7 @@ from core.local_voice import LocalVoiceError, voice_status, synthesize as synthe
 from core.night_scheduler import NightScheduler
 from core.safety.sovereignty import sovereignty_status
 from core.approval_protocol import SignedApprovalProtocol, ApprovalProtocolError
+from core.improvement_gate import ImprovementProposalStore, ImprovementProposalError
 from core.integrations.catalog import integration_status
 from tools.clean_room_audit import scan_code_cleanliness
 
@@ -767,6 +769,29 @@ class VideoRequest(BaseModel):
     duration: float = 4.0
 
 
+class VideoStoryRequest(BaseModel):
+    prompts: list[str]
+    duration: float = 8.0
+
+
+class ImprovementProposalRequest(BaseModel):
+    title: str
+    rationale: str
+    files: list[str]
+    patch: str
+    test_plan: list[str]
+
+
+class ImprovementGenerateRequest(BaseModel):
+    file_path: str
+    issue: str
+    test_plan: list[str]
+
+
+class ImprovementApprovalRequest(BaseModel):
+    confirmation: str
+
+
 @app.post("/api/media/video")
 async def api_media_video(req: VideoRequest, authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
@@ -781,6 +806,28 @@ async def api_media_video(req: VideoRequest, authorization: Optional[str] = Head
             raise HTTPException(503, str(exc))
         logger.exception("MKAOS local video rendering failed")
         raise HTTPException(500, "Video oluşturma başarısız oldu.")
+
+
+@app.post("/api/media/story-video")
+async def api_media_story_video(req: VideoStoryRequest, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    if not isinstance(req.prompts, list) or not 2 <= len(req.prompts) <= 6:
+        raise HTTPException(400, "Storyboard için 2-6 sahne açıklaması gerekli.")
+    if any(not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 1000 for prompt in req.prompts):
+        raise HTTPException(400, "Her sahne açıklaması 1-1000 karakter olmalı.")
+    duration = max(4.0, min(24.0, float(req.duration)))
+    try:
+        p = get_pipeline(user["username"])
+        payload = {"prompts": [prompt.strip() for prompt in req.prompts], "duration": duration}
+        if p.media_engine.should_defer_heavy():
+            return p.media_engine.submit("story_video", payload)
+        return await asyncio.to_thread(p.media_bridge.execute, "story_video", payload)
+    except Exception as exc:
+        from tools.image_gen import MediaToolError
+        if isinstance(exc, MediaToolError):
+            raise HTTPException(503, str(exc))
+        logger.exception("MKAOS local storyboard video failed")
+        raise HTTPException(500, "Storyboard videosu oluşturulamadı.")
 
 
 @app.get("/api/images/{filename}")
@@ -806,7 +853,7 @@ async def api_media_capabilities(authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
     p = get_pipeline(user["username"])
     return {"bridge": p.media_bridge.capabilities(), "engine": p.media_engine.capabilities(),
-            "jobs": p.media_engine.list_jobs(20), "video_mode": "local ffmpeg motion effect, not text-to-video"}
+            "jobs": p.media_engine.list_jobs(20), "video_mode": "local ffmpeg motion effect plus 2-6-scene self-hosted Stable Diffusion storyboard; not neural text-to-video"}
 
 
 @app.post("/api/media/queue")
@@ -834,6 +881,87 @@ async def api_media_run_job(job_id: str, authorization: Optional[str] = Header(N
 async def api_media_jobs(authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
     return {"jobs": get_pipeline(user["username"]).media_engine.list_jobs(30)}
+
+
+def _improvement_store(username: str) -> ImprovementProposalStore:
+    root = tenant_root("./memory/tenants", tenant_storage_id(username)) / "improvement_proposals"
+    return ImprovementProposalStore(root)
+
+
+@app.post("/api/improvements/generate")
+async def api_generate_improvement_proposal(req: ImprovementGenerateRequest, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    file_path = str(req.file_path or "").strip().replace("\\", "/")
+    try:
+        # Validate the requested path before reading any repository file.
+        from core.improvement_gate import validate_candidate
+        validate_candidate(title="Code improvement", rationale=req.issue, files=[file_path],
+                           patch="candidate", test_plan=req.test_plan)
+        source = (ROOT / file_path).resolve()
+        if ROOT not in source.parents or not source.is_file() or source.stat().st_size > 40000:
+            raise ImprovementProposalError("Yalnızca izin verilen, 40 KB altındaki mevcut kaynak dosyalar seçilebilir.")
+        issue = str(req.issue or "").strip()
+        if not issue or len(issue) > 2000:
+            raise ImprovementProposalError("Sorun açıklaması 1-2000 karakter olmalı.")
+        current = source.read_text(encoding="utf-8")
+        pipeline = get_pipeline(user["username"])
+        candidate = await asyncio.to_thread(pipeline.code_writer.propose_fix, file_path, current, issue)
+        if not isinstance(candidate, str) or not candidate.strip() or len(candidate.encode("utf-8")) > 40000:
+            raise ImprovementProposalError("Yerel model boş veya çok büyük bir kod önerisi döndürdü.")
+        diff = "\n".join(difflib.unified_diff(
+            current.splitlines(), candidate.strip().splitlines(),
+            fromfile="a/" + file_path, tofile="b/" + file_path, lineterm=""
+        ))
+        if not diff.strip():
+            raise ImprovementProposalError("Model değişiklik önermedi; dosya aynı kaldı.")
+        return _improvement_store(user["username"]).create(
+            title="Kod iyileştirmesi: " + file_path,
+            rationale=issue,
+            files=[file_path],
+            patch=diff,
+            test_plan=req.test_plan,
+        )
+    except ImprovementProposalError as exc:
+        raise HTTPException(400, str(exc))
+    except Exception as exc:
+        logger.warning("Local code proposal generation failed: %s", type(exc).__name__)
+        raise HTTPException(503, "Yerel kod önerisi üretilemedi; Ollama/model durumunu denetle.")
+
+
+@app.post("/api/improvements/proposals")
+async def api_create_improvement_proposal(req: ImprovementProposalRequest, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    try:
+        return _improvement_store(user["username"]).create(
+            title=req.title, rationale=req.rationale, files=req.files, patch=req.patch, test_plan=req.test_plan
+        )
+    except ImprovementProposalError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.get("/api/improvements/proposals")
+async def api_list_improvement_proposals(authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    return {"proposals": _improvement_store(user["username"]).list()}
+
+
+@app.get("/api/improvements/proposals/{proposal_id}")
+async def api_get_improvement_proposal(proposal_id: str, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    try:
+        return _improvement_store(user["username"]).get(proposal_id)
+    except ImprovementProposalError as exc:
+        raise HTTPException(404, str(exc))
+
+
+@app.post("/api/improvements/proposals/{proposal_id}/approve")
+async def api_approve_improvement_proposal(proposal_id: str, req: ImprovementApprovalRequest,
+                                           authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    try:
+        return _improvement_store(user["username"]).approve_for_review(proposal_id, req.confirmation)
+    except ImprovementProposalError as exc:
+        raise HTTPException(400, str(exc))
 
 
 @app.post("/api/approval/verify")

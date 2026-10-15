@@ -836,6 +836,26 @@ $("#video-btn")?.addEventListener("click", async () => {
     renderMediaResult(res.ok ? data : { error: data.detail || "Video oluşturulamadı." });
   } catch (_) { box.textContent = "Yerel video servisine ulaşılamadı."; }
 });
+$("#story-video-btn")?.addEventListener("click", async () => {
+  const box = $("#image-result");
+  const prompts = ($("#story-prompts")?.value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+  if (prompts.length < 2 || prompts.length > 6) {
+    box.textContent = "Lütfen 2-6 sahne yaz; her satır bir sahne olmalı.";
+    return;
+  }
+  box.textContent = "Yerel model sahneleri oluşturuyor ve ffmpeg videoya dönüştürüyor…";
+  try {
+    const res = await fetch("/api/media/story-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompts, duration: Math.max(4, Math.min(24, prompts.length * 4)) }),
+    });
+    const data = await res.json();
+    renderMediaResult(res.ok ? data : { error: data.detail || "Storyboard videosu oluşturulamadı." });
+  } catch (_) {
+    box.textContent = "Storyboard video servisine ulaşılamadı.";
+  }
+});
 async function loadGithub() {
   const box = $("#gh-repos");
   if (!box) return;

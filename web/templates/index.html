@@ -256,7 +256,7 @@
       <section id="panel-image" class="panel">
         <header class="panel-header">
           <h1>MKAOS Medya Stüdyosu</h1>
-          <p>Yerel görsel üretimi, görsel düzenleme, arka plan ve kısa video. Dış API yedeği yoktur.</p>
+          <p>Yerel görsel üretimi, düzenleme, arka plan ve çok sahneli storyboard videosu. Dış API yedeği yoktur.</p>
         </header>
         <div class="media-studio">
           <div class="media-mode-row">
@@ -279,7 +279,12 @@
             <button id="image-btn" class="primary">Yerel olarak işle</button>
             <button id="video-btn" type="button">Son görselden kısa video</button>
           </div>
-          <p class="media-note">Video, yerel ffmpeg ile görsele hareket efekti verir; bu aşamada metinden tam video modeli değildir. Gerçek model üretimi için kendi SD_API_URL sunucun ve model ağırlıkların gerekir.</p>
+          <p class="media-note">Kısa video yerel ffmpeg ile hareket efekti verir. Storyboard modu 2-6 sahne için yerel SD modelinden anahtar kareler üretip MP4'e birleştirir; nöral text-to-video değildir.</p>
+          <label for="story-prompts">Storyboard sahneleri (her satıra bir sahne, 2-6 satır)</label>
+          <textarea id="story-prompts" rows="5" placeholder="1. Geniş açı: gün doğumunda dağlar\n2. Kamera vadiye yaklaşır\n3. Gece gökyüzünde yıldızlar"></textarea>
+          <div class="media-actions">
+            <button id="story-video-btn" type="button">Sahnelerden yerel video oluştur</button>
+          </div>
           <div id="image-result" class="image-result" aria-live="polite"></div>
         </div>
       </section>

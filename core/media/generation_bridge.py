@@ -30,7 +30,7 @@ class ImageGeneratorAdapter:
     def capabilities(self) -> dict:
         configured = bool(getattr(self.generator, "sd_url", ""))
         return {"name": self.name, "enabled": True, "backend_configured": configured,
-                "operations": ["generate", "edit", "background", "video"],
+                "operations": ["generate", "edit", "background", "video", "story_video"],
                 "policy": "self-hosted only; no public fallback"}
     def execute(self, operation: str, payload: dict) -> dict:
         if operation == "generate":
@@ -50,6 +50,8 @@ class ImageGeneratorAdapter:
             return self.generator.replace_background(image_bytes or b"", payload.get("color", "#172033"))
         if operation == "video":
             return self.generator.create_video(payload.get("filename", ""), payload.get("duration", 4.0))
+        if operation == "story_video":
+            return self.generator.create_story_video(payload.get("prompts", []), payload.get("duration", 8.0))
         if operation == "report_infographic":
             raise RuntimeError("Rapor infografiği adaptörü henüz etkin değil.")
         raise RuntimeError("Medya işlemi desteklenmiyor.")

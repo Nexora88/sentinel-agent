@@ -29,8 +29,12 @@ MKAOS, *Mustafa Kemal Atatürk Operating System* anlamıyla yerel egemenlik, bil
 
 - Görsel üretimi ve düzenleme yalnızca `SD_API_URL` ile açıkça yapılandırılmış, kendi yönettiğin Stable Diffusion WebUI API sunucusuna gider. Kamuya açık görsel API yedeği kaldırılmıştır; sunucu tanımlı değilse işlem başarısız olur ve görsel istemi dışarı gönderilmez.
 - `POST /api/media/edit` yerel `img2img` uç noktasını kullanır. `POST /api/media/background` isteğe bağlı `rembg` + önceden indirilmiş `u2net.onnx` modeliyle arka planı ayırıp yerel renk ile birleştirir. İlk çalıştırmada otomatik model indirme yapılmaz. Arka plan özelliğinin Python bağımlılığı için `pip install -r requirements-media.txt` kullan; `u2net.onnx` dosyasını güvenilir kaynaktan önceden indirip `U2NET_HOME` içine yerleştir.
-- `POST /api/media/video` yerel `ffmpeg` ile mevcut PNG görseline kısa hareket/zoom efekti verir. Bu, metinden gerçek video üreten bir model değildir; tam video üretimi daha sonra kendi barındırılan video model adaptörüyle eklenebilir.
+- `POST /api/media/video` yerel `ffmpeg` ile mevcut PNG görseline kısa hareket/zoom efekti verir. `POST /api/media/story-video` ise 2-6 sahne açıklamasından, açıkça yapılandırılmış yerel Stable Diffusion modelinde ayrı anahtar kareler üretir ve bunları yerel `ffmpeg` ile MP4 olarak birleştirir. Bu, çok sahneli AI storyboard videosudur; **nöral text-to-video modeli değildir**. İstek gövdesi: `{"prompts":["Sahne 1 açıklaması","Sahne 2 açıklaması"],"duration":8}`; süre 4-24 saniye ile sınırlandırılır. Ağ çıkışı veya bulut medya API'si yedeği yoktur.
 - Görseller 12 MB ve 20 MP sınırlarıyla doğrulanır; çıktılar yerel `memory/generated_images/` içinde tutulur. `SD_API_URL` boşsa üretim kapalıdır.
+
+## Denetlenebilir kod geliştirme
+
+Gece araştırmacısı kaynakları ve kodu analiz edip öneriler üretir; `POST /api/improvements/generate` yerel kod modelinden izin verilen mevcut bir dosya için birleşik diff taslağı oluşturur. `POST /api/improvements/proposals` ise elle hazırlanmış önerileri de kabul ederek kullanıcı başına ayrı depoda dosyaları, yama metnini ve test planını saklar. Öneri listesi ve yama yalnızca kimliği doğrulanmış aynı kullanıcı tarafından okunabilir. `READY_FOR_HUMAN_CODE_REVIEW` onayı sadece öneriyi insan incelemesine hazır olarak işaretler; dosya değiştirmez, kod çalıştırmaz, commit/push/merge veya dağıtım yapmaz. Hedefler `agents/`, `core/`, `tools/`, `web/`, `tests/`, `docs/` ve `config/` ile sınırlıdır; yol geçişi ve sır dosyaları reddedilir. Önerilen yamalar ayrıca CI, güvenlik taraması ve insan incelemesinden geçmelidir.
 
 ## Kesin çevrimdışı çalışma profili
 
