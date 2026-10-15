@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import queue
+import re
 import shutil
 import tempfile
 import uuid
