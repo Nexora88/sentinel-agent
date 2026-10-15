@@ -67,7 +67,7 @@ Optional encrypted personal-profile mode:
 - MKAOS_ENCRYPT_PERSONAL_PROFILE=true (encrypts only the personal profile)
 - MKAOS_MEMORY_KEY=<base64-encoded-random-32-byte-key>
 
-The key must be provided out-of-band and kept outside the repository and data volume. Losing the key means losing access to the encrypted profile. When encrypted mode is enabled, a legacy plaintext profile.json is not automatically migrated or ignored; stop and perform a reviewed migration. When disabled, backward-compatible plaintext profile mode remains.
+When MKAOS_ENCRYPT_MEMORY_FILES is enabled, set OWNER_PASSWORD explicitly; the app refuses to create a plaintext first-run password file in encrypted mode. The key must be provided out-of-band and kept outside the repository and data volume. Losing the key means losing access to the encrypted profile. When encrypted mode is enabled, a legacy plaintext profile.json is not automatically migrated or ignored; stop and perform a reviewed migration. When disabled, backward-compatible plaintext profile mode remains.
 
 **This does not encrypt all application storage.** Chroma/RAG vectors, uploads, generated media, logs, backups, and the WebAuthn public-credential registry need separate protection. Use full-disk/volume encryption for the whole data volume. For production, use full-disk/volume encryption and an external OS credential vault or secret manager; include restore drills and a data inventory in acceptance testing.
 
