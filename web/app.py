@@ -382,7 +382,7 @@ async def api_status(authorization: Optional[str] = Header(None)):
         },
         "pending_approvals": len(p.permissions.list_pending()),
         "github_enabled": p.github.enabled,
-        "chat_turns": sum(len(turns) for turns in chat_history.values()),
+        "chat_turns": len(chat_history.get(user["username"], [])),
         "privacy": {
             "web_research": os.getenv("ALLOW_WEB_RESEARCH", "false").lower() == "true",
             "external_finance_data": os.getenv("ALLOW_EXTERNAL_FINANCE_DATA", "false").lower() == "true",
@@ -748,7 +748,9 @@ async def api_media_background(file: UploadFile = File(...), color: str = Form("
     try:
         p = get_pipeline(user["username"])
         if p.media_engine.should_defer_heavy():
-            saved = UPLOAD_DIR / ("media_" + uuid.uuid4().hex + ".upload")
+            tenant_upload_dir = tenant_root("./memory/uploads", user["username"])
+            tenant_upload_dir.mkdir(parents=True, exist_ok=True)
+            saved = tenant_upload_dir / ("media_" + uuid.uuid4().hex + ".upload")
             saved.write_bytes(raw)
             return p.media_engine.submit("background", {"image_path": str(saved.resolve()), "color": color})
         return await asyncio.to_thread(p.media_bridge.execute, "background", {"image_bytes": raw, "color": color})
@@ -880,7 +882,7 @@ async def api_privacy_forget(req: ForgetRequest, authorization: Optional[str] = 
     deleted_chat_turns = before - len(chat_history[user["username"]])
     if deleted_chat_turns:
         _save_chat_history()
-    audit = Path("./memory/privacy_deletion_audit.jsonl")
+    audit = tenant_root("./memory/tenants", user["username"]) / "privacy_deletion_audit.jsonl"
     audit.parent.mkdir(parents=True, exist_ok=True)
     from datetime import datetime
     import hashlib
