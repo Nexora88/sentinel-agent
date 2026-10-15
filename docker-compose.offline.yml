@@ -23,6 +23,7 @@ services:
     container_name: seka-ollama-offline
     volumes:
       - ollama_models:/root/.ollama
+    ports: []
     networks:
       - offline_internal
     restart: unless-stopped

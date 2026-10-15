@@ -13,6 +13,7 @@ import queue
 import shutil
 import tempfile
 import uuid
+import requests
 from pathlib import Path
 from typing import List, Optional
 
@@ -99,7 +100,7 @@ chat_history = _load_chat_history()
 
 MANIFESTO = {
     "name": "SEKA",
-    "version": "6.1",
+    "version": "6.2",
     "tagline": "Yerel Türkçe ajan — ağ özellikleri varsayılan olarak kapalı",
     "pillars": [
         "Ollama ile tamamen yerel zeka",
@@ -174,8 +175,14 @@ class VoiceRequest(BaseModel):
 
 @app.on_event("startup")
 async def startup():
-    logger.info("SEKA Web v6.1")
-    get_pipeline()
+    # Keep the web process available even if Ollama/models are temporarily offline.
+    logger.info("SEKA Web v6.2 — lazy local model initialization")
+
+
+@app.get("/health")
+async def health():
+    # Container health must not depend on the Ollama model being loaded.
+    return {"status": "ok", "service": "SEKA", "version": "6.2", "model_checked": False}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -231,16 +238,63 @@ async def api_voice_transcribe(file: UploadFile = File(...), authorization: Opti
     return {"text": transcript, "mode": "local-only"}
 
 
+
+
+def _ollama_status(p: SentinelPipeline) -> dict:
+    """Probe only the configured local Ollama endpoint with a short timeout."""
+    base_url = str(getattr(p.ollama, "base_url", "http://localhost:11434")).rstrip("/")
+    session = requests.Session()
+    session.trust_env = False
+    try:
+        response = session.get(base_url + "/api/tags", timeout=(0.4, 1.0))
+        response.raise_for_status()
+        payload = response.json()
+        names = {
+            str(item.get("name", "")).split(":")[0]
+            for item in payload.get("models", [])
+            if isinstance(item, dict)
+        }
+        expected = str(getattr(p.ollama, "model_name", "")).split(":")[0]
+        if expected and expected not in names:
+            return {
+                "status": "model_missing",
+                "message": f"Ollama çalışıyor ancak {getattr(p.ollama, 'model_name', expected)} modeli yerelde bulunamadı.",
+                "model": getattr(p.ollama, "model_name", ""),
+                "base_url": base_url,
+            }
+        return {"status": "online", "message": "Yerel Ollama bağlantısı hazır.", "base_url": base_url}
+    except Exception:
+        return {
+            "status": "unavailable",
+            "message": "Ollama'ya bağlanılamadı. Hizmeti ve yerel bağlantı adresini kontrol et.",
+            "base_url": base_url,
+        }
+    finally:
+        session.close()
+
+
 @app.get("/api/status")
 async def api_status(authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
-    p = get_pipeline()
+    try:
+        p = get_pipeline()
+    except Exception as exc:
+        logger.warning("SEKA bileşenleri başlatılamadı (%s).", type(exc).__name__)
+        return {
+            "brand": "SEKA", "version": "6.2", "status": "degraded", "user": user,
+            "assistant": {"status": "degraded", "message": "SEKA paneli açık; yerel bellek veya model bileşeni başlatılamadı. Veriler otomatik silinmedi."},
+            "ollama": {"status": "unavailable", "message": "Ollama bağlantısı hazır değil. Ollama hizmetini, model kurulumunu ve yerel bellek dizinini kontrol et."},
+            "privacy": {"web_research": False, "external_finance_data": False, "site_scanning": False, "external_notifications": False, "github_network_access": False},
+        }
     uni = p.expander.get_status()
     fin = p.finance_status()
     cur = p.curiosity.get_status()
     return {
         "brand": "SEKA",
-        "version": "6.1",
+        "version": "6.2",
+        "status": "ok",
+        "ollama": _ollama_status(p),
+        "rag": p.memory.stats(),
         "user": user,
         "assistant": p.status(),
         "universe": uni,
@@ -302,14 +356,21 @@ async def api_jobs_stream(authorization: Optional[str] = Header(None)):
 @app.post("/api/chat")
 async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
-    p = get_pipeline()
     message = req.message.strip()
     if not message:
         return {"reply": "Boş mesaj."}
-    if message.lower() in ("/status", "durum", "status"):
-        reply = p.status()
-    else:
-        reply = p.chat(message)
+    try:
+        p = get_pipeline()
+        if message.lower() in ("/status", "durum", "status"):
+            reply = p.status()
+        else:
+            reply = p.chat(message)
+    except Exception as exc:
+        # Keep FastAPI alive and never return raw exception/traceback to the browser.
+        logger.warning("Yerel yanıt üretilemedi (%s).", type(exc).__name__)
+        reply = ("SEKA paneli çalışıyor ancak yerel Ollama/model bağlantısı hazır değil. "
+                 "Ollama hizmetinin açık olduğunu, OLLAMA_BASE_URL değerini ve OLLAMA_MODEL "
+                 "modelinin yerel olarak yüklü olduğunu kontrol et. Yerel verilerin silinmedi.")
     history = chat_history.setdefault(user["username"], [])
     history.extend([
         {"role": "user", "content": message},

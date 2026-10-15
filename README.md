@@ -1,4 +1,4 @@
-# SEKA v6.1 — Sentinel Agent
+# SEKA v6.2 — Sentinel Agent
 
 **Yerel Türkçe ajan altyapısı.** Ollama üzerinden yerel çıkarım; bulut model API'si zorunlu değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
@@ -27,6 +27,12 @@ SEKA; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik ta
 6. Çevrimdışı çalışma ağını başlat: `docker compose -f docker-compose.yml -f docker-compose.offline.yml up -d --no-build`.
 
 `internal: true` ağı, uygulama konteynerlerinin normal internet çıkışını engeller; ana bilgisayarın veya başka uygulamaların ağ erişimini kendiliğinden sınırlandırmaz. En yüksek güvence için ana bilgisayarın güvenlik duvarı kurallarını da denetle. Çevrimdışı mod, internete bağlanma kabiliyetini azaltır; ama tek başına ana bilgisayardaki her sürecin veri göndermesini engellemez.
+
+## Docker ilk açılış ve RAG sınırları
+
+`docker compose up --build -d` web panelini ve yerel Ollama hizmetini başlatır. Panel sağlık denetimi Ollama modelinin hazır olmasına bağlı değildir; `/health` web sürecini, `Durum` paneli ise yerel Ollama bağlantısını ayrıca raporlar. Model ilk kurulumda otomatik indirilmez; böylece ağdan model indirme sürprizi olmaz. Bilerek indirmek için `docker compose exec ollama ollama pull qwen2.5-coder:7b` ve `docker compose exec ollama ollama pull nomic-embed-text` komutlarını çalıştır. Bu indirme sırasında model dosyaları internetten gelir; tamamen çevrimdışı kurulumda daha önce hazırlanmış model hacmini kullan.
+
+RAG varsayılan olarak en fazla 10.000 parça tutar; bir yüklemede 500 parça ve 1.000.000 karakter sınırı vardır. Tekrarlanan aynı kaynak/parçalar kararlı kimliklerle yinelenmez; sınır aşılırsa en eski parçalar temizlenir. Limitler `SEKA_RAG_MAX_DOCUMENTS`, `SEKA_RAG_MAX_CHUNKS_PER_INGEST` ve `SEKA_RAG_MAX_CHARS_PER_INGEST` ile düşürülebilir/yükseltilebilir (kodun güvenlik tavanları korunur). Durum API’si yaklaşık disk kullanımını ve parça sayısını gösterir.
 
 ## Yerel Türkçe ses
 
@@ -102,3 +108,8 @@ Otonom şirket, gerçek para ile alım-satım, izinsiz uzaktan kod çalıştırm
 
 ## Lisans
 MIT
+
+
+## Test edilen davranış ve doğrulama sınırı
+
+CI; Python derlemesi, JavaScript sözdizimi, Compose profillerinin yapılandırması, Docker imaj derlemesi, güvenlik regresyon testleri ve depodaki muhtemel sabit sırların taramasını çalıştırır. CI’da imaj derlemesi, gerçek cihazda mikrofon/ses kalitesi veya Ollama modeliyle uçtan uca konuşma testinin yerine geçmez. İki Türkçe Piper sesi için yerel model dosyaları kullanıcı tarafından kurulmalıdır; erkek/kadın ses karakteri ve kedi efekti gerçek hoparlör/mikrofon üzerinde ayrıca dinlenip değerlendirilmelidir. 
