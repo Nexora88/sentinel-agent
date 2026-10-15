@@ -44,6 +44,18 @@ The MKAOS port is not published on the host. Container-interface binding is expl
 
 To roll back, set `MKAOS_ENABLED=false` and run `docker compose up -d sentinel`. First startup includes model loading; subsequent requests reuse the resident process unless the service restarts.
 
+**Target-device quality and steady-request benchmark (the dedicated TTFT test is deliberately not run yet):**
+
+```bash
+# This local-test overlay publishes MKAOS and Ollama on host loopback only.
+docker compose -f docker-compose.yml -f docker-compose.mkaos-local-test.yml --profile mkaos up --build -d
+docker compose exec ollama ollama pull smollm2:135m-instruct-fp16
+python tools/evaluate_mkaos_quality.py --server-url http://127.0.0.1:11435 --output memory/benchmarks/mkaos-quality.json
+python tools/benchmark_mkaos_vs_ollama.py --mkaos-url http://127.0.0.1:11435 --ollama-url http://127.0.0.1:11434 --ollama-model smollm2:135m-instruct-fp16 --runs 2 --max-new-tokens 32
+```
+
+Use this test overlay only on a trusted local development device; production Compose intentionally publishes neither inference port. Reports include answer smoke checks, full request latency, tokens/s, prefix-cache hits and sampled memory. These are not expert semantic grading or TTFT measurements.
+
 ## Local reasoning, hardware and agent-cluster foundations
 
 - `core/reasoning_engine.py` provides a bounded local-model draft → critique → synthesis flow, optionally routing each role to a different local model. It returns concise findings and uncertainty, not hidden chain-of-thought. It does not execute tools, mutate files or merge pull requests.
