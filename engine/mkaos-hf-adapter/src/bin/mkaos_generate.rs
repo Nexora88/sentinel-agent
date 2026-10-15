@@ -1,4 +1,4 @@
-use mkaos_hf_adapter::{model_loader::load_smollm2, HuggingFaceTokenizer, ChatMessage};
+use mkaos_hf_adapter::{model_loader::load_smollm2, policy::TURKISH_FIRST_SYSTEM_PROMPT, HuggingFaceTokenizer, ChatMessage};
 use mkaos_inference::{sampling, stacked_decoder::KvCache};
 use serde_json::{json, Value};
 use std::{env, fs, process, time::Instant};
@@ -40,7 +40,7 @@ fn main() {
     };
     let model_load_ms = model_load_start.elapsed().as_secs_f64() * 1000.0;
     let messages = [
-        ChatMessage::new("system", "Answer accurately and concisely."),
+        ChatMessage::new("system", TURKISH_FIRST_SYSTEM_PROMPT),
         ChatMessage::new("user", prompt.as_str()),
     ];
     let prompt_ids_u32 = match tokenizer.encode_chat(&messages, true) {
