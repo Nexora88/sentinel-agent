@@ -33,7 +33,7 @@ The application integration is deliberately opt-in:
 
    `python tools/fetch_model.py --output-dir models/smollm2-135m-instruct`
 
-2. Copy `.env.example` to `.env` and set `MKAOS_ENABLED=true`. The embedding model is still served by Ollama.
+2. Copy `.env.example` to `.env` and set `MKAOS_BASE_URL` to the resident MKAOS service. `MKAOS_ENABLED` no longer switches the chat provider. Ollama remains temporarily for embeddings only.
 3. Start the app and the opt-in resident runtime on the internal Docker network:
 
    `docker compose --profile mkaos up --build`
@@ -42,7 +42,7 @@ The MKAOS port is not published on the host. Container-interface binding is expl
 
 `docker compose exec sentinel python -c "import urllib.request; print(urllib.request.urlopen('http://mkaos:11435/health').read().decode())"`
 
-To roll back, set `MKAOS_ENABLED=false` and run `docker compose up -d sentinel`. First startup includes model loading; subsequent requests reuse the resident process unless the service restarts.
+There is no Ollama chat rollback. If MKAOS is down, chat requests fail visibly; restore the MKAOS service rather than changing providers. First startup includes model loading; subsequent requests reuse the resident process unless the service restarts.
 
 **Target-device quality and steady-request benchmark (the dedicated TTFT test is deliberately not run yet):**
 
