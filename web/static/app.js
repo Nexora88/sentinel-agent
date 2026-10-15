@@ -348,6 +348,8 @@ $("#pack-btn")?.addEventListener("click", exportPack);
 const voiceBtn = $("#voice-btn");
 const voiceSelect = $("#voice-select");
 const catDubToggle = $("#cat-dub-toggle");
+const voicePace = $("#voice-pace");
+const voicePaceValue = $("#voice-pace-value");
 const voiceStatus = $("#voice-status");
 let mediaRecorder = null;
 let recordingChunks = [];
@@ -377,6 +379,14 @@ async function loadVoiceStatus() {
   }
 }
 
+if (voicePace && voicePaceValue) {
+  const updatePaceLabel = () => {
+    voicePaceValue.textContent = Number(voicePace.value).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "×";
+  };
+  voicePace.addEventListener("input", updatePaceLabel);
+  updatePaceLabel();
+}
+
 async function speakText(text) {
   if (activeAudio) {
     activeAudio.pause();
@@ -393,7 +403,8 @@ async function speakText(text) {
       body: JSON.stringify({
         text: String(text).slice(0, 4000),
         voice: voiceSelect?.value || "male",
-        cat_mode: Boolean(catDubToggle?.checked)
+        cat_mode: Boolean(catDubToggle?.checked),
+        pace: Number(voicePace?.value || 1)
       })
     });
     if (!response.ok) {
@@ -408,6 +419,12 @@ async function speakText(text) {
       activeAudio = null;
       if (activeAudioUrl) URL.revokeObjectURL(activeAudioUrl);
       activeAudioUrl = null;
+    }, { once: true });
+    activeAudio.addEventListener("error", () => {
+      activeAudio = null;
+      if (activeAudioUrl) URL.revokeObjectURL(activeAudioUrl);
+      activeAudioUrl = null;
+      if (voiceStatus) voiceStatus.textContent = "Ses dosyası oynatılamadı; yeniden dene.";
     }, { once: true });
     await activeAudio.play();
   } catch (error) {
