@@ -350,3 +350,59 @@ fn main() {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_chat_sampling_options_with_bounds() {
+        let body = json!({
+            "messages": [{"role":"user","content":"Merhaba"}],
+            "options": {
+                "num_predict": 24,
+                "repeat_penalty": 1.2,
+                "temperature": 0.15,
+                "top_p": 0.9
+            }
+        });
+        let (messages, max_new, penalty, temperature, top_p) =
+            parse_messages("/api/chat", &body, "Kısa yanıt ver.", 1.1).unwrap();
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0].role, "system");
+        assert_eq!(max_new, 24);
+        assert!((penalty - 1.2).abs() < 1e-6);
+        assert!((temperature - 0.15).abs() < 1e-6);
+        assert!((top_p - 0.9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn rejects_unsafe_generation_bounds_and_invalid_sampling_values() {
+        for options in [
+            json!({"num_predict": 0}),
+            json!({"num_predict": 513}),
+            json!({"temperature": 3.0}),
+            json!({"top_p": 0.0}),
+            json!({"repeat_penalty": 0.5})
+        ] {
+            let body = json!({
+                "messages": [{"role":"user","content":"test"}],
+                "options": options
+            });
+            assert!(parse_messages("/api/chat", &body, "system", 1.1).is_err());
+        }
+    }
+
+    #[test]
+    fn deterministic_sampling_rng_is_bounded_and_repeatable() {
+        let mut first = 123456789_u64;
+        let mut second = 123456789_u64;
+        for _ in 0..16 {
+            let a = next_random_unit(&mut first);
+            let b = next_random_unit(&mut second);
+            assert!((0.0..1.0).contains(&a));
+            assert_eq!(a, b);
+        }
+    }
+}
