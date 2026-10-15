@@ -46,6 +46,34 @@
           <h1>Komut Köprüsü</h1>
           <p>MKAOS · İstikbal Siber Göklerdedir. Ağ durumu doğrulanmadan “tam egemen” sayılmaz.</p>
         </header>
+        <section class="command-dashboard" aria-label="Siber Karargah genel bakış">
+          <div class="command-topline">
+            <div><span class="eyebrow">MKAOS / KOMUTA MERKEZİ</span><h2>Operasyon görünümü</h2><p>Yerel sistemin durumu, bekleyen kararlar ve doğrulanmış telemetri tek ekranda.</p></div>
+            <div id="command-network" class="network-chip" data-state="unknown"><span class="network-light"></span><span id="command-network-label">Ağ durumu doğrulanıyor</span></div>
+          </div>
+          <div class="command-metrics">
+            <article class="metric-card"><span class="metric-icon">◈</span><span class="metric-label">Yerel model</span><strong id="dash-model">Denetleniyor</strong><small id="dash-model-note">Ollama bağlantısı kontrol ediliyor</small></article>
+            <article class="metric-card"><span class="metric-icon">⌘</span><span class="metric-label">Bekleyen onay</span><strong id="dash-approvals">—</strong><small>İşlem öncesi kullanıcı kararı</small></article>
+            <article class="metric-card"><span class="metric-icon">▤</span><span class="metric-label">Yerel bilgi parçaları</span><strong id="dash-memory">—</strong><small id="dash-memory-note">Bellek istatistiği bekleniyor</small></article>
+            <article class="metric-card"><span class="metric-icon">◎</span><span class="metric-label">Gece denetimi</span><strong id="dash-night">Kayıt bekleniyor</strong><small id="dash-night-note">Sonuç yoksa sayı gösterilmez</small></article>
+          </div>
+          <div class="command-columns">
+            <article class="command-panel command-activity">
+              <div class="section-heading"><div><span class="eyebrow">CANLI AKIŞ</span><h3>Operasyon günlüğü</h3></div><span class="live-indicator"><i></i> Durum güncelleniyor</span></div>
+              <div id="dash-activity" class="activity-list"><p class="empty-state">Sunucudan gerçek iş kayıtları bekleniyor…</p></div>
+              <div class="command-shortcuts"><button type="button" class="shortcut-btn" data-panel="approvals">Onay kuyruğunu aç ↗</button><button type="button" class="shortcut-btn" data-panel="control">Egemenlik denetimi ↗</button><button type="button" class="shortcut-btn" data-panel="image">Medya stüdyosu ↗</button></div>
+            </article>
+            <aside class="command-panel command-telemetry">
+              <div class="section-heading"><div><span class="eyebrow">SİSTEM TELEMETRİSİ</span><h3>Yerel çalışma</h3></div><span class="telemetry-mark">MKAOS</span></div>
+              <div class="telemetry-row"><span>API / panel</span><strong id="dash-api-state">Bekleniyor</strong></div>
+              <div class="telemetry-row"><span>Harici web araştırması</span><strong id="dash-web-state">Bilinmiyor</strong></div>
+              <div class="telemetry-row"><span>GPU doğrulaması</span><strong id="dash-gpu-state">Ölçülmedi</strong></div>
+              <div class="telemetry-row"><span>İmza anahtarı</span><strong id="dash-key-state">Sunucu durumu ayrıca kontrol edilmeli</strong></div>
+              <p class="telemetry-note">Yeşil gösterge tek başına air-gap kanıtı değildir. İşletim sistemi düzeyinde ağ çıkışı ölçülmeden “tam egemen” durumu ilan edilmez.</p>
+            </aside>
+          </div>
+          <div class="briefing-strip"><span class="briefing-icon">✦</span><div><strong>Sabah brifingi</strong><p id="dash-briefing">Henüz doğrulanmış gece denetimi raporu yok. Tamamlanmış kayıtlar geldiğinde burada özetlenecek.</p></div><button type="button" class="shortcut-btn" data-panel="night">Raporu aç ↗</button></div>
+        </section>
         <div class="quick-grid">
           <button class="qcard" data-cmd="expand">🌌 Bilgi genişlet</button>
           <button class="qcard" data-cmd="curiosity">🔭 Merak turu</button>
