@@ -1016,6 +1016,60 @@ async function loadStatus() {
     const night = data.night_scheduler || {};
     const sovereign = data.sovereignty || {};
     const miniSovereignty = $("#sovereignty-mini-label");
+    const networkChip = $("#command-network");
+    const networkLabel = $("#command-network-label");
+    const webEnabled = Boolean(data.privacy?.web_research);
+    const sovereigntyText = String(sovereign.label || "");
+    const hasHostProof = Boolean(sovereign.host_egress_verified || sovereign.air_gapped_verified);
+    if (networkChip && networkLabel) {
+      networkChip.dataset.state = webEnabled ? "risk" : (hasHostProof ? "safe" : "unknown");
+      networkLabel.textContent = webEnabled ? "HARİCİ AĞ İZNİ AÇIK" : (hasHostProof ? "AIR-GAP KANITI VAR" : "AĞ ÇIKIŞI DOĞRULANMADI");
+      networkChip.title = hasHostProof ? "Sunucu egemenlik denetimi host düzeyi kanıt bildiriyor." : "ALLOW_WEB_RESEARCH kapalı olması tek başına ağ çıkışını engellemez; host/firewall testi gerekli.";
+    }
+    const modelCard = $("#dash-model");
+    if (modelCard) modelCard.textContent = ollama.status === "online" ? "Çevrimiçi" : (ollama.status === "model_missing" ? "Model eksik" : "Hazır değil");
+    const modelNote = $("#dash-model-note");
+    if (modelNote) modelNote.textContent = String(ollama.model || ollama.message || "Yerel model durumu API'den alındı").slice(0,130);
+    const approvalsCard = $("#dash-approvals");
+    if (approvalsCard) approvalsCard.textContent = String(data.pending_approvals ?? "—");
+    const memoryCard = $("#dash-memory");
+    if (memoryCard) memoryCard.textContent = String(rag.documents ?? "—");
+    const memoryNote = $("#dash-memory-note");
+    if (memoryNote) memoryNote.textContent = rag.disk_bytes != null ? (diskMb.toFixed(1) + " MB yerel disk kullanımı") : "Bellek metriği sunulmadı";
+    const apiState = $("#dash-api-state");
+    if (apiState) apiState.textContent = data.status === "ok" ? "Yanıt veriyor" : "Kısıtlı";
+    const webState = $("#dash-web-state");
+    if (webState) webState.textContent = webEnabled ? "İzin açık" : "İzin kapalı";
+    const gpuState = $("#dash-gpu-state");
+    if (gpuState) gpuState.textContent = String(data.models?.gpu_backend || data.models?.gpu || "Donanım testi yapılmadı");
+    const keyState = $("#dash-key-state");
+    if (keyState) keyState.textContent = String(sovereign.signing_key_status || "Anahtar doğrulaması ayrıca gerekli");
+    const nightCard = $("#dash-night");
+    const nightNote = $("#dash-night-note");
+    const briefing = $("#dash-briefing");
+    const nightLast = night.last_run || {};
+    if (nightCard) nightCard.textContent = nightLast.status ? String(nightLast.status) : (night.enabled ? "İlk rapor bekleniyor" : "Kapalı");
+    if (nightNote) nightNote.textContent = nightLast.finished_at ? ("Son kayıt: " + String(nightLast.finished_at)) : "Tamamlanmış çalışma kaydı bulunamadı";
+    if (briefing) briefing.textContent = nightLast.status ? ("Son gece denetimi: " + String(nightLast.status) + (nightLast.finished_at ? " · " + String(nightLast.finished_at) : "") + ". Ayrıntılı bulgu sayısı rapor kaydından doğrulanmalıdır.") : "Henüz doğrulanmış gece denetimi raporu yok. Tamamlanmış kayıtlar geldiğinde burada özetlenecek.";
+    const activity = $("#dash-activity");
+    if (activity) {
+      const jobs = Array.isArray(data.jobs) ? data.jobs.slice(0,5) : [];
+      activity.replaceChildren();
+      if (!jobs.length) {
+        const empty = document.createElement("p"); empty.className = "empty-state"; empty.textContent = "Henüz gösterilecek iş kaydı yok. Yeni bir görev başlatıldığında gerçek durum burada görünecek."; activity.appendChild(empty);
+      } else {
+        jobs.forEach((job) => {
+          const item = document.createElement("div"); item.className = "activity-item";
+          const dot = document.createElement("span"); dot.className = "activity-dot";
+          const body = document.createElement("div");
+          const title = document.createElement("strong"); title.textContent = String(job.title || job.name || job.kind || job.id || "İsimsiz görev");
+          const detail = document.createElement("small"); detail.textContent = String(job.message || job.description || job.updated_at || job.created_at || "Ayrıntı sağlanmadı");
+          body.append(title,detail);
+          const state = document.createElement("span"); state.className = "activity-state"; state.textContent = String(job.status || "kaydedildi");
+          item.append(dot,body,state); activity.appendChild(item);
+        });
+      }
+    }
     if (miniSovereignty) miniSovereignty.textContent = String(sovereign.label || "MKAOS · EGEMENLİK DOĞRULANMADI");
     const nightState = night.last_run || {};
     const nightBox = $("#night-scheduler-status");
