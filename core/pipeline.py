@@ -23,6 +23,8 @@ from tools.github_client import GitHubClient
 from tools.finance_engine import FinanceEngine
 from tools.autonomous_finance import AutonomousFinance
 from tools.image_gen import ImageGenerator
+from core.media.generation_bridge import GenerationBridge, ImageGeneratorAdapter
+from core.media.engine import MediaEngine
 from tools.secret_scanner import SecretScanner
 from tools.document_ingester import DocumentIngester
 from tools.license_checker import LicenseChecker
@@ -60,6 +62,8 @@ class SentinelPipeline:
         self.finance = FinanceEngine(ollama=self.ollama)
         self.auto_finance = AutonomousFinance(ollama=self.ollama)
         self.image_gen = ImageGenerator()
+        self.media_bridge = GenerationBridge([ImageGeneratorAdapter(self.image_gen)])
+        self.media_engine = MediaEngine(self.media_bridge)
         self.secret_scanner = SecretScanner()
         self.doc_ingester = DocumentIngester(ollama=self.ollama, memory=self.memory)
         self.license_checker = LicenseChecker()
