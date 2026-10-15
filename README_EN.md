@@ -118,3 +118,22 @@ Use security tools only on systems you own or have explicit permission to test. 
 ## License
 
 See LICENSE for the license and third-party notices.
+
+## Experimental resident MKAOS runtime (opt-in)
+
+The resident HTTP server loads model weights and the tokenizer once at startup and creates a fresh KV cache per request. For safety, it binds only to loopback:
+
+```bash
+python tools/fetch_model.py
+cargo run --release --manifest-path engine/mkaos-hf-adapter/Cargo.toml --bin mkaos_server -- models/smollm2-135m-instruct
+```
+
+The default address is `http://127.0.0.1:11435`. It supports `/health`, `/api/chat`, `/api/generate`, and `/api/tags`. Chat responses currently use a single NDJSON record; token-by-token streaming is not implemented yet.
+
+To route app chat through MKAOS, set `MKAOS_ENABLED=true` and `MKAOS_BASE_URL=http://127.0.0.1:11435` in `.env`. **Rollback:** set `MKAOS_ENABLED=false` and restart to return chat generation to the existing local Ollama provider. Embeddings remain on Ollama. If the MKAOS server is unavailable, the app does not silently switch providers; it fails explicitly.
+
+This is experimental. The current candidate weights are third-party SmolLM2; this server does not train owned weights. Do not make it the default until Turkish quality, semantic correctness, and target-device performance have passed the fixed evaluation set.
+
+```bash
+python tools/evaluate_mkaos_quality.py --model-dir models/smollm2-135m-instruct
+```
