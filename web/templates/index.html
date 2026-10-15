@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SEKA — Egemen Kişisel Ajan</title>
+  <title>SEKA v5 — Egemen Kişisel Ajan</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -13,11 +13,13 @@
         <span class="logo-icon">◈</span>
         <div class="logo-text">
           <span class="brand">SEKA</span>
-          <span class="tag">v4 · yerel · apisiz</span>
+          <span class="tag">v5 · yerel · apisiz</span>
         </div>
       </div>
       <nav>
         <button class="nav-btn active" data-panel="bridge">Köprü</button>
+        <button class="nav-btn" data-panel="pulse">Nabız</button>
+        <button class="nav-btn" data-panel="plan">Plan Motoru</button>
         <button class="nav-btn" data-panel="universe">Bilgi Evreni</button>
         <button class="nav-btn" data-panel="curiosity">Merak</button>
         <button class="nav-btn" data-panel="night">Gece + Podcast</button>
@@ -31,16 +33,16 @@
         <button class="nav-btn" data-panel="status">Durum</button>
       </nav>
       <div class="sidebar-footer">
+        <div id="job-live" class="job-live">İş yok</div>
         <div id="quick-status" class="quick-status">Yükleniyor...</div>
       </div>
     </aside>
 
     <main class="main">
-      <!-- KÖPRÜ: komut merkezi, sadece sohbet değil -->
       <section id="panel-bridge" class="panel active">
         <header class="panel-header">
           <h1>Komut Köprüsü</h1>
-          <p>SEKA senin yerel süper ajanın. Ücretli API yok — Ollama + senin makinen.</p>
+          <p>SEKA v5 — plan, canlı işler, bilgi paketi. Ücretli API yok.</p>
         </header>
         <div class="quick-grid">
           <button class="qcard" data-cmd="expand">🌌 Bilgi genişlet</button>
@@ -49,19 +51,47 @@
           <button class="qcard" data-cmd="finance">💰 Paper döngü</button>
           <button class="qcard" data-cmd="discover">🔌 Yerel keşif</button>
           <button class="qcard" data-cmd="podcast">🎙 Podcast taslağı</button>
+          <button class="qcard" data-cmd="pack">📦 Bilgi paketi</button>
+          <button class="qcard" data-cmd="plan">🗺 Plan oluştur</button>
         </div>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="chat-input-area">
           <button id="voice-btn" title="Sesli komut" class="icon-btn">🎤</button>
-          <textarea id="chat-input" placeholder="Emir ver: incele, öğren, tara, öner..." rows="2"></textarea>
+          <textarea id="chat-input" placeholder="Emir veya hedef yaz... (plan için: planla: ...)" rows="2"></textarea>
           <button id="send-btn">Gönder</button>
         </div>
+      </section>
+
+      <section id="panel-pulse" class="panel">
+        <header class="panel-header">
+          <h1>Nabız — Neden SEKA?</h1>
+          <p>İnternetteki sıradan chatbot’lardan farkın burada.</p>
+        </header>
+        <div id="manifesto-pillars" class="pillars"></div>
+        <h3 class="section-h">Canlı İşler</h3>
+        <div id="jobs-list" class="approvals-list"></div>
+        <h3 class="section-h">Modeller</h3>
+        <pre id="models-box" class="status-box">—</pre>
+      </section>
+
+      <section id="panel-plan" class="panel">
+        <header class="panel-header">
+          <h1>Plan Motoru</h1>
+          <p>Tek hedeften çok adım. Riskli adımlar onay ister; güvenliler çalışır.</p>
+        </header>
+        <div class="universe-actions">
+          <input type="text" id="plan-goal" placeholder="Hedef: projeyi güvenli hale getir, kripto araştır..." />
+          <button id="plan-create-btn" class="primary">Plan Üret</button>
+        </div>
+        <div id="plan-view" class="approvals-list"></div>
+        <h3 class="section-h">Son Planlar</h3>
+        <div id="plans-list" class="approvals-list"></div>
       </section>
 
       <section id="panel-universe" class="panel">
         <header class="panel-header">
           <h1>Bilgi Evreni</h1>
-          <p>Kara delik gibi büyür — sanitize + güven skoru ile.</p>
+          <p>Kara delik gibi büyür — sanitize + güven skoru.</p>
         </header>
         <div class="universe-stats">
           <div class="stat-card"><span class="stat-value" id="u-pages">—</span><span class="stat-label">Toplam Bilgi</span></div>
@@ -70,53 +100,55 @@
           <div class="stat-card"><span class="stat-value" id="u-visited">—</span><span class="stat-label">Ziyaret</span></div>
         </div>
         <div class="universe-actions">
-          <input type="text" id="new-topic" placeholder="Yeni konu (Türkçe / İngilizce)" />
+          <input type="text" id="new-topic" placeholder="Yeni konu" />
           <button id="add-seed-btn">Tohum</button>
           <button id="expand-btn" class="primary">Şimdi Genişlet</button>
+          <button id="pack-btn">Paket Dışa Aktar</button>
         </div>
         <div class="recent-topics">
           <h3>Son Konular</h3>
           <ul id="topic-list"></ul>
         </div>
+        <pre id="pack-out" class="status-box" style="margin-top:12px;display:none"></pre>
       </section>
 
       <section id="panel-curiosity" class="panel">
         <header class="panel-header">
           <h1>Merak Motoru</h1>
-          <p>Boşta iken bilim, felsefe, kriptografi, medya okuryazarlığı keşfeder.</p>
+          <p>Boşta bilim, felsefe, kriptografi keşfeder.</p>
         </header>
         <div class="universe-stats">
           <div class="stat-card"><span class="stat-value" id="c-count">—</span><span class="stat-label">Keşif</span></div>
           <div class="stat-card"><span class="stat-value" id="c-last">—</span><span class="stat-label">Son Tur</span></div>
         </div>
         <div class="universe-actions">
-          <button id="curiosity-btn" class="primary">Bir Merak Turu Başlat</button>
+          <button id="curiosity-btn" class="primary">Merak Turu</button>
         </div>
-        <pre id="curiosity-out" class="status-box">Henüz tur yok.</pre>
+        <pre id="curiosity-out" class="status-box">—</pre>
       </section>
 
       <section id="panel-night" class="panel">
         <header class="panel-header">
-          <h1>Gece Araştırması + Podcast Taslağı</h1>
-          <p>Öneri üretir. Para harcamaz. Otomatik yayın yok.</p>
+          <h1>Gece + Podcast</h1>
+          <p>Öneri + metin taslağı. Otomatik yayın yok.</p>
         </header>
         <div class="universe-actions">
           <button id="night-btn" class="primary">Gece Döngüsü</button>
-          <button id="podcast-btn">Podcast Metni Üret</button>
+          <button id="podcast-btn">Podcast Metni</button>
         </div>
-        <pre id="night-out" class="status-box">Rapor burada görünecek.</pre>
+        <pre id="night-out" class="status-box">—</pre>
       </section>
 
       <section id="panel-docs" class="panel">
         <header class="panel-header">
           <h1>Belge Merkezi</h1>
-          <p>PDF / MD / TXT yükle → bilgi evreni + tarih/tutar önerisi. Otomatik ödeme yok.</p>
+          <p>PDF → RAG + tarih/tutar. Otomatik ödeme yok.</p>
         </header>
         <div class="universe-actions">
           <input type="file" id="doc-file" accept=".pdf,.md,.txt,.csv" />
-          <button id="doc-upload-btn" class="primary">Yükle ve Analiz Et</button>
+          <button id="doc-upload-btn" class="primary">Yükle + Analiz</button>
         </div>
-        <pre id="doc-out" class="status-box">Dosya seç...</pre>
+        <pre id="doc-out" class="status-box">—</pre>
       </section>
 
       <section id="panel-finance" class="panel">
@@ -124,7 +156,7 @@
           <h1>Finans (Paper)</h1>
           <p>Sanal portföy. Gerçek cüzdan kapalı.</p>
         </header>
-        <div class="universe-stats" id="fin-stats">
+        <div class="universe-stats">
           <div class="stat-card"><span class="stat-value" id="f-equity">—</span><span class="stat-label">Portföy $</span></div>
           <div class="stat-card"><span class="stat-value" id="f-pnl">—</span><span class="stat-label">PnL %</span></div>
           <div class="stat-card"><span class="stat-value" id="f-cash">—</span><span class="stat-label">Nakit $</span></div>
@@ -135,12 +167,12 @@
           <button id="fin-refresh-btn">Yenile</button>
           <span id="fin-mode" class="stat-label" style="align-self:center"></span>
         </div>
-        <h3 class="section-h">Açık Pozisyonlar</h3>
+        <h3 class="section-h">Pozisyonlar</h3>
         <div id="fin-positions" class="approvals-list"></div>
-        <h3 class="section-h">Düşünce Günlüğü</h3>
+        <h3 class="section-h">Düşünceler</h3>
         <pre id="fin-thoughts" class="status-box" style="max-height:220px">—</pre>
         <div class="finance-box" style="margin-top:16px">
-          <input type="text" id="finance-query" placeholder="Analiz: Bitcoin, piyasa..." />
+          <input type="text" id="finance-query" placeholder="Analiz sorusu..." />
           <button id="finance-btn">Analiz</button>
         </div>
         <pre id="finance-result" class="status-box">—</pre>
@@ -149,7 +181,7 @@
       <section id="panel-discover" class="panel">
         <header class="panel-header">
           <h1>Yerel Keşif</h1>
-          <p>Sadece localhost portları. Cihaz kontrolü yok.</p>
+          <p>Localhost port — cihaz kontrolü yok.</p>
         </header>
         <div class="universe-actions">
           <button id="discover-btn" class="primary">Tara</button>
@@ -160,10 +192,10 @@
       <section id="panel-legacy" class="panel">
         <header class="panel-header">
           <h1>Legacy Yedek</h1>
-          <p>Şifreli yerel yedek. Blockchain değil — dosya sende kalır.</p>
+          <p>Şifreli yerel dosya. Blockchain değil.</p>
         </header>
         <div class="universe-actions">
-          <input type="password" id="legacy-pass" placeholder="En az 8 karakter parola" />
+          <input type="password" id="legacy-pass" placeholder="En az 8 karakter" />
           <button id="legacy-btn" class="primary">Yedekle</button>
         </div>
         <pre id="legacy-out" class="status-box">—</pre>
@@ -172,10 +204,9 @@
       <section id="panel-image" class="panel">
         <header class="panel-header">
           <h1>Görsel</h1>
-          <p>Yerel SD veya ücretsiz Pollinations.</p>
         </header>
         <div class="universe-actions">
-          <input type="text" id="image-prompt" placeholder="Görsel tarifi..." />
+          <input type="text" id="image-prompt" placeholder="Tarif..." />
           <button id="image-btn" class="primary">Üret</button>
         </div>
         <div id="image-result" class="image-result"></div>
@@ -184,26 +215,20 @@
       <section id="panel-github" class="panel">
         <header class="panel-header">
           <h1>GitHub</h1>
-          <p>Yazma / push her zaman onaylı.</p>
+          <p>Yazma/push onaylı.</p>
         </header>
-        <button id="gh-refresh" class="primary">Repoları Yenile</button>
+        <button id="gh-refresh" class="primary">Yenile</button>
         <div id="gh-repos" class="gh-repos"></div>
       </section>
 
       <section id="panel-approvals" class="panel">
-        <header class="panel-header">
-          <h1>Bekleyen Onaylar</h1>
-        </header>
-        <div id="approvals-list" class="approvals-list">
-          <p class="empty">Bekleyen onay yok.</p>
-        </div>
+        <header class="panel-header"><h1>Onaylar</h1></header>
+        <div id="approvals-list" class="approvals-list"><p class="empty">Yok</p></div>
       </section>
 
       <section id="panel-status" class="panel">
-        <header class="panel-header">
-          <h1>Sistem Nabzı</h1>
-        </header>
-        <pre id="status-text" class="status-box">Yükleniyor...</pre>
+        <header class="panel-header"><h1>Sistem</h1></header>
+        <pre id="status-text" class="status-box">—</pre>
       </section>
     </main>
   </div>
