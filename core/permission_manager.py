@@ -129,7 +129,7 @@ class PermissionManager:
         with self._lock:
             completed = [
                 dict(r) for r in self.pending_approvals
-                if r.get("status") in {"rejected", "executed", "execution_failed", "executing"}
+                if r.get("status") in {"rejected", "executed", "execution_failed", "executing", "staged"}
             ]
             return completed[-max(1, min(limit, 100)):]
 
@@ -159,11 +159,12 @@ class PermissionManager:
                     return True
         return False
 
-    def finish_execution(self, request_id: str, success: bool, result: str) -> bool:
+    def finish_execution(self, request_id: str, success: bool, result: str, final_status: Optional[str] = None) -> bool:
         with self._lock:
             for request in self.pending_approvals:
                 if request.get("id") == request_id and request.get("status") == "executing":
-                    request["status"] = "executed" if success else "execution_failed"
+                    allowed_statuses = {"executed", "staged", "execution_failed"}
+                    request["status"] = final_status if success and final_status in allowed_statuses else ("executed" if success else "execution_failed")
                     request["execution_result"] = str(result)[:1000]
                     request["execution_finished_at"] = datetime.now(timezone.utc).isoformat()
                     self._save()
