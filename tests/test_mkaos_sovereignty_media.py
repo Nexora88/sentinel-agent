@@ -5,6 +5,7 @@ from core.safety.sovereignty import sovereignty_status
 from core.media.generation_bridge import GenerationBridge
 from core.media.engine import MediaEngine, MediaEngineError
 from core.approval_protocol import SignedApprovalProtocol, ApprovalProtocolError
+from core.personal_memory import PersonalMemory
 
 class SovereigntyTests(unittest.TestCase):
     def test_never_claims_fully_sovereign_from_environment_only(self):
@@ -30,6 +31,12 @@ class MediaEngineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             engine=MediaEngine(GenerationBridge(), state_path=str(Path(d)/"jobs.json"))
             with self.assertRaises(MediaEngineError): engine.submit("edit", {"image":b"secret"})
+
+class ForgetMemoryTests(unittest.TestCase):
+    def test_topic_must_be_specific_enough(self):
+        instance=PersonalMemory.__new__(PersonalMemory)
+        with self.assertRaisesRegex(ValueError, "en az 3 karakter"):
+            instance.forget_matching("ab", 24)
 
 class SignedApprovalTests(unittest.TestCase):
     def test_missing_public_key_fails_closed(self):
