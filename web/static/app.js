@@ -1009,6 +1009,9 @@ async function loadStatus() {
     const ollama = data.ollama || {};
     const rag = data.rag || {};
     const night = data.night_scheduler || {};
+    const sovereign = data.sovereignty || {};
+    const miniSovereignty = $("#sovereignty-mini-label");
+    if (miniSovereignty) miniSovereignty.textContent = String(sovereign.label || "MKAOS · EGEMENLİK DOĞRULANMADI");
     const nightState = night.last_run || {};
     const nightBox = $("#night-scheduler-status");
     if (nightBox) {
@@ -1040,7 +1043,7 @@ loadStatus();
 setInterval(loadStatus, 30000);
 addMessage(
   "assistant",
-  "MKAOS v6.4 online · yerel ajan işletim sistemi.\n" +
+  "MKAOS v6.5 online · yerel ajan işletim sistemi.\n" +
     "• Canlı iş kuyruğu (SSE)\n" +
     "• Plan motoru → planla: hedef\n" +
     "• Bilgi paketi dışa aktar (paylaşılabilir)\n" +
