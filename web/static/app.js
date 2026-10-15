@@ -1,5 +1,5 @@
 const $ = (sel) => document.querySelector(sel);
-const $ = (sel) => document.querySelectorAll(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
 
 // Authenticated local session. Token is kept in sessionStorage, not in URLs.
 const nativeFetch = window.fetch.bind(window);
