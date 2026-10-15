@@ -325,7 +325,7 @@ async function exportPack() {
   const res = await fetch("/api/pack", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: "SEKA Araştırma Paketi" }),
+    body: JSON.stringify({ title: "MKAOS Araştırma Paketi" }),
   });
   const data = await res.json();
   const out = $("#pack-out");
@@ -434,10 +434,10 @@ async function speakText(text) {
 
 $("#voice-test-btn")?.addEventListener("click", () => {
   const text = catDubToggle?.checked
-    ? "Merhaba! Ben SEKA. Bu yerel kedi dublajı denemesidir."
+    ? "Merhaba! Ben MKAOS. Bu yerel kedi dublajı denemesidir."
     : voiceSelect?.value === "female"
-      ? "Merhaba, ben SEKA. Türkçe konuşma kalitemi yerel ses motoruyla test ediyoruz."
-      : "Merhaba. Ben SEKA. Sakin, tok ve anlaşılır Türkçe ses denemesi.";
+      ? "Merhaba, ben MKAOS. Türkçe konuşma kalitemi yerel ses motoruyla test ediyoruz."
+      : "Merhaba. Ben MKAOS. Sakin, tok ve anlaşılır Türkçe ses denemesi.";
   speakText(text);
 });
 
@@ -1021,7 +1021,7 @@ async function loadStatus() {
     const ollamaLabel = ollama.status === "online" ? "hazır" : ollama.status === "model_missing" ? "model eksik" : "bağlantı yok";
     const diskMb = Number(rag.disk_bytes || 0) / (1024 * 1024);
     $("#quick-status").innerHTML = `
-      <strong>SEKA ${data.version || ""}</strong><br>
+      <strong>MKAOS ${data.version || ""}</strong><br>
       Ollama: ${ollamaLabel}<br>
       Bilgi: ${u.total_pages || 0}<br>
       RAG: ${rag.documents ?? 0}/${rag.max_documents ?? "—"} parça · ${diskMb.toFixed(1)} MB<br>
