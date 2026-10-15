@@ -2,20 +2,21 @@
 
 ## Hedef ve dürüst durum
 
-MKAOS'un uzun vadeli hedefi, model çalışma zamanı üzerinde mimari kontrolü artırmak ve Ollama gibi harici çalışma zamanlarına zorunlu bağımlılığı zaman içinde azaltmaktır. Bu, tek bir PR ile tamamlanmış değildir. İlk adım olarak `engine/mkaos-inference` altında harici crate bağımlılığı olmayan, `unsafe` kodu yasaklayan Rust CPU tensör çekirdeği başlatıldı.
+MKAOS'un uzun vadeli hedefi, model çalışma zamanı üzerinde mimari kontrolü artırmak ve Ollama gibi harici çalışma zamanlarına zorunlu bağımlılığı zaman içinde azaltmaktır. Bu, tek bir PR ile tamamlanmış değildir. `engine/mkaos-inference` altında harici crate bağımlılığı olmayan, `unsafe` kodu yasaklayan Rust CPU çekirdeği bulunur.
 
-**Mevcut kapsam:** temel matris çarpımı, transpoz, satır bazlı kararlı softmax, RMS normalizasyonu ve referans scaled dot-product attention. Bu kod henüz tokenizer, transformer decoder, model ağırlığı yükleyicisi, KV cache, kuantizasyon, GPU sürücüsü veya sohbet üretim hattı içermez; mevcut Ollama yolunun yerine geçmez.
+**Şu anki gerçek kapsam:** F32 tensör işlemleri, matris çarpımı/transpoz, softmax, RMSNorm, token embedding lookup, RoPE, gelecek tokenları maskeleyen causal attention, çok başlıklı attention, residual bağlantıları, SwiGLU ve tek decoder bloğu için forward pass. Kaynak koduna deterministik testler eklendi. Bu, eğitilmiş bir LLM'nin çalıştığı anlamına gelmez: henüz tokenizer, doğrulanmış checkpoint okuyucu, birden çok decoder bloğu, final norm + LM head/logit üretimi, token sampling, KV cache, kuantizasyon, SIMD/GPU ve uçtan uca metin üretimi yoktur. Testler CI'da çalışıp sonuçları doğrulanmadan başarılı kabul edilmemelidir.
 
 ## Aşamalı plan
 
-1. **Denetlenebilir çekirdek:** şekil/taşma/NaN kontrolleri, deterministik CPU işlemleri, birim testleri ve referans sonuçlarla karşılaştırma.
-2. **Model sözleşmesi:** sürümlü ve açık dokümante edilmiş model manifesti; tensör adları/şekilleri, tokenizer kimliği, ağırlık hash'leri, sayısal tür ve lisans/menşe alanları.
-3. **Tokenizer ve küçük referans model:** küçük, açık lisanslı bir test modeliyle uçtan uca tokenleştirme ve üretim; mevcut model aileleriyle uyumluluk ancak lisans ve format incelemesinden sonra.
-4. **Transformer bileşenleri:** embedding, RoPE, attention, KV cache, MLP/SwiGLU, RMSNorm ve örnekleme. Her bileşen Python/başka referans uygulamayla diferansiyel teste tabi tutulmalı.
-5. **Bellek ve performans:** F32 doğruluğu, sonra F16/BF16/INT8/INT4 gibi türler için ölçümlü optimizasyon. SIMD ve GPU/NPU yolları yalnızca gerçek cihaz benchmark'ı varsa desteklenmiş ilan edilir.
-6. **Model uyarlama:** önce izinli veri ve uygun lisanslı temel ağırlık üzerinde LoRA/QLoRA; sıfırdan temel model eğitimi ayrı GPU/veri/uzmanlık bütçesi ister.
-7. **Kontrollü sürekli gelişim:** üretim konuşmaları varsayılan olarak eğitim verisi olmaz. İzin, kaynağın lisansı, kişisel veri temizliği, insan değerlendirmesi ve sabit holdout testleri gerekir. Aday ağırlıklar otomatik olarak kararlı sürümün üzerine yazılmaz.
-8. **Kademeli bağımsızlık:** aynı sabit değerlendirme kümesinde doğruluk, güvenlik, RAM/VRAM, gecikme ve enerji ölçümleri karşılaştırılır. Bağımsız motor eşit veya daha iyi sonuçları tekrarlanabilir biçimde verene kadar mevcut backend geri dönüş seçeneği olarak kalır.
+1. **Denetlenebilir çekirdek:** boyut/taşma/NaN kontrolleri, deterministik CPU işlemleri, birim testleri ve referans sonuçlarla karşılaştırma.
+2. **Decoder katmanı:** embedding, RoPE, causal mask, çok başlıklı attention, RMSNorm, residual ve SwiGLU için uçtan uca referans forward pass. Sonraki iş: referans uygulamayla diferansiyel sayısal testler ve sınır koşulları.
+3. **Model sözleşmesi ve yükleyici:** sürümlü manifest; tensör adları/şekilleri, tokenizer kimliği, ağırlık hash'leri, sayısal tür ve lisans/menşe alanları. Dosya boyutu, hash, sınırlar ve tahsisler doğrulanmadan ağırlıklar yüklenmemeli.
+4. **Tokenizer ve küçük referans model:** küçük, açık lisanslı test modeliyle uçtan uca tokenleştirme ve üretim; mevcut model aileleriyle uyumluluk ancak lisans ve format incelemesinden sonra.
+5. **Tam model döngüsü:** çok katmanlı decoder, final norm + LM head, logits/sampling, EOS/stop koşulları ve ardından KV cache. Aynı token dizisiyle full-pass ve incremental decode sonuçları karşılaştırılmalı.
+6. **Bellek ve performans:** önce F32 doğruluğu, sonra F16/BF16/INT8/INT4 gibi türler için ölçümlü optimizasyon. SIMD ve GPU/NPU yolları yalnızca gerçek cihaz benchmark'ı varsa desteklenmiş ilan edilir.
+7. **Model uyarlama:** önce izinli veri ve uygun lisanslı temel ağırlık üzerinde LoRA/QLoRA; sıfırdan temel model eğitimi ayrı GPU/veri/uzmanlık bütçesi ister.
+8. **Kontrollü sürekli gelişim:** üretim konuşmaları varsayılan olarak eğitim verisi olmaz. İzin, kaynağın lisansı, kişisel veri temizliği, insan değerlendirmesi ve sabit holdout testleri gerekir. Aday ağırlıklar otomatik olarak kararlı sürümün üzerine yazılmaz.
+9. **Kademeli bağımsızlık:** aynı sabit değerlendirme kümesinde doğruluk, güvenlik, RAM/VRAM, gecikme ve enerji ölçümleri karşılaştırılır. Bağımsız motor eşit veya daha iyi sonuçları tekrarlanabilir biçimde verene kadar mevcut backend geri dönüş seçeneği olarak kalır.
 
 ## Türkçe ve kültürel veri egemenliği
 
