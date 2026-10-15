@@ -1,19 +1,22 @@
 """
-SEKA — Sentinel Egemen Kişisel Ajan
-Yerel · Türkçe · Ollama · ücretli API yok
+SEKA v5 — Sentinel Egemen Kişisel Ajan
+Canlı işler · plan motoru · bilgi paketleri · Ollama
 """
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import os
+import queue
 import shutil
 import uuid
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, Request, BackgroundTasks, Header, HTTPException, UploadFile, File
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi import FastAPI, Request, Header, HTTPException, UploadFile, File
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -28,18 +31,18 @@ load_dotenv()
 from core.pipeline import SentinelPipeline
 from core.auth import AuthManager
 from core.energy_policy import policy_status
+from core.job_bus import job_bus
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("seka.web")
 
-app = FastAPI(title="SEKA", version="4.0", description="Sentinel Egemen Kişisel Ajan")
+app = FastAPI(title="SEKA", version="5.0", description="Sentinel Egemen Kişisel Ajan")
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
 UPLOAD_DIR = Path("./memory/uploads")
-TEMPLATES_DIR.mkdir(exist_ok=True)
-STATIC_DIR.mkdir(exist_ok=True)
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+for d in (TEMPLATES_DIR, STATIC_DIR, UPLOAD_DIR):
+    d.mkdir(parents=True, exist_ok=True)
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -47,6 +50,27 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 pipeline: Optional[SentinelPipeline] = None
 auth = AuthManager()
 chat_history: List[dict] = []
+
+MANIFESTO = {
+    "name": "SEKA",
+    "version": "5.0",
+    "tagline": "Yerel süper ajan — ücretli API yok, veri sende kalır",
+    "pillars": [
+        "Ollama ile tamamen yerel zeka",
+        "Bilgi evreni: sanitize + güven skoru ile büyür",
+        "İzin modeli: yazma/push asla otomatik değil",
+        "Paper finans: sanal para, kilitli risk kuralları",
+        "Plan motoru: çok adımlı emir, onay kapıları",
+        "Canlı iş kuyruğu (SSE)",
+        "Paylaşılabilir bilgi paketi (kişisel veri yok)",
+        "Türkçe komut köprüsü + paneller",
+    ],
+    "not_included": [
+        "Otonom şirket / gerçek trading",
+        "Açık P2P sürü / uzaktan kod çalıştırma",
+        "IoT cihaz kontrolü",
+    ],
+}
 
 
 def get_pipeline() -> SentinelPipeline:
@@ -64,7 +88,7 @@ def get_user(authorization: Optional[str] = Header(None)):
     token = authorization.replace("Bearer ", "").strip()
     session = auth.validate(token)
     if not session:
-        raise HTTPException(401, "Geçersiz veya süresi dolmuş oturum")
+        raise HTTPException(401, "Geçersiz oturum")
     return session
 
 
@@ -90,10 +114,16 @@ class FinanceRequest(BaseModel):
 class LegacyRequest(BaseModel):
     passphrase: str
 
+class PlanRequest(BaseModel):
+    goal: str
+
+class PackRequest(BaseModel):
+    title: Optional[str] = "SEKA Araştırma Paketi"
+
 
 @app.on_event("startup")
 async def startup():
-    logger.info("SEKA Web v4.0 başlıyor...")
+    logger.info("SEKA Web v5.0")
     get_pipeline()
 
 
@@ -102,13 +132,17 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/api/manifesto")
+async def api_manifesto():
+    return MANIFESTO
+
+
 @app.post("/api/login")
 async def login(req: LoginRequest):
     token = auth.authenticate(req.username, req.password)
     if not token:
         raise HTTPException(401, "Hatalı kullanıcı veya şifre")
-    session = auth.validate(token)
-    return {"token": token, "user": session}
+    return {"token": token, "user": auth.validate(token)}
 
 
 @app.get("/api/status")
@@ -120,12 +154,14 @@ async def api_status(authorization: Optional[str] = Header(None)):
     cur = p.curiosity.get_status()
     return {
         "brand": "SEKA",
-        "version": "4.0",
+        "version": "5.0",
         "user": user,
         "assistant": p.status(),
         "universe": uni,
         "curiosity": cur,
         "energy": policy_status(),
+        "models": p.router.info(),
+        "jobs": job_bus.list_recent(8),
         "finance": {
             "equity": fin.get("equity"),
             "pnl_total_pct": fin.get("pnl_total_pct"),
@@ -139,6 +175,37 @@ async def api_status(authorization: Optional[str] = Header(None)):
     }
 
 
+@app.get("/api/jobs")
+async def api_jobs(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return {"jobs": job_bus.list_recent(30)}
+
+
+@app.get("/api/jobs/stream")
+async def api_jobs_stream(authorization: Optional[str] = Header(None)):
+    """SSE — canlı iş güncellemeleri."""
+    get_user(authorization)
+    q: queue.Queue = queue.Queue()
+
+    def on_event(payload: dict):
+        q.put(payload)
+
+    job_bus.subscribe(on_event)
+
+    async def gen():
+        # snapshot
+        for j in job_bus.list_recent(10):
+            yield f"data: {json.dumps(j, ensure_ascii=False)}\n\n"
+        while True:
+            try:
+                item = await asyncio.get_event_loop().run_in_executor(None, lambda: q.get(timeout=15))
+                yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
+            except Exception:
+                yield ": keepalive\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
+
+
 @app.post("/api/chat")
 async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
@@ -146,8 +213,7 @@ async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)
     message = req.message.strip()
     if not message:
         return {"reply": "Boş mesaj."}
-    lower = message.lower()
-    if lower in ("/status", "durum", "status"):
+    if message.lower() in ("/status", "durum", "status"):
         reply = p.status()
     else:
         reply = p.chat(message)
@@ -165,18 +231,20 @@ async def api_history(authorization: Optional[str] = Header(None)):
 
 
 @app.post("/api/expand")
-async def api_expand(req: ExpandRequest, background_tasks: BackgroundTasks, authorization: Optional[str] = Header(None)):
+async def api_expand(req: ExpandRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
     p = get_pipeline()
     if req.topic:
         p.expander.add_seed_topic(req.topic)
 
-    def run():
+    def work(upd):
+        upd(progress=0.2, message="Aranıyor...")
         result = p.expand_knowledge(topic=req.topic)
-        logger.info(f"Expansion: {result}")
+        upd(progress=0.9, message=f"+{result.get('pages_ingested', 0)} sayfa")
+        return result
 
-    background_tasks.add_task(run)
-    return {"status": "started", "message": "Bilgi evreni genişliyor..."}
+    jid = job_bus.run_in_thread("expand", f"Bilgi: {req.topic or 'otomatik'}", work)
+    return {"status": "started", "job_id": jid, "message": "Bilgi genişletme başladı"}
 
 
 @app.post("/api/seed")
@@ -193,16 +261,18 @@ async def api_universe(authorization: Optional[str] = Header(None)):
 
 
 @app.post("/api/curiosity")
-async def api_curiosity(background_tasks: BackgroundTasks, authorization: Optional[str] = Header(None)):
+async def api_curiosity(authorization: Optional[str] = Header(None)):
     get_user(authorization)
     p = get_pipeline()
 
-    def run():
+    def work(upd):
+        upd(progress=0.3, message="Merak konusu seçiliyor")
         r = p.run_curiosity()
-        logger.info(f"Curiosity: {r.get('topic')}")
+        upd(progress=0.95, message=r.get("topic", ""))
+        return r
 
-    background_tasks.add_task(run)
-    return {"status": "started", "message": "Merak motoru çalışıyor..."}
+    jid = job_bus.run_in_thread("curiosity", "Merak turu", work)
+    return {"status": "started", "job_id": jid}
 
 
 @app.get("/api/curiosity")
@@ -223,21 +293,22 @@ async def api_legacy(req: LegacyRequest, authorization: Optional[str] = Header(N
     get_user(authorization)
     if len(req.passphrase) < 8:
         raise HTTPException(400, "Parola en az 8 karakter")
-    msg = get_pipeline().legacy_export(req.passphrase)
-    return {"status": "ok", "message": msg}
+    return {"status": "ok", "message": get_pipeline().legacy_export(req.passphrase)}
 
 
 @app.post("/api/night")
-async def api_night(background_tasks: BackgroundTasks, authorization: Optional[str] = Header(None)):
+async def api_night(authorization: Optional[str] = Header(None)):
     get_user(authorization)
     p = get_pipeline()
 
-    def run():
+    def work(upd):
+        upd(progress=0.2, message="Gece araştırması")
         r = p.run_night_research()
-        logger.info("Night research done")
+        upd(progress=0.95, message="Rapor yazıldı")
+        return {"summary": (r.get("summary") or "")[:2000]}
 
-    background_tasks.add_task(run)
-    return {"status": "started", "message": "Gece araştırması başladı (sadece öneri)."}
+    jid = job_bus.run_in_thread("night", "Gece araştırması", work)
+    return {"status": "started", "job_id": jid}
 
 
 @app.post("/api/podcast")
@@ -246,21 +317,49 @@ async def api_podcast(authorization: Optional[str] = Header(None)):
     return get_pipeline().podcast_from_night()
 
 
+@app.post("/api/plan")
+async def api_plan(req: PlanRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return get_pipeline().create_plan(req.goal)
+
+
+@app.post("/api/plan/{plan_id}/run")
+async def api_plan_run(plan_id: str, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    p = get_pipeline()
+
+    def work(upd):
+        upd(progress=0.2, message="Güvenli adımlar çalışıyor")
+        r = p.run_plan_safe(plan_id)
+        upd(progress=0.95, message="Bitti")
+        return r
+
+    jid = job_bus.run_in_thread("plan", f"Plan {plan_id}", work)
+    return {"status": "started", "job_id": jid}
+
+
+@app.get("/api/plans")
+async def api_plans(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return {"plans": get_pipeline().planner.list_plans(12)}
+
+
+@app.post("/api/pack")
+async def api_pack(req: PackRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return get_pipeline().export_knowledge_pack(title=req.title or "SEKA Araştırma Paketi")
+
+
 @app.post("/api/ingest")
-async def api_ingest(
-    file: UploadFile = File(...),
-    authorization: Optional[str] = Header(None),
-):
+async def api_ingest(file: UploadFile = File(...), authorization: Optional[str] = Header(None)):
     get_user(authorization)
     suffix = Path(file.filename or "doc.txt").suffix.lower()
     if suffix not in {".pdf", ".md", ".txt", ".csv"}:
         raise HTTPException(400, "Sadece PDF, MD, TXT, CSV")
-    safe_name = f"{uuid.uuid4().hex[:12]}{suffix}"
-    dest = UPLOAD_DIR / safe_name
+    dest = UPLOAD_DIR / f"{uuid.uuid4().hex[:12]}{suffix}"
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
-    result = get_pipeline().ingest_document(str(dest))
-    return result
+    return get_pipeline().ingest_document(str(dest))
 
 
 @app.get("/api/approvals")
@@ -273,7 +372,7 @@ async def api_approvals(authorization: Optional[str] = Header(None)):
 async def api_approve(index: int, authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
     if user.get("role") not in ("owner", "admin"):
-        raise HTTPException(403, "Sadece sahip/admin")
+        raise HTTPException(403)
     return {"success": get_pipeline().permissions.approve(index)}
 
 
@@ -281,7 +380,7 @@ async def api_approve(index: int, authorization: Optional[str] = Header(None)):
 async def api_reject(index: int, authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
     if user.get("role") not in ("owner", "admin"):
-        raise HTTPException(403, "Sadece sahip/admin")
+        raise HTTPException(403)
     return {"success": get_pipeline().permissions.reject(index)}
 
 
@@ -307,16 +406,17 @@ async def api_finance_portfolio(authorization: Optional[str] = Header(None)):
 
 
 @app.post("/api/finance/cycle")
-async def api_finance_cycle(background_tasks: BackgroundTasks, authorization: Optional[str] = Header(None)):
+async def api_finance_cycle(authorization: Optional[str] = Header(None)):
     get_user(authorization)
     p = get_pipeline()
 
-    def run():
-        result = p.run_finance_cycle()
-        logger.info(f"Finance: {result.get('decision')}")
+    def work(upd):
+        upd(progress=0.3, message="Paper döngü")
+        r = p.run_finance_cycle()
+        return r.get("decision")
 
-    background_tasks.add_task(run)
-    return {"status": "started", "message": "Paper trading döngüsü (sanal para)."}
+    jid = job_bus.run_in_thread("finance", "Paper trading", work)
+    return {"status": "started", "job_id": jid}
 
 
 @app.post("/api/image")
