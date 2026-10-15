@@ -1,7 +1,7 @@
 //! Hugging Face tokenizer.json adapter and explicit SmolLM2 chat serialization.
-pub mod model_loader;
 //! The core tensor crate stays dependency-free; this adapter uses the upstream tokenizers
 //! implementation so BPE/ByteLevel behavior comes from the pinned tokenizer artifact.
+pub mod model_loader;
 use std::path::Path;
 use tokenizers::{Encoding, Tokenizer};
 type TokenizerError = Box<dyn std::error::Error + Send + Sync>;
