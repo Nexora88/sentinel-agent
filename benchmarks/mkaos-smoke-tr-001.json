@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "dataset_id": "mkaos-smoke-tr-001",
+  "language": "tr",
+  "purpose": "Smoke-test prompt set for local inference comparisons; not a comprehensive accuracy benchmark.",
+  "prompts": [
+    {"id":"tr-factual-001","prompt":"Türkiye'nin başkenti neresidir? Kısa yanıt ver.","expected_contains":["Ankara"]},
+    {"id":"tr-reasoning-001","prompt":"Bir kutuda 3 kırmızı ve 2 mavi kalem var. Toplam kaç kalem vardır? İşlemi kısaca açıkla.","expected_contains":["5"]},
+    {"id":"tr-summary-001","prompt":"Şu metni tek cümlede özetle: Ağaçlar fotosentez yaparak güneş ışığını kimyasal enerjiye dönüştürür. Ayrıca karbon döngüsünde ve birçok canlıya yaşam alanı sağlamada rol oynarlar.","expected_contains":["fotosentez"]},
+    {"id":"tr-instruction-001","prompt":"Aşağıdaki üç maddeyi numaralı liste olarak yaz: veri topla; veriyi doğrula; sonucu raporla.","expected_contains":["1.","2.","3."]},
+    {"id":"en-factual-001","prompt":"What is the capital of France? Answer briefly.","expected_contains":["Paris"]}
+  ]
+}
