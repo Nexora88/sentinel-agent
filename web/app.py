@@ -32,6 +32,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from core.pipeline import SentinelPipeline
+from core.tenant_storage import tenant_root
 from core.auth import AuthManager
 from core.energy_policy import policy_status
 from core.job_bus import job_bus
@@ -56,7 +57,7 @@ for d in (TEMPLATES_DIR, STATIC_DIR, UPLOAD_DIR):
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-pipeline: Optional[SentinelPipeline] = None
+pipelines: dict[str, SentinelPipeline] = {}
 night_scheduler: Optional[NightScheduler] = None
 auth = AuthManager()
 CHAT_HISTORY_FILE = Path("./memory/chat_history.json")
@@ -129,11 +130,12 @@ MANIFESTO = {
 }
 
 
-def get_pipeline() -> SentinelPipeline:
-    global pipeline
-    if pipeline is None:
-        pipeline = SentinelPipeline()
-    return pipeline
+def get_pipeline(tenant_id: str = "owner") -> SentinelPipeline:
+    identity = str(tenant_id or "owner").strip().lower()
+    tenant_root("./memory/tenants", identity)
+    if identity not in pipelines:
+        pipelines[identity] = SentinelPipeline(tenant_id=identity)
+    return pipelines[identity]
 
 
 def get_user(authorization: Optional[str] = Header(None)):
@@ -341,7 +343,7 @@ def _ollama_status(p: SentinelPipeline) -> dict:
 async def api_status(authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
     try:
-        p = get_pipeline()
+        p = get_pipeline(user["username"])
     except Exception as exc:
         logger.warning("MKAOS bileşenleri başlatılamadı (%s).", type(exc).__name__)
         return {
@@ -370,7 +372,7 @@ async def api_status(authorization: Optional[str] = Header(None)):
         "curiosity": cur,
         "energy": policy_status(),
         "models": p.router.info(),
-        "jobs": job_bus.list_recent(8),
+        "jobs": job_bus.list_recent(8, owner_id=user["username"]),
         "finance": {
             "equity": fin.get("equity"),
             "pnl_total_pct": fin.get("pnl_total_pct"),
@@ -394,24 +396,26 @@ async def api_status(authorization: Optional[str] = Header(None)):
 
 @app.get("/api/jobs")
 async def api_jobs(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    return {"jobs": job_bus.list_recent(30)}
+    user = get_user(authorization)
+    return {"jobs": job_bus.list_recent(30, owner_id=user["username"])}
 
 
 @app.get("/api/jobs/stream")
 async def api_jobs_stream(authorization: Optional[str] = Header(None)):
     """SSE — canlı iş güncellemeleri."""
-    get_user(authorization)
+    user = get_user(authorization)
     q: queue.Queue = queue.Queue()
 
+    owner_id = str(user["username"]).strip().lower()
     def on_event(payload: dict):
-        q.put(payload)
+        if str(payload.get("owner_id", "")).strip().lower() == owner_id:
+            q.put(payload)
 
     job_bus.subscribe(on_event)
 
     async def gen():
         # snapshot
-        for j in job_bus.list_recent(10):
+        for j in job_bus.list_recent(10, owner_id=user["username"]):
             yield f"data: {json.dumps(j, ensure_ascii=False)}\n\n"
         while True:
             try:
@@ -430,7 +434,7 @@ async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)
     if not message:
         return {"reply": "Boş mesaj."}
     try:
-        p = get_pipeline()
+        p = get_pipeline(user["username"])
         if message.lower() in ("/status", "durum", "status"):
             reply = p.status()
         else:
@@ -461,8 +465,8 @@ async def api_history(authorization: Optional[str] = Header(None)):
 
 @app.post("/api/expand")
 async def api_expand(req: ExpandRequest, authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    p = get_pipeline()
+    user = get_user(authorization)
+    p = get_pipeline(user["username"])
     if req.topic:
         p.expander.add_seed_topic(req.topic)
 
@@ -472,27 +476,27 @@ async def api_expand(req: ExpandRequest, authorization: Optional[str] = Header(N
         upd(progress=0.9, message=f"+{result.get('pages_ingested', 0)} sayfa")
         return result
 
-    jid = job_bus.run_in_thread("expand", f"Bilgi: {req.topic or 'otomatik'}", work)
+    jid = job_bus.run_in_thread("expand", f"Bilgi: {req.topic or 'otomatik'}", work, owner_id=user["username"])
     return {"status": "started", "job_id": jid, "message": "Bilgi genişletme başladı"}
 
 
 @app.post("/api/seed")
 async def api_seed(req: SeedRequest, authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    get_pipeline().expander.add_seed_topic(req.topic)
+    user = get_user(authorization)
+    get_pipeline(user["username"]).expander.add_seed_topic(req.topic)
     return {"status": "ok"}
 
 
 @app.get("/api/universe")
 async def api_universe(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    return get_pipeline().expander.get_status()
+    user = get_user(authorization)
+    return get_pipeline(user["username"]).expander.get_status()
 
 
 @app.post("/api/curiosity")
 async def api_curiosity(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    p = get_pipeline()
+    user = get_user(authorization)
+    p = get_pipeline(user["username"])
 
     def work(upd):
         upd(progress=0.3, message="Merak konusu seçiliyor")
@@ -500,35 +504,35 @@ async def api_curiosity(authorization: Optional[str] = Header(None)):
         upd(progress=0.95, message=r.get("topic", ""))
         return r
 
-    jid = job_bus.run_in_thread("curiosity", "Merak turu", work)
+    jid = job_bus.run_in_thread("curiosity", "Merak turu", work, owner_id=user["username"])
     return {"status": "started", "job_id": jid}
 
 
 @app.get("/api/curiosity")
 async def api_curiosity_status(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    return get_pipeline().curiosity.get_status()
+    user = get_user(authorization)
+    return get_pipeline(user["username"]).curiosity.get_status()
 
 
 @app.get("/api/discover")
 async def api_discover(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    data = get_pipeline().discover_local()
-    return {"result": data, "report": get_pipeline().local_discovery.format_report(data)}
+    user = get_user(authorization)
+    data = get_pipeline(user["username"]).discover_local()
+    return {"result": data, "report": get_pipeline(user["username"]).local_discovery.format_report(data)}
 
 
 @app.post("/api/legacy")
 async def api_legacy(req: LegacyRequest, authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
     if len(req.passphrase) < 8:
         raise HTTPException(400, "Parola en az 8 karakter")
-    return {"status": "ok", "message": get_pipeline().legacy_export(req.passphrase)}
+    return {"status": "ok", "message": get_pipeline(user["username"]).legacy_export(req.passphrase)}
 
 
 @app.post("/api/night")
 async def api_night(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    p = get_pipeline()
+    user = get_user(authorization)
+    p = get_pipeline(user["username"])
 
     def work(upd):
         upd(progress=0.2, message="Gece araştırması")
@@ -536,26 +540,26 @@ async def api_night(authorization: Optional[str] = Header(None)):
         upd(progress=0.95, message="Rapor yazıldı")
         return {"summary": (r.get("summary") or "")[:2000]}
 
-    jid = job_bus.run_in_thread("night", "Gece araştırması", work)
+    jid = job_bus.run_in_thread("night", "Gece araştırması", work, owner_id=user["username"])
     return {"status": "started", "job_id": jid}
 
 
 @app.post("/api/podcast")
 async def api_podcast(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    return get_pipeline().podcast_from_night()
+    user = get_user(authorization)
+    return get_pipeline(user["username"]).podcast_from_night()
 
 
 @app.post("/api/plan")
 async def api_plan(req: PlanRequest, authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    return get_pipeline().create_plan(req.goal)
+    user = get_user(authorization)
+    return get_pipeline(user["username"]).create_plan(req.goal)
 
 
 @app.post("/api/plan/{plan_id}/run")
 async def api_plan_run(plan_id: str, authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    p = get_pipeline()
+    user = get_user(authorization)
+    p = get_pipeline(user["username"])
 
     def work(upd):
         upd(progress=0.2, message="Güvenli adımlar çalışıyor")
@@ -563,30 +567,30 @@ async def api_plan_run(plan_id: str, authorization: Optional[str] = Header(None)
         upd(progress=0.95, message="Bitti")
         return r
 
-    jid = job_bus.run_in_thread("plan", f"Plan {plan_id}", work)
+    jid = job_bus.run_in_thread("plan", f"Plan {plan_id}", work, owner_id=user["username"])
     return {"status": "started", "job_id": jid}
 
 
 @app.get("/api/plans")
 async def api_plans(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    return {"plans": get_pipeline().planner.list_plans(12)}
+    user = get_user(authorization)
+    return {"plans": get_pipeline(user["username"]).planner.list_plans(12)}
 
 
 @app.post("/api/pack")
 async def api_pack(req: PackRequest, authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    return get_pipeline().export_knowledge_pack(title=req.title or "MKAOS Araştırma Paketi")
+    user = get_user(authorization)
+    return get_pipeline(user["username"]).export_knowledge_pack(title=req.title or "MKAOS Araştırma Paketi")
 
 
 @app.post("/api/ingest")
 async def api_ingest(file: UploadFile = File(...), authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
     suffix = Path(file.filename or "doc.txt").suffix.lower()
     if suffix not in {".pdf", ".md", ".txt", ".csv"}:
         raise HTTPException(400, "Sadece PDF, MD, TXT, CSV")
     max_bytes = 20 * 1024 * 1024
-    dest = UPLOAD_DIR / f"{uuid.uuid4().hex[:12]}{suffix}"
+    tenant_upload_dir = tenant_root("./memory/uploads", user["username"])\n    tenant_upload_dir.mkdir(parents=True, exist_ok=True)\n    dest = tenant_upload_dir / f"{uuid.uuid4().hex}{suffix}"
     total = 0
     try:
         with dest.open("wb") as f:
@@ -598,7 +602,7 @@ async def api_ingest(file: UploadFile = File(...), authorization: Optional[str] 
                 if total > max_bytes:
                     raise HTTPException(413, "Dosya en fazla 20 MB olabilir.")
                 f.write(chunk)
-        return get_pipeline().ingest_document(str(dest))
+        return get_pipeline(user["username"]).ingest_document(str(dest))
     except Exception:
         dest.unlink(missing_ok=True)
         raise
@@ -611,7 +615,7 @@ async def api_approvals(authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
     if user.get("role") != "owner":
         raise HTTPException(403, "Onay içeriği ve denetim geçmişi yalnızca sahibine açıktır.")
-    permissions = get_pipeline().permissions
+    permissions = get_pipeline(user["username"]).permissions
     return {"pending": permissions.list_actionable(), "history": permissions.list_history(30)}
 
 
@@ -620,7 +624,7 @@ async def api_approve(request_id: str, authorization: Optional[str] = Header(Non
     user = get_user(authorization)
     if user.get("role") != "owner":
         raise HTTPException(403, "Yalnızca sahip onay verebilir.")
-    return {"success": get_pipeline().permissions.approve(request_id)}
+    return {"success": get_pipeline(user["username"]).permissions.approve(request_id)}
 
 
 @app.post("/api/approvals/{request_id}/execute")
@@ -628,7 +632,7 @@ async def api_execute_approved(request_id: str, authorization: Optional[str] = H
     user = get_user(authorization)
     if user.get("role") != "owner":
         raise HTTPException(403, "Yalnızca sahip onaylı işlemi yürütebilir.")
-    p = get_pipeline()
+    p = get_pipeline(user["username"])
     request = p.permissions.get_request(request_id)
     if not request or request.get("status") != "approved":
         raise HTTPException(409, "İşlem bulunamadı veya yürütme için onaylı değil.")
@@ -654,7 +658,7 @@ async def api_reject(request_id: str, authorization: Optional[str] = Header(None
     user = get_user(authorization)
     if user.get("role") != "owner":
         raise HTTPException(403, "Yalnızca sahip reddedebilir.")
-    return {"success": get_pipeline().permissions.reject(request_id)}
+    return {"success": get_pipeline(user["username"]).permissions.reject(request_id)}
 
 
 @app.get("/api/github/repos")
@@ -662,7 +666,7 @@ async def api_github_repos(authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
     if user.get("role") != "owner":
         raise HTTPException(403, "GitHub depoları yalnızca sahibine açıktır.")
-    p = get_pipeline()
+    p = get_pipeline(user["username"])
     if not p.github.enabled:
         return {"error": "GITHUB_TOKEN yok", "repos": []}
     return {"repos": p.github.list_repos(20)}
@@ -670,35 +674,35 @@ async def api_github_repos(authorization: Optional[str] = Header(None)):
 
 @app.post("/api/finance")
 async def api_finance(req: FinanceRequest, authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    return {"result": get_pipeline().finance.analyze(req.query)}
+    user = get_user(authorization)
+    return {"result": get_pipeline(user["username"]).finance.analyze(req.query)}
 
 
 @app.get("/api/finance/portfolio")
 async def api_finance_portfolio(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    return get_pipeline().finance_status()
+    user = get_user(authorization)
+    return get_pipeline(user["username"]).finance_status()
 
 
 @app.post("/api/finance/cycle")
 async def api_finance_cycle(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    p = get_pipeline()
+    user = get_user(authorization)
+    p = get_pipeline(user["username"])
 
     def work(upd):
         upd(progress=0.3, message="Paper döngü")
         r = p.run_finance_cycle()
         return r.get("decision")
 
-    jid = job_bus.run_in_thread("finance", "Paper trading", work)
+    jid = job_bus.run_in_thread("finance", "Paper trading", work, owner_id=user["username"])
     return {"status": "started", "job_id": jid}
 
 
 @app.post("/api/image")
 async def api_image(req: ImageRequest, authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
     try:
-        p = get_pipeline()
+        p = get_pipeline(user["username"])
         if p.media_engine.should_defer_heavy():
             return p.media_engine.submit("generate", {"prompt": req.prompt[:2000], "width": req.width, "height": req.height})
         return await asyncio.to_thread(p.media_bridge.execute, "generate", {"prompt": req.prompt, "width": req.width, "height": req.height})
@@ -712,14 +716,14 @@ async def api_image(req: ImageRequest, authorization: Optional[str] = Header(Non
 
 @app.post("/api/media/edit")
 async def api_media_edit(prompt: str = Form(...), file: UploadFile = File(...), authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
     raw = await file.read(12 * 1024 * 1024 + 1)
     if len(raw) > 12 * 1024 * 1024:
         raise HTTPException(413, "Görsel en fazla 12 MB olabilir.")
     try:
-        p = get_pipeline()
+        p = get_pipeline(user["username"])
         if p.media_engine.should_defer_heavy():
-            saved = UPLOAD_DIR / ("media_" + uuid.uuid4().hex + ".upload")
+            tenant_upload_dir = tenant_root("./memory/uploads", user["username"])\n            tenant_upload_dir.mkdir(parents=True, exist_ok=True)\n            saved = tenant_upload_dir / ("media_" + uuid.uuid4().hex + ".upload")
             saved.write_bytes(raw)
             return p.media_engine.submit("edit", {"prompt": prompt[:2000], "image_path": str(saved.resolve())})
         return await asyncio.to_thread(p.media_bridge.execute, "edit", {"prompt": prompt, "image_bytes": raw})
@@ -733,12 +737,12 @@ async def api_media_edit(prompt: str = Form(...), file: UploadFile = File(...), 
 
 @app.post("/api/media/background")
 async def api_media_background(file: UploadFile = File(...), color: str = Form("#172033"), authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
     raw = await file.read(12 * 1024 * 1024 + 1)
     if len(raw) > 12 * 1024 * 1024:
         raise HTTPException(413, "Görsel en fazla 12 MB olabilir.")
     try:
-        p = get_pipeline()
+        p = get_pipeline(user["username"])
         if p.media_engine.should_defer_heavy():
             saved = UPLOAD_DIR / ("media_" + uuid.uuid4().hex + ".upload")
             saved.write_bytes(raw)
@@ -759,9 +763,9 @@ class VideoRequest(BaseModel):
 
 @app.post("/api/media/video")
 async def api_media_video(req: VideoRequest, authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
     try:
-        p = get_pipeline()
+        p = get_pipeline(user["username"])
         if p.media_engine.should_defer_heavy():
             return p.media_engine.submit("video", {"filename": req.filename, "duration": req.duration})
         return await asyncio.to_thread(p.media_bridge.execute, "video", {"filename": req.filename, "duration": req.duration})
@@ -774,37 +778,38 @@ async def api_media_video(req: VideoRequest, authorization: Optional[str] = Head
 
 
 @app.get("/api/images/{filename}")
-async def serve_image(filename: str):
+async def serve_image(filename: str, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}\.(png|jpg|jpeg|webp|mp4)", filename, re.IGNORECASE):
         raise HTTPException(404)
-    root = Path("./memory/generated_images").resolve()
+    root = (tenant_root("./memory/tenants", user["username"]) / "generated_images").resolve()
     path = (root / filename).resolve()
     if root in path.parents and path.is_file():
-        return FileResponse(path)
+        return FileResponse(path, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
     raise HTTPException(404)
 
 
 @app.get("/api/sovereignty")
 async def api_sovereignty(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
     return sovereignty_status()
 
 
 @app.get("/api/media/capabilities")
 async def api_media_capabilities(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    p = get_pipeline()
+    user = get_user(authorization)
+    p = get_pipeline(user["username"])
     return {"bridge": p.media_bridge.capabilities(), "engine": p.media_engine.capabilities(),
             "jobs": p.media_engine.list_jobs(20), "video_mode": "local ffmpeg motion effect, not text-to-video"}
 
 
 @app.post("/api/media/queue")
 async def api_media_queue(req: MediaQueueRequest, authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
     if req.operation != "generate":
         raise HTTPException(400, "Kuyruğa şu an yalnızca metinden görsel üretim görevi alınır.")
     try:
-        return get_pipeline().media_engine.submit("generate", {"prompt": req.prompt[:2000],
+        return get_pipeline(user["username"]).media_engine.submit("generate", {"prompt": req.prompt[:2000],
             "width": req.width, "height": req.height})
     except Exception as exc:
         raise HTTPException(400, str(exc))
@@ -812,22 +817,22 @@ async def api_media_queue(req: MediaQueueRequest, authorization: Optional[str] =
 
 @app.post("/api/media/jobs/{job_id}/run")
 async def api_media_run_job(job_id: str, authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
     try:
-        return await asyncio.to_thread(get_pipeline().media_engine.run_job, job_id)
+        return await asyncio.to_thread(get_pipeline(user["username"]).media_engine.run_job, job_id)
     except Exception as exc:
         raise HTTPException(400, str(exc))
 
 
 @app.get("/api/media/jobs")
 async def api_media_jobs(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    return {"jobs": get_pipeline().media_engine.list_jobs(30)}
+    user = get_user(authorization)
+    return {"jobs": get_pipeline(user["username"]).media_engine.list_jobs(30)}
 
 
 @app.post("/api/approval/verify")
 async def api_approval_verify(req: ApprovalVerifyRequest, authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
     try:
         result = SignedApprovalProtocol().verify(req.payload, req.signature_b64)
         return {**result, "execution": "not_started", "message": "İmza doğrulandı; bu uç nokta push/merge yürütmez."}
@@ -843,7 +848,7 @@ async def api_privacy_forget(req: ForgetRequest, authorization: Optional[str] = 
         raise HTTPException(400, "Açık onay gerekli: DELETE_MATCHING_MEMORY")
     if len(req.topic.strip()) < 3:
         raise HTTPException(400, "Silme konusu en az 3 karakter olmalı.")
-    p = get_pipeline()
+    p = get_pipeline(user["username"])
     try:
         memory_result = p.personal_memory.forget_matching(req.topic, req.last_hours)
     except Exception as exc:
@@ -891,7 +896,7 @@ async def api_privacy_forget(req: ForgetRequest, authorization: Optional[str] = 
 
 @app.get("/api/audit/clean-room")
 async def api_clean_room_audit(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
     return scan_code_cleanliness(os.getenv("MKAOS_AUDIT_ROOT", "."), max_files=300)
 
 
