@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sentinel-agent-public-config
+  namespace: mkaos
+data:
+  webauthn-rp-id: sentinel.example.com
+  webauthn-origin: https://sentinel.example.com
