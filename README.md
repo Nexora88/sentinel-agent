@@ -6,44 +6,21 @@ MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik t
 
 ## Bağımsız çıkarım motoru — aşamalı geçiş
 
-- Çekirdek: [`engine/mkaos-inference/`](engine/mkaos-inference/) — Rust CPU tensör işlemleri, Transformer decoder ve KV cache.
-- HF uyumluluk katmanı: [`engine/mkaos-hf-adapter/`](engine/mkaos-hf-adapter/).
-- Yerleşik servis: `mkaos_server` model ağırlıklarını/tokenizer'ı başlangıçta bir kez yükler ve yerel HTTP API'si sağlar. Aynı sistem istemi için sınırlı KV önek önbelleği kullanır.
-- Sohbet üretimi yalnızca MKAOS'a yönlendirilir; `MKAOS_ENABLED=false` Ollama sohbet yolunu açmaz. RAG varsayılanı `mkaos-native` olup Ollama embedding'i açık opt-in'dir.
-- Sunucu varsayılan olarak loopback'e bağlanır. Docker Compose dağıtımı, portu host'a yayınlamadan yalnızca dahili ağa bağlar; container arayüzüne bağlanmak için açık bir ayar gerekir.
-- Şimdiki aday ağırlıklar üçüncü taraf SmolLM2-135M-Instruct'tır. Motorun bağımsız kodu geliştirilse de model ağırlıkları henüz MKAOS tarafından eğitilmiş değildir. Türkçe anlamsal kalite ve hedef cihaz performansı geçiş kapılarıdır.
+- Çekirdek: [engine/mkaos-inference/](engine/mkaos-inference/) — Rust CPU tensör işlemleri, Transformer decoder ve KV cache.
+- Eğitim: tools/train_mkaos_from_scratch.py rastgele başlatılmış ağırlıklarla eğitim altyapısı sağlar; yalnızca onaylı yerel korpus ve manifest kabul edilir.
+- HTTP sohbet adaptörü: core/mkaos_native_chat.py yerel mkaos-generate ikilisini shell kullanmadan çalıştırır; hash, boyut, zaman aşımı ve çıktı sınırlarını denetler.
+- Docker imajı Rust CLI'ı çok aşamalı derlemeyle paketler. Model ağırlıkları otomatik indirilmez ve depoya dahil edilmez.
+- Şimdilik onaylı Türkçe korpus veya eğitilmiş kullanılabilir checkpoint yoktur. Bu nedenle varsayılan sohbet, checkpoint yapılandırılana kadar açık HTTP 503 döndürür; üçüncü taraf modele sessiz geri dönüş yoktur.
+- Üçüncü taraf SmolLM2 uyumluluk servisi yalnızca açıkça seçilen legacy-third-party-chat Compose profili ile başlatılabilir.
+- RAG varsayılanı çevrimdışı yerel sözcük/karakter n-gram taban çizgisidir; eğitilmiş semantik embedding modeli değildir.
 
-### İsteğe bağlı Docker Compose kurulumu
+### Başlatma
 
-1. Sabitlenmiş model dosyalarını indirin ve hash raporunu oluşturun:
+1. .env.example dosyasını .env olarak kopyala.
+2. Onaylı korpusla eğitim ve bağımsız inceleme tamamlandıktan sonra checkpoint'i models/mkaos/model.mkaosw içine yerleştir; eğitim raporundaki SHA-256 değerini MKAOS_NATIVE_SHA256 olarak ayarla. Heads/KV-heads/sequence ayarları checkpoint mimarisiyle eşleşmelidir.
+3. docker compose up --build komutuyla başlat. Checkpoint yokken chat'in 503 dönmesi beklenen fail-closed davranışıdır.
 
-   `python tools/fetch_model.py --output-dir models/smollm2-135m-instruct`
-
-2. `.env.example` dosyasını `.env` olarak kopyalayın. Sohbet için MKAOS zorunludur; RAG varsayılan olarak çevrimdışı yerel n-gram embedding kullanır.
-3. Servisi dahili Docker ağı üzerinde başlatın:
-
-   `docker compose --profile mkaos up --build`
-
-4. Sağlık uç noktasını kontrol edin:
-
-   `docker compose exec sentinel python -c "import urllib.request; print(urllib.request.urlopen('http://mkaos:11435/health').read().decode())"`
-
-Ollama sohbetine geri dönüş yolu kaldırılmıştır. MKAOS hizmeti kapalıysa sohbet isteği açık hata verir; önce MKAOS servisini düzeltin. İlk model yüklemesi birkaç saniye veya daha uzun sürebilir; sonraki isteklerde süreç yeniden başlatılmadıkça ağırlıklar bellekte kalır. `stream: true` ile NDJSON token akışı desteklenir. İstekler sınırlı worker havuzuyla eşzamanlı işlenir; varsayılan sınır 4 olup `MKAOS_MAX_CONCURRENT_REQUESTS` ile 1–64 aralığında ayarlanır. Kapasite dolduğunda sınırsız kuyruk yerine `503 Service Unavailable` döner.
-
-**Hedef cihazda kalite ve sürekli-istek ölçümü (TTFT testi bu aşamada çalıştırılmaz):**
-
-```bash
-# Yalnızca yerel test için MKAOS ve Ollama portlarını host loopback'ine açar.
-docker compose -f docker-compose.yml -f docker-compose.mkaos-local-test.yml --profile mkaos up --build -d
-docker compose exec ollama ollama pull smollm2:135m-instruct-fp16
-python tools/evaluate_mkaos_quality.py --server-url http://127.0.0.1:11435 --output memory/benchmarks/mkaos-quality.json
-python tools/benchmark_mkaos_vs_ollama.py --mkaos-url http://127.0.0.1:11435 --ollama-url http://127.0.0.1:11434 --ollama-model smollm2:135m-instruct-fp16 --runs 2 --max-new-tokens 32
-```
-
-Bu test overlay'i yalnızca güvenilir, yerel geliştirme cihazında kullan; üretimde port yayınlamayan varsayılan Compose dosyasını kullan. Raporlar yanıt doğruluğu, istek süresi, token/s, istem önbelleği ve örneklenmiş bellek ölçümlerini içerir. Bunlar anlamsal uzman değerlendirmesi veya TTFT ölçümü değildir.
-
-- Yol haritası: [`docs/MKAOS_INDEPENDENCE_MILESTONES.md`](docs/MKAOS_INDEPENDENCE_MILESTONES.md).
-- Türkçe/tarihî veri menşei ve eğitim politikası: [`docs/MKAOS_TURKISH_DATA_GOVERNANCE.md`](docs/MKAOS_TURKISH_DATA_GOVERNANCE.md).
+Yol haritası: [docs/MKAOS_INDEPENDENCE_MILESTONES.md](docs/MKAOS_INDEPENDENCE_MILESTONES.md).
 
 ## Native Rust chat integration status
 
