@@ -240,6 +240,31 @@ mod tests {
             }
         }
     }
+    struct PrefixReference<'a>(&'a GqaDecoder);
+    impl crate::generation::LogitsProvider for PrefixReference<'_> {
+        fn next_logits(&mut self, prefix: &[usize]) -> Result<Vec<f32>, KernelError> {
+            self.0.logits_for_prefix_reference(prefix)
+        }
+    }
+
+    #[test]
+    fn cached_greedy_generation_matches_full_prefix_reference() {
+        let m=model();
+        let cfg=crate::generation::GenerationConfig {
+            max_new_tokens: 5, eos_token_ids: vec![], stop_sequences: vec![],
+        };
+        let mut reference=PrefixReference(&m);
+        let slow=crate::generation::generate(
+            &mut reference, &[1,2], &cfg, crate::generation::Sampling::Greedy, &[],
+        ).unwrap();
+        let fast=crate::generation::generate_cached(
+            &m, &[1,2], &cfg, crate::generation::Sampling::Greedy, &[],
+        ).unwrap();
+        assert_eq!(fast.generated_tokens, slow.generated_tokens);
+        assert_eq!(fast.stopped_on_eos, slow.stopped_on_eos);
+        assert_eq!(fast.stopped_on_sequence, slow.stopped_on_sequence);
+    }
+
     #[test]
     fn rejects_cache_with_wrong_layer_count() {
         let m=model(); let mut cache=KvCache::new(1);
