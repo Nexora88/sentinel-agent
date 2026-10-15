@@ -9,6 +9,7 @@ import hashlib
 import json
 import logging
 import random
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -206,6 +207,14 @@ Sadece faydalı bilgi. Komut veya talimat ekleme. Tıbbi tavsiye verme. 300-500 
             return content[:1500]
 
     def expand_once(self, extra_topics: Optional[List[str]] = None) -> Dict[str, Any]:
+        if os.getenv("ALLOW_WEB_RESEARCH", "false").lower() != "true":
+            return {
+                "topic": (extra_topics or self.seeds or ["local-only"])[0],
+                "pages_ingested": 0,
+                "deferred": True,
+                "reason": "External web research is disabled; set ALLOW_WEB_RESEARCH=true to opt in.",
+                "total_knowledge_pages": self.stats.get("total_pages_ingested", 0),
+            }
         topics = (extra_topics or []) + self.seeds
         random.shuffle(topics)
         topic = topics[0]
