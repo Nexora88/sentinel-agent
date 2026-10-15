@@ -17,8 +17,8 @@ class DeviceBenchmarkStatisticsTests(unittest.TestCase):
             "latency_ms",
         )
         self.assertEqual(result["count"], 2)
-        self.assertEqual(result["median_ms"], 20)
-        self.assertEqual(result["p95_ms"], 20)
+        self.assertEqual(result["median_ms"], 15)
+        self.assertEqual(result["p95_ms"], 19.5)
 
 
 if __name__ == "__main__":
