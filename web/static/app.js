@@ -14,6 +14,8 @@ function switchPanel(name) {
   if (name === "github") loadGithub();
   if (name === "finance") loadPortfolio();
   if (name === "curiosity") loadCuriosity();
+  if (name === "pulse") loadPulse();
+  if (name === "plan") loadPlans();
 }
 
 $$(".nav-btn").forEach((btn) => {
@@ -33,8 +35,18 @@ function addMessage(role, content) {
 }
 
 async function sendMessage() {
-  const text = chatInput.value.trim();
+  let text = chatInput.value.trim();
   if (!text) return;
+
+  // Shortcut: planla: ...
+  if (/^planla\s*:/i.test(text)) {
+    const goal = text.split(/:/).slice(1).join(":").trim();
+    chatInput.value = "";
+    addMessage("user", text);
+    await createPlan(goal);
+    return;
+  }
+
   addMessage("user", text);
   chatInput.value = "";
   sendBtn.disabled = true;
@@ -63,7 +75,94 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-// Hızlı komut kartları
+async function createPlan(goal) {
+  if (!goal) {
+    goal = prompt("Plan hedefi?");
+    if (!goal) return;
+  }
+  addMessage("assistant", "Plan üretiliyor: " + goal);
+  try {
+    const res = await fetch("/api/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goal }),
+    });
+    const plan = await res.json();
+    if (!plan.success && plan.error) {
+      addMessage("assistant", plan.error);
+      return;
+    }
+    renderPlan(plan);
+    switchPanel("plan");
+    addMessage(
+      "assistant",
+      `Plan hazır (${plan.steps?.length || 0} adım). Plan panelinden güvenli adımları çalıştır.`
+    );
+  } catch (e) {
+    addMessage("assistant", "Plan hatası: " + e.message);
+  }
+}
+
+function renderPlan(plan) {
+  const box = $("#plan-view");
+  if (!box) return;
+  box.innerHTML = "";
+  const head = document.createElement("div");
+  head.className = "approval-card";
+  head.innerHTML = `
+    <div class="details">
+      <div class="action-name">${plan.goal || plan.id}</div>
+      <div>Durum: ${plan.status} · id ${plan.id}</div>
+    </div>
+    <button class="primary" id="run-plan-btn" data-id="${plan.id}">Güvenli Adımları Çalıştır</button>`;
+  box.appendChild(head);
+  (plan.steps || []).forEach((s, i) => {
+    const div = document.createElement("div");
+    div.className = "approval-card";
+    const badge = s.needs_approval ? "🔒 onay" : "⚡ güvenli";
+    div.innerHTML = `
+      <div class="details">
+        <div class="action-name">${i + 1}. ${s.title}</div>
+        <div>${s.type} · ${badge} · ${s.status || "pending"}</div>
+        <div style="color:var(--text-muted);font-size:0.85rem">${s.detail || ""}</div>
+      </div>`;
+    box.appendChild(div);
+  });
+  $("#run-plan-btn")?.addEventListener("click", async () => {
+    await fetch(`/api/plan/${plan.id}/run`, { method: "POST" });
+    addMessage("assistant", "Plan güvenli adımları arka planda çalışıyor (canlı işler)." );
+  });
+}
+
+async function loadPlans() {
+  try {
+    const res = await fetch("/api/plans");
+    const data = await res.json();
+    const box = $("#plans-list");
+    box.innerHTML = "";
+    (data.plans || []).forEach((p) => {
+      const div = document.createElement("div");
+      div.className = "approval-card";
+      div.innerHTML = `
+        <div class="details">
+          <div class="action-name">${p.goal}</div>
+          <div>${p.status} · ${(p.steps || []).length} adım</div>
+        </div>
+        <button data-pid="${p.id}">Aç</button>`;
+      div.querySelector("button").addEventListener("click", () => renderPlan(p));
+      box.appendChild(div);
+    });
+  } catch (e) {}
+}
+
+$("#plan-create-btn")?.addEventListener("click", async () => {
+  const goal = $("#plan-goal").value.trim();
+  if (!goal) return;
+  await createPlan(goal);
+  loadPlans();
+});
+
+// Quick cards
 $$(".qcard").forEach((card) => {
   card.addEventListener("click", async () => {
     const cmd = card.dataset.cmd;
@@ -75,36 +174,39 @@ $$(".qcard").forEach((card) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ topic: null }),
         });
-        addMessage("assistant", "Bilgi evreni genişletme arka planda başladı.");
+        addMessage("assistant", "Bilgi genişletme işi kuyruğa alındı.");
       } else if (cmd === "curiosity") {
         await fetch("/api/curiosity", { method: "POST" });
-        addMessage("assistant", "Merak motoru çalışıyor. Birkaç dakika sonra Merak panelini yenile.");
+        addMessage("assistant", "Merak turu başladı.");
         switchPanel("curiosity");
       } else if (cmd === "night") {
         await fetch("/api/night", { method: "POST" });
-        addMessage("assistant", "Gece araştırması başladı (sadece öneri). Podcast için rapor bitince üret.");
+        addMessage("assistant", "Gece araştırması iş kuyruğunda.");
         switchPanel("night");
       } else if (cmd === "finance") {
         await fetch("/api/finance/cycle", { method: "POST" });
-        addMessage("assistant", "Paper trading döngüsü başladı (sanal para).");
+        addMessage("assistant", "Paper döngü başladı.");
         switchPanel("finance");
       } else if (cmd === "discover") {
         const res = await fetch("/api/discover");
         const data = await res.json();
-        addMessage("assistant", data.report || JSON.stringify(data.result));
-        $("#discover-out").textContent = data.report || JSON.stringify(data, null, 2);
+        addMessage("assistant", data.report || "");
+        $("#discover-out").textContent = data.report || "";
         switchPanel("discover");
       } else if (cmd === "podcast") {
-        $("#night-out").textContent = "Podcast taslağı üretiliyor...";
         const res = await fetch("/api/podcast", { method: "POST" });
         const data = await res.json();
         if (data.success) {
           $("#night-out").textContent = data.script || data.path;
-          addMessage("assistant", `Podcast taslağı hazır (${data.chars} karakter). Otomatik yayın yok.\nDosya: ${data.path}`);
-        } else {
-          addMessage("assistant", data.error || "Podcast üretilemedi. Önce gece araştırması çalıştır.");
-        }
+          addMessage("assistant", `Podcast taslağı hazır · ${data.path}`);
+        } else addMessage("assistant", data.error || "Önce gece turu çalıştır.");
         switchPanel("night");
+      } else if (cmd === "pack") {
+        await exportPack();
+      } else if (cmd === "plan") {
+        switchPanel("plan");
+        $("#plan-goal")?.focus();
+        addMessage("assistant", "Hedefini yazıp Plan Üret’e bas veya: planla: ...");
       }
     } catch (e) {
       addMessage("assistant", "Komut hatası: " + e.message);
@@ -112,7 +214,30 @@ $$(".qcard").forEach((card) => {
   });
 });
 
-// Ses
+async function exportPack() {
+  const res = await fetch("/api/pack", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "SEKA Araştırma Paketi" }),
+  });
+  const data = await res.json();
+  const out = $("#pack-out");
+  if (out) {
+    out.style.display = "block";
+    out.textContent = JSON.stringify(data.pack || data, null, 2);
+  }
+  addMessage(
+    "assistant",
+    data.success
+      ? `Bilgi paketi hazır (kişisel veri yok).\nJSON: ${data.json_path}\nMD: ${data.md_path}`
+      : "Paket hatası"
+  );
+  switchPanel("universe");
+}
+
+$("#pack-btn")?.addEventListener("click", exportPack);
+
+// Voice
 const voiceBtn = $("#voice-btn");
 let recognizing = false;
 let recognition = null;
@@ -121,7 +246,6 @@ if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
   recognition = new SR();
   recognition.lang = "tr-TR";
   recognition.continuous = false;
-  recognition.interimResults = false;
   recognition.onresult = (e) => {
     chatInput.value = e.results[0][0].transcript;
     sendMessage();
@@ -145,8 +269,74 @@ if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
     voiceBtn.textContent = "🔴";
     recognition.start();
   });
-} else {
-  voiceBtn.style.display = "none";
+} else if (voiceBtn) voiceBtn.style.display = "none";
+
+// SSE jobs
+function renderJobs(jobs) {
+  const box = $("#jobs-list");
+  const live = $("#job-live");
+  if (!jobs || !jobs.length) {
+    if (live) live.textContent = "İş yok";
+    if (box) box.innerHTML = '<p class="empty">Canlı iş yok</p>';
+    return;
+  }
+  const top = jobs[0];
+  if (live) {
+    live.textContent = `${top.status} · ${top.title} · ${Math.round((top.progress || 0) * 100)}%`;
+  }
+  if (!box) return;
+  box.innerHTML = "";
+  jobs.slice(0, 12).forEach((j) => {
+    const div = document.createElement("div");
+    div.className = "approval-card";
+    div.innerHTML = `
+      <div class="details">
+        <div class="action-name">${j.title}</div>
+        <div>${j.kind} · ${j.status} · ${Math.round((j.progress || 0) * 100)}%</div>
+        <div style="color:var(--text-muted);font-size:0.82rem">${j.message || ""}</div>
+      </div>`;
+    box.appendChild(div);
+  });
+}
+
+function connectSSE() {
+  try {
+    const es = new EventSource("/api/jobs/stream");
+    const cache = new Map();
+    es.onmessage = (ev) => {
+      try {
+        const j = JSON.parse(ev.data);
+        cache.set(j.id, j);
+        const list = Array.from(cache.values()).sort((a, b) =>
+          (b.updated_at || "").localeCompare(a.updated_at || "")
+        );
+        renderJobs(list);
+      } catch (e) {}
+    };
+    es.onerror = () => {
+      es.close();
+      setTimeout(connectSSE, 5000);
+    };
+  } catch (e) {}
+}
+
+async function loadPulse() {
+  try {
+    const [m, s] = await Promise.all([
+      fetch("/api/manifesto").then((r) => r.json()),
+      fetch("/api/status").then((r) => r.json()),
+    ]);
+    const pillars = $("#manifesto-pillars");
+    pillars.innerHTML = "";
+    (m.pillars || []).forEach((p) => {
+      const d = document.createElement("div");
+      d.className = "pillar";
+      d.textContent = p;
+      pillars.appendChild(d);
+    });
+    $("#models-box").textContent = JSON.stringify(s.models || {}, null, 2);
+    renderJobs(s.jobs || []);
+  } catch (e) {}
 }
 
 // Universe
@@ -170,19 +360,12 @@ async function loadUniverse() {
 
 $("#expand-btn").addEventListener("click", async () => {
   const topic = $("#new-topic").value.trim();
-  $("#expand-btn").disabled = true;
-  $("#expand-btn").textContent = "Genişliyor...";
-  try {
-    await fetch("/api/expand", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic: topic || null }),
-    });
-    setTimeout(loadUniverse, 4000);
-  } finally {
-    $("#expand-btn").disabled = false;
-    $("#expand-btn").textContent = "Şimdi Genişlet";
-  }
+  await fetch("/api/expand", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic: topic || null }),
+  });
+  setTimeout(loadUniverse, 4000);
 });
 
 $("#add-seed-btn").addEventListener("click", async () => {
@@ -197,7 +380,6 @@ $("#add-seed-btn").addEventListener("click", async () => {
   loadUniverse();
 });
 
-// Curiosity
 async function loadCuriosity() {
   try {
     const res = await fetch("/api/curiosity");
@@ -206,107 +388,68 @@ async function loadCuriosity() {
     $("#c-last").textContent = (d.last_run || "—").toString().slice(0, 16);
     const notes = d.recent || [];
     $("#curiosity-out").textContent = notes.length
-      ? notes.map((n) => `• ${n.topic} (+${n.pages || 0} sayfa) @ ${n.at || ""}`).join("\n")
-      : "Henüz tur yok. Butona bas.";
-  } catch (e) {
-    $("#curiosity-out").textContent = "Yüklenemedi";
-  }
+      ? notes.map((n) => `• ${n.topic} (+${n.pages || 0})`).join("\n")
+      : "Henüz tur yok.";
+  } catch (e) {}
 }
 
 $("#curiosity-btn")?.addEventListener("click", async () => {
-  $("#curiosity-btn").disabled = true;
-  $("#curiosity-out").textContent = "Merak turu çalışıyor...";
-  try {
-    await fetch("/api/curiosity", { method: "POST" });
-    setTimeout(loadCuriosity, 6000);
-  } finally {
-    $("#curiosity-btn").disabled = false;
-  }
+  await fetch("/api/curiosity", { method: "POST" });
+  setTimeout(loadCuriosity, 6000);
 });
 
-// Night + podcast
 $("#night-btn")?.addEventListener("click", async () => {
-  $("#night-out").textContent = "Gece araştırması arka planda...";
+  $("#night-out").textContent = "Gece işi kuyruğa alındı...";
   await fetch("/api/night", { method: "POST" });
-  $("#night-out").textContent =
-    "Başladı. Bittiğinde memory/night_reports altında rapor oluşur.\nSonra ‘Podcast Metni Üret’ ile taslak çıkar.";
 });
 
 $("#podcast-btn")?.addEventListener("click", async () => {
-  $("#night-out").textContent = "Podcast taslağı üretiliyor (yerel Ollama)...";
-  try {
-    const res = await fetch("/api/podcast", { method: "POST" });
-    const data = await res.json();
-    if (data.success) {
-      $("#night-out").textContent =
-        `Dosya: ${data.path}\nKaynak: ${data.source_report || "—"}\n\n` + (data.script || "");
-    } else {
-      $("#night-out").textContent = data.error || "Üretilemedi";
-    }
-  } catch (e) {
-    $("#night-out").textContent = "Hata: " + e.message;
-  }
+  $("#night-out").textContent = "Podcast üretiliyor...";
+  const res = await fetch("/api/podcast", { method: "POST" });
+  const data = await res.json();
+  $("#night-out").textContent = data.success
+    ? `Dosya: ${data.path}\n\n${data.script || ""}`
+    : data.error || "Hata";
 });
 
-// Documents upload
 $("#doc-upload-btn")?.addEventListener("click", async () => {
   const fileInput = $("#doc-file");
-  if (!fileInput.files || !fileInput.files[0]) {
-    $("#doc-out").textContent = "Önce dosya seç.";
+  if (!fileInput.files?.[0]) {
+    $("#doc-out").textContent = "Dosya seç";
     return;
   }
   const fd = new FormData();
   fd.append("file", fileInput.files[0]);
-  $("#doc-out").textContent = "Yükleniyor + analiz...";
-  try {
-    const res = await fetch("/api/ingest", { method: "POST", body: fd });
-    const data = await res.json();
-    if (data.success) {
-      $("#doc-out").textContent =
-        (data.message || "OK") +
-        "\n\n" +
-        (data.analysis_report || JSON.stringify(data.analysis || {}, null, 2));
-    } else {
-      $("#doc-out").textContent = data.error || JSON.stringify(data);
-    }
-  } catch (e) {
-    $("#doc-out").textContent = "Hata: " + e.message;
-  }
+  $("#doc-out").textContent = "Yükleniyor...";
+  const res = await fetch("/api/ingest", { method: "POST", body: fd });
+  const data = await res.json();
+  $("#doc-out").textContent =
+    (data.message || data.error || "") +
+    "\n\n" +
+    (data.analysis_report || "");
 });
 
-// Discover
 $("#discover-btn")?.addEventListener("click", async () => {
-  $("#discover-out").textContent = "Taranıyor...";
-  try {
-    const res = await fetch("/api/discover");
-    const data = await res.json();
-    $("#discover-out").textContent = data.report || JSON.stringify(data, null, 2);
-  } catch (e) {
-    $("#discover-out").textContent = "Hata: " + e.message;
-  }
+  const res = await fetch("/api/discover");
+  const data = await res.json();
+  $("#discover-out").textContent = data.report || "";
 });
 
-// Legacy
 $("#legacy-btn")?.addEventListener("click", async () => {
   const pass = $("#legacy-pass").value;
   if (!pass || pass.length < 8) {
-    $("#legacy-out").textContent = "Parola en az 8 karakter.";
+    $("#legacy-out").textContent = "Min 8 karakter";
     return;
   }
-  try {
-    const res = await fetch("/api/legacy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ passphrase: pass }),
-    });
-    const data = await res.json();
-    $("#legacy-out").textContent = data.message || JSON.stringify(data);
-  } catch (e) {
-    $("#legacy-out").textContent = "Hata: " + e.message;
-  }
+  const res = await fetch("/api/legacy", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ passphrase: pass }),
+  });
+  const data = await res.json();
+  $("#legacy-out").textContent = data.message || JSON.stringify(data);
 });
 
-// Finance
 async function loadPortfolio() {
   try {
     const res = await fetch("/api/finance/portfolio");
@@ -316,160 +459,112 @@ async function loadPortfolio() {
     $("#f-cash").textContent = (d.cash ?? 0).toFixed(2);
     $("#f-open").textContent = (d.open_positions || []).length;
     $("#fin-mode").textContent = d.mode || "paper";
-    if (d.circuit_breaker) $("#fin-mode").textContent += " | DEVRE KESİCİ";
-
     const box = $("#fin-positions");
     const positions = d.open_positions || [];
-    if (!positions.length) {
-      box.innerHTML = '<p class="empty">Açık pozisyon yok</p>';
-    } else {
+    if (!positions.length) box.innerHTML = '<p class="empty">Yok</p>';
+    else {
       box.innerHTML = "";
       positions.forEach((p) => {
         const div = document.createElement("div");
         div.className = "approval-card";
-        const pnlCls = p.pnl >= 0 ? "var(--success)" : "var(--danger)";
-        div.innerHTML = `
-          <div class="details">
-            <div class="action-name">${p.symbol}</div>
-            <div>Entry $${p.entry?.toFixed(4)} → Mark $${p.mark?.toFixed(4)}</div>
-            <div style="color:${pnlCls}">PnL $${p.pnl?.toFixed(2)}</div>
-          </div>`;
+        div.innerHTML = `<div class="details"><div class="action-name">${p.symbol}</div>
+          <div>PnL $${p.pnl?.toFixed(2)}</div></div>`;
         box.appendChild(div);
       });
     }
-
-    const thoughts = d.recent_thoughts || [];
-    $("#fin-thoughts").textContent = thoughts
-      .map((t) => `[${(t.ts || "").slice(11, 19)}] ${t.action}: ${t.thought}`)
-      .join("\n") || "Henüz düşünce yok.";
-  } catch (e) {
-    $("#fin-thoughts").textContent = "Yüklenemedi: " + e.message;
-  }
+    $("#fin-thoughts").textContent = (d.recent_thoughts || [])
+      .map((t) => `${t.action}: ${t.thought}`)
+      .join("\n") || "—";
+  } catch (e) {}
 }
 
 $("#fin-refresh-btn")?.addEventListener("click", loadPortfolio);
 $("#fin-cycle-btn")?.addEventListener("click", async () => {
-  $("#fin-cycle-btn").disabled = true;
-  try {
-    await fetch("/api/finance/cycle", { method: "POST" });
-    setTimeout(loadPortfolio, 5000);
-  } finally {
-    $("#fin-cycle-btn").disabled = false;
-  }
+  await fetch("/api/finance/cycle", { method: "POST" });
+  setTimeout(loadPortfolio, 5000);
 });
 
 $("#finance-btn").addEventListener("click", async () => {
   const q = $("#finance-query").value.trim();
   if (!q) return;
-  $("#finance-result").textContent = "Analiz...";
-  try {
-    const res = await fetch("/api/finance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: q }),
-    });
-    const data = await res.json();
-    $("#finance-result").textContent = data.result || JSON.stringify(data);
-  } catch (e) {
-    $("#finance-result").textContent = "Hata: " + e.message;
-  }
+  const res = await fetch("/api/finance", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: q }),
+  });
+  const data = await res.json();
+  $("#finance-result").textContent = data.result || "";
 });
 
-// Image
 $("#image-btn").addEventListener("click", async () => {
   const prompt = $("#image-prompt").value.trim();
   if (!prompt) return;
-  $("#image-result").innerHTML = "<p>Üretiliyor...</p>";
-  try {
-    const res = await fetch("/api/image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      $("#image-result").innerHTML = `
-        <p>Kaynak: ${data.source} — ${data.filename}</p>
-        <img src="/api/images/${data.filename}" alt="generated" style="max-width:100%;border-radius:12px;margin-top:12px" />
-      `;
-    } else {
-      $("#image-result").innerHTML = `<p>Hata: ${data.error}</p>`;
-    }
-  } catch (e) {
-    $("#image-result").innerHTML = `<p>Hata: ${e.message}</p>`;
-  }
+  $("#image-result").innerHTML = "Üretiliyor...";
+  const res = await fetch("/api/image", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    $("#image-result").innerHTML = `<img src="/api/images/${data.filename}" style="max-width:100%;border-radius:12px" />`;
+  } else $("#image-result").textContent = data.error || "Hata";
 });
 
-// GitHub
 async function loadGithub() {
   const box = $("#gh-repos");
-  box.innerHTML = "Yükleniyor...";
-  try {
-    const res = await fetch("/api/github/repos");
-    const data = await res.json();
-    if (data.error) {
-      box.innerHTML = `<p class="empty">${data.error}</p>`;
-      return;
-    }
-    box.innerHTML = "";
-    (data.repos || []).forEach((r) => {
-      const div = document.createElement("div");
-      div.className = "approval-card";
-      div.innerHTML = `
-        <div class="details">
-          <div class="action-name">${r.private ? "🔒" : "🌐"} ${r.full_name}</div>
-          <div>${r.description || ""} · ${r.language || "?"}</div>
-        </div>
-        <a href="${r.url}" target="_blank" style="color:var(--accent-2)">Aç</a>`;
-      box.appendChild(div);
-    });
-  } catch (e) {
-    box.innerHTML = '<p class="empty">Yüklenemedi</p>';
+  box.innerHTML = "...";
+  const res = await fetch("/api/github/repos");
+  const data = await res.json();
+  if (data.error) {
+    box.innerHTML = `<p class="empty">${data.error}</p>`;
+    return;
   }
+  box.innerHTML = "";
+  (data.repos || []).forEach((r) => {
+    const div = document.createElement("div");
+    div.className = "approval-card";
+    div.innerHTML = `<div class="details"><div class="action-name">${r.full_name}</div>
+      <div>${r.description || ""}</div></div>
+      <a href="${r.url}" target="_blank" style="color:var(--accent-2)">Aç</a>`;
+    box.appendChild(div);
+  });
 }
 $("#gh-refresh").addEventListener("click", loadGithub);
 
-// Approvals
 async function loadApprovals() {
   const box = $("#approvals-list");
-  try {
-    const res = await fetch("/api/approvals");
-    const data = await res.json();
-    const pending = data.pending || [];
-    if (!pending.length) {
-      box.innerHTML = '<p class="empty">Bekleyen onay yok.</p>';
-      return;
-    }
-    box.innerHTML = "";
-    pending.forEach((item, idx) => {
-      const card = document.createElement("div");
-      card.className = "approval-card";
-      card.innerHTML = `
-        <div class="details">
-          <div class="action-name">${item.action}</div>
-          <div>${item.details}</div>
-        </div>
-        <div class="approval-actions">
-          <button class="approve" data-idx="${idx}">Onayla</button>
-          <button class="reject" data-idx="${idx}">Reddet</button>
-        </div>`;
-      box.appendChild(card);
-    });
-    box.querySelectorAll(".approve").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        await fetch(`/api/approvals/${btn.dataset.idx}/approve`, { method: "POST" });
-        loadApprovals();
-      });
-    });
-    box.querySelectorAll(".reject").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        await fetch(`/api/approvals/${btn.dataset.idx}/reject`, { method: "POST" });
-        loadApprovals();
-      });
-    });
-  } catch (e) {
-    box.innerHTML = '<p class="empty">Yüklenemedi</p>';
+  const res = await fetch("/api/approvals");
+  const data = await res.json();
+  const pending = data.pending || [];
+  if (!pending.length) {
+    box.innerHTML = '<p class="empty">Bekleyen yok</p>';
+    return;
   }
+  box.innerHTML = "";
+  pending.forEach((item, idx) => {
+    const card = document.createElement("div");
+    card.className = "approval-card";
+    card.innerHTML = `
+      <div class="details"><div class="action-name">${item.action}</div><div>${item.details}</div></div>
+      <div class="approval-actions">
+        <button class="approve" data-idx="${idx}">Onayla</button>
+        <button class="reject" data-idx="${idx}">Reddet</button>
+      </div>`;
+    box.appendChild(card);
+  });
+  box.querySelectorAll(".approve").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      await fetch(`/api/approvals/${btn.dataset.idx}/approve`, { method: "POST" });
+      loadApprovals();
+    })
+  );
+  box.querySelectorAll(".reject").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      await fetch(`/api/approvals/${btn.dataset.idx}/reject`, { method: "POST" });
+      loadApprovals();
+    })
+  );
 }
 
 async function loadStatus() {
@@ -479,27 +574,25 @@ async function loadStatus() {
     $("#status-text").textContent = JSON.stringify(data, null, 2);
     const u = data.universe || {};
     const f = data.finance || {};
-    const c = data.curiosity || {};
     $("#quick-status").innerHTML = `
-      <strong>SEKA</strong> ${data.version || ""}<br>
+      <strong>SEKA ${data.version || ""}</strong><br>
       Bilgi: ${u.total_pages || 0}<br>
-      Merak: ${c.explored_count || 0}<br>
-      Paper $: ${f.equity ?? "—"}<br>
-      Onay: ${data.pending_approvals || 0}
-    `;
-  } catch (e) {
-    $("#status-text").textContent = "Durum alınamadı";
-  }
+      Paper: ${f.equity ?? "—"}<br>
+      Onay: ${data.pending_approvals || 0}`;
+    renderJobs(data.jobs || []);
+  } catch (e) {}
 }
 
+connectSSE();
 loadStatus();
 setInterval(loadStatus, 30000);
 addMessage(
   "assistant",
-  "SEKA v4 hazır — Sentinel Egemen Kişisel Ajan.\n" +
-    "• Ücretli API yok (Ollama)\n" +
-    "• Komut köprüsü + paneller\n" +
-    "• Merak · Gece · Podcast taslağı · Belge · Keşif · Yedek\n" +
-    "• Paper finans (gerçek para kapalı)\n\n" +
-    "Üstteki kartlardan tek tıkla operasyon başlat veya emir yaz."
+  "SEKA v5 online.\n" +
+    "• Canlı iş kuyruğu (SSE)\n" +
+    "• Plan motoru → planla: hedef\n" +
+    "• Bilgi paketi dışa aktar (paylaşılabilir)\n" +
+    "• Hızlı/derin model yönlendirme\n" +
+    "• Paper finans · merak · gece · podcast taslağı\n\n" +
+    "Ücretli API yok. Veri sende kalır."
 );
