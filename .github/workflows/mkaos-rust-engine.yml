@@ -48,6 +48,6 @@ jobs:
       - name: Run Hugging Face adapter tests
         run: cargo test --manifest-path engine/mkaos-hf-adapter/Cargo.toml
       - name: Install PyTorch for owned-weight smoke test
-        run: python -m pip install --disable-pip-version-check torch
+        run: python -m pip install --disable-pip-version-check torch --index-url https://download.pytorch.org/whl/cpu
       - name: Train, export, and compare real logits through the Rust decoder
         run: python tools/run_mkaos_owned_smoke.py
