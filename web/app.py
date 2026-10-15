@@ -82,7 +82,7 @@ def get_pipeline() -> SentinelPipeline:
 
 def get_user(authorization: Optional[str] = Header(None)):
     if not authorization:
-        if os.getenv("AUTH_REQUIRED", "false").lower() != "true":
+        if os.getenv("AUTH_REQUIRED", "true").lower() != "true":
             return {"username": "owner", "role": "owner", "display_name": "Sahip"}
         raise HTTPException(401, "Yetki gerekli")
     token = authorization.replace("Bearer ", "").strip()
@@ -356,10 +356,25 @@ async def api_ingest(file: UploadFile = File(...), authorization: Optional[str] 
     suffix = Path(file.filename or "doc.txt").suffix.lower()
     if suffix not in {".pdf", ".md", ".txt", ".csv"}:
         raise HTTPException(400, "Sadece PDF, MD, TXT, CSV")
+    max_bytes = 20 * 1024 * 1024
     dest = UPLOAD_DIR / f"{uuid.uuid4().hex[:12]}{suffix}"
-    with dest.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
-    return get_pipeline().ingest_document(str(dest))
+    total = 0
+    try:
+        with dest.open("wb") as f:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_bytes:
+                    raise HTTPException(413, "Dosya en fazla 20 MB olabilir.")
+                f.write(chunk)
+        return get_pipeline().ingest_document(str(dest))
+    except Exception:
+        dest.unlink(missing_ok=True)
+        raise
+    finally:
+        await file.close()
 
 
 @app.get("/api/approvals")
@@ -368,20 +383,20 @@ async def api_approvals(authorization: Optional[str] = Header(None)):
     return {"pending": get_pipeline().permissions.list_pending()}
 
 
-@app.post("/api/approvals/{index}/approve")
-async def api_approve(index: int, authorization: Optional[str] = Header(None)):
+@app.post("/api/approvals/{request_id}/approve")
+async def api_approve(request_id: str, authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
-    if user.get("role") not in ("owner", "admin"):
-        raise HTTPException(403)
-    return {"success": get_pipeline().permissions.approve(index)}
+    if user.get("role") != "owner":
+        raise HTTPException(403, "Yalnızca sahip onay verebilir.")
+    return {"success": get_pipeline().permissions.approve(request_id)}
 
 
-@app.post("/api/approvals/{index}/reject")
-async def api_reject(index: int, authorization: Optional[str] = Header(None)):
+@app.post("/api/approvals/{request_id}/reject")
+async def api_reject(request_id: str, authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
-    if user.get("role") not in ("owner", "admin"):
-        raise HTTPException(403)
-    return {"success": get_pipeline().permissions.reject(index)}
+    if user.get("role") != "owner":
+        raise HTTPException(403, "Yalnızca sahip reddedebilir.")
+    return {"success": get_pipeline().permissions.reject(request_id)}
 
 
 @app.get("/api/github/repos")
