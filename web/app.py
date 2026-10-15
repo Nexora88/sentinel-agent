@@ -206,6 +206,8 @@ def _run_night_with_infographic() -> dict:
     visual = get_pipeline().media_engine.render_report_infographic(str(summary or result)[:4000])
     if isinstance(result, dict):
         result["infographic"] = visual
+        if visual.get("success"):
+            result["summary"] = (str(summary or "Gece denetimi tamamlandı.") + " · Yerel infografik: " + visual["filename"])[:800]
         return result
     return {"summary": str(result)[:800], "infographic": visual}
 
@@ -437,9 +439,10 @@ async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)
                  "Ollama hizmetinin açık olduğunu, OLLAMA_BASE_URL değerini ve OLLAMA_MODEL "
                  "modelinin yerel olarak yüklü olduğunu kontrol et. Yerel verilerin silinmedi.")
     history = chat_history.setdefault(user["username"], [])
+    from datetime import datetime
     history.extend([
-        {"role": "user", "content": message},
-        {"role": "assistant", "content": reply},
+        {"role": "user", "content": message, "timestamp": datetime.now().astimezone().isoformat()},
+        {"role": "assistant", "content": reply, "timestamp": datetime.now().astimezone().isoformat()},
     ])
     if len(history) > 300:
         del history[:-300]
@@ -829,8 +832,23 @@ async def api_privacy_forget(req: ForgetRequest, authorization: Optional[str] = 
         raise HTTPException(500, "Kişisel vektör hafızası temizlenemedi; veri otomatik sıfırlanmadı.")
     history = chat_history.get(user["username"], [])
     phrase = req.topic.strip().casefold()
+    from datetime import datetime, timezone
+    cutoff = datetime.now(timezone.utc).timestamp() - max(1, min(req.last_hours, 8760)) * 3600
+    def is_recent_match(row):
+        if phrase not in str(row.get("content", "")).casefold():
+            return False
+        stamp = row.get("timestamp")
+        if not stamp:
+            return False
+        try:
+            parsed = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.timestamp() >= cutoff
+        except (TypeError, ValueError, OverflowError):
+            return False
     before = len(history)
-    chat_history[user["username"]] = [row for row in history if phrase not in str(row.get("content", "")).casefold()]
+    chat_history[user["username"]] = [row for row in history if not is_recent_match(row)]
     deleted_chat_turns = before - len(chat_history[user["username"]])
     if deleted_chat_turns:
         _save_chat_history()
