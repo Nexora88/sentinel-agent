@@ -50,6 +50,14 @@ class MemoryStore:
         self.persist_directory = Path(persist_directory)
         self.persist_directory.mkdir(parents=True, exist_ok=True)
         self.ollama = ollama or OllamaClient()
+        self.embedding_provider = os.getenv("SEKA_EMBEDDINGS_PROVIDER", "ollama").strip().lower()
+        if self.embedding_provider == "mkaos-native":
+            from core.native_embeddings import NativeHashEmbeddings
+            embedding_function = NativeHashEmbeddings()
+        elif self.embedding_provider == "ollama":
+            embedding_function = self.ollama.embeddings
+        else:
+            raise ValueError("SEKA_EMBEDDINGS_PROVIDER must be ollama or mkaos-native")
         self.collection_name = collection_name
         self.max_documents = _limit(max_documents, "SEKA_RAG_MAX_DOCUMENTS", 10000, 100000)
         self.max_chunks_per_ingest = _limit(
@@ -61,7 +69,7 @@ class MemoryStore:
         self._lock = threading.RLock()
         self.vectorstore = Chroma(
             collection_name=collection_name,
-            embedding_function=self.ollama.embeddings,
+            embedding_function=embedding_function,
             persist_directory=str(self.persist_directory),
         )
         self.splitter = RecursiveCharacterTextSplitter(
@@ -209,6 +217,7 @@ class MemoryStore:
             pass
         return {
             "mode": "local",
+            "embedding_provider": getattr(self, "embedding_provider", "unknown"),
             "documents": count,
             "max_documents": self.max_documents,
             "max_chunks_per_ingest": self.max_chunks_per_ingest,
