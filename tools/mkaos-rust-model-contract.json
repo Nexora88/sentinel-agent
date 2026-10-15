@@ -1,0 +1,52 @@
+{
+  "contract_version": "mkaos-rust-gqa-v1",
+  "status": "experimental_contract",
+  "tokenizer": {
+    "kind": "utf8-byte",
+    "vocab_size": 257,
+    "byte_id_min": 0,
+    "byte_id_max": 255,
+    "eos_token_id": 256,
+    "unicode_normalization": "none",
+    "encode": "UTF-8 bytes mapped one-to-one to IDs; append EOS only between training records or when explicitly requested",
+    "decode": "IDs 0..255 become bytes and are decoded as UTF-8 with replacement for incomplete sequences; EOS is omitted"
+  },
+  "architecture": {
+    "kind": "mkaos-gqa-rope-rmsnorm-swiglu",
+    "tensor_dtype": "float32",
+    "layout": "row-major",
+    "attention": "causal grouped-query attention",
+    "position_encoding": "RoPE split-half rotate_half",
+    "normalization": "RMSNorm",
+    "mlp_activation": "SiLU(gate) * up",
+    "projection_bias": false,
+    "embedding_and_lm_head": "exported as separate tensors; may start tied during training but must be duplicated in checkpoint",
+    "required_config": ["vocab_size", "hidden_size", "num_layers", "query_heads", "kv_heads", "intermediate_size", "max_sequence_len", "rms_epsilon", "rope_theta", "eos_token_id"]
+  },
+  "rust_tensor_shapes": {
+    "token_embedding.weight": "[vocab_size, hidden_size]",
+    "layers.{i}.input_norm.weight": "[1, hidden_size]",
+    "layers.{i}.q_proj.weight": "[hidden_size, hidden_size] (transposed from PyTorch Linear storage)",
+    "layers.{i}.k_proj.weight": "[hidden_size, kv_heads * head_dim] (transposed from PyTorch)",
+    "layers.{i}.v_proj.weight": "[hidden_size, kv_heads * head_dim] (transposed from PyTorch)",
+    "layers.{i}.o_proj.weight": "[hidden_size, hidden_size] (transposed from PyTorch)",
+    "layers.{i}.post_attention_norm.weight": "[1, hidden_size]",
+    "layers.{i}.gate_proj.weight": "[hidden_size, intermediate_size] (transposed from PyTorch)",
+    "layers.{i}.up_proj.weight": "[hidden_size, intermediate_size] (transposed from PyTorch)",
+    "layers.{i}.down_proj.weight": "[intermediate_size, hidden_size] (transposed from PyTorch)",
+    "final_norm.weight": "[1, hidden_size]",
+    "lm_head.weight": "[hidden_size, vocab_size] (transposed from PyTorch)"
+  },
+  "checkpoint": {
+    "container": "MKAOSW1",
+    "endianness": "little",
+    "tensor_values": "IEEE-754 float32",
+    "integrity": "SHA-256 recorded in sidecar manifest; Rust loader must verify the supplied expected hash",
+    "shape_policy": "exact tensor set and exact dimensions; reject missing, unexpected, non-finite, or mismatched tensors"
+  },
+  "compatibility_limits": [
+    "This contract matches the current Rust GqaDecoder math, not the external SmolLM2 BPE/SentencePiece tokenizer or checkpoint format.",
+    "A successful export proves serialization and shape compatibility only; it does not prove trained-model quality or numerical parity.",
+    "The current Rust library exposes tensor primitives and a GQA decoder but still needs a production assembly/loader layer to turn this checkpoint into GqaDecoderWeights."
+  ]
+}
