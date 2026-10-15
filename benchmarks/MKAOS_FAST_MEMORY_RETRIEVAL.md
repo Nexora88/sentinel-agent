@@ -1,30 +1,34 @@
 # MKAOS fast response and local-memory retrieval milestone
 
-This milestone improves the existing two local paths without claiming a stronger model than the weights can support.
+## Implemented in this branch
 
-## Memory retrieval
+- Bounded hybrid retrieval: vector-store candidates are reranked using semantic/vector rank and Unicode-aware lexical overlap.
+- Turkish Unicode tokenization, including dotted/dotless i and other Turkish letters.
+- Short-lived per-process LRU result cache (30-second TTL, maximum 128 entries).
+- Cache invalidation after ingestion and a memory-generation key.
+- Cache counters and retrieval mode in `MemoryStore.stats()`.
+- `tools/evaluate_mkaos_memory.py` evaluates a transparent, curated Turkish smoke set with Recall@k, MRR, answer-context hit rate, cold-query latency, repeat-query latency and cache consistency. It forces `SEKA_EMBEDDINGS_PROVIDER=mkaos-native` and needs no Ollama embedding daemon.
 
-core/rag.py now:
-- uses a bounded candidate pool from the configured local vector store, then reranks with both vector rank and Unicode-aware lexical overlap;
-- keeps Turkish letters and inflected forms in lexical matching;
-- caches repeated (tenant, query, k) searches in a per-process LRU cache for 30 seconds (128 entries maximum);
-- clears the cache immediately after ingestion so a newly learned fact is not hidden by stale results;
-- exposes cache counters and retrieval mode through MemoryStore.stats().
+## Run the memory evaluation
 
-The cache stores results only in process memory; it does not persist prompts or query text. Tenant identity remains part of the cache key and the vector-store filter. Existing Chroma persistence remains local.
+```bash
+python tools/evaluate_mkaos_memory.py --k 3 --output artifacts/mkaos-memory-evaluation.json
+python -m unittest tests.test_mkaos_memory_evaluation tests.test_hybrid_memory_retrieval
+```
 
-## Two engine tracks
+The eight-case set is a regression smoke test, not an independent or production-quality benchmark. Review the per-query rankings and repeat on a held-out Turkish set before changing the default embedding provider.
 
-1. **Chat/inference engine:** MKAOS remains the only chat route. The Rust reference decoder already exposes incremental KV-cache generation; this milestone does not claim production throughput or a validated owned checkpoint.
-2. **Memory/embedding engine:** SEKA_EMBEDDINGS_PROVIDER=mkaos-native selects the deterministic local hash/character n-gram embedding baseline. It avoids the Ollama embedding service, but is lexical rather than a trained semantic model. The default stays unchanged until retrieval-quality tests on a reviewed Turkish dataset justify switching it.
+## Rust inference / KV-cache validation
 
-## Validation required before production claims
+The Rust tests compare cached incremental logits against fresh-prefix recomputation on deterministic synthetic weights and compare greedy token sequences between cached and reference generation. Run:
 
-- Run the full Python and Rust CI on this commit.
-- Compare recall@k, MRR, answer-context hit rate and latency on a held-out Turkish memory set, including spelling variations and inflections.
-- Benchmark first-query and cache-hit latency on target hardware, with corpus size and environment recorded.
-- Verify tenant isolation and that ingestion invalidates cache entries.
-- Test KV-cache token/logit parity against uncached generation and benchmark TTFT separately from total generation time.
-- Keep the existing external model/embedding comparison until quality, latency, offline, and license gates pass.
+```bash
+cargo test --manifest-path engine/mkaos-inference/Cargo.toml
+cargo test --manifest-path engine/mkaos-hf-adapter/Cargo.toml
+```
 
-A cache hit is a speed optimization, not improved model intelligence. Hash embeddings are not represented as a replacement for a trained semantic embedding model until the measured retrieval gate passes.
+These validate algorithmic consistency, not production throughput or compatibility with arbitrary pretrained model weights. Use `tools/benchmark_mkaos_device.py` on the target physical device to measure cold-start time, time to first response, per-request latency, token throughput, and memory usage. CI-host numbers are not substitutes for the user's device.
+
+## Sovereignty gate
+
+The native hash/character n-gram embedding is local and deterministic, but it is not a trained semantic embedding model. Ollama remains the default until a reviewed held-out Turkish evaluation demonstrates adequate retrieval quality and offline tests pass. Full sovereignty also requires a compatible, trained owned language model, tokenizer and model weights, license/provenance review, and network-isolation evidence. These are not declared complete by this benchmark.
