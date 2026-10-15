@@ -110,3 +110,37 @@ jobs:
               raise SystemExit("Potential hardcoded credentials found.")
           print("No likely hardcoded credentials found.")
           PY
+
+  supply-chain-sbom:
+    # Do not mint attestations from unmerged pull-request code.
+    if: github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Generate local CycloneDX SBOM
+        run: python tools/generate_mkaos_sbom.py --requirements requirements.txt --output artifacts/mkaos-sbom.cdx.json
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkaos-sbom-cyclonedx
+          path: artifacts/mkaos-sbom.cdx.json
+          if-no-files-found: error
+      - name: Attest SBOM provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: artifacts/mkaos-sbom.cdx.json
