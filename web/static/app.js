@@ -805,10 +805,25 @@ async function loadApprovals() {
         preview += "\nDepo: " + (context.owner || "?") + "/" + (context.repo || "?") +
           "\nDal: " + (context.head || "?") + " → " + (context.base || "?") +
           "\nBaşlık: " + (context.title || "") + "\nAçıklama:\n" + (context.body || "");
+      } else if (["modify_files", "push_to_remote"].includes(item.action)) {
+        preview += "\nDepo: " + (context.owner || "?") + "/" + (context.repo || "?") +
+          "\nDosya: " + (context.path || "?") + "\nDal: " + (context.branch || "main") +
+          "\nCommit: " + (context.message || "") + "\nSHA: " + (context.sha || "Yeni dosya");
       } else if (context.preview) {
         preview += "\nÖnizleme:\n" + context.preview;
       }
       description.textContent = preview;
+      if (["modify_files", "push_to_remote"].includes(item.action) && typeof context.content === "string") {
+        const contentDetails = document.createElement("details");
+        contentDetails.className = "approval-content-details";
+        const summary = document.createElement("summary");
+        summary.textContent = "Dosya içeriğini incele (" + context.content.length + " karakter)";
+        const code = document.createElement("pre");
+        code.className = "approval-preview";
+        code.textContent = context.content;
+        contentDetails.append(summary, code);
+        description.appendChild(contentDetails);
+      }
       const state = document.createElement("div");
       state.className = "approval-state";
       state.textContent = "Durum: " + (item.status || "pending");
@@ -833,12 +848,15 @@ async function loadApprovals() {
           await loadApprovals();
         });
         actions.append(approve, reject);
-      } else if (item.status === "approved" && ["open_github_issue", "create_pull_request"].includes(item.action)) {
+      } else if (item.status === "approved" && ["open_github_issue", "create_pull_request", "modify_files", "push_to_remote"].includes(item.action)) {
         const execute = document.createElement("button");
         execute.className = "primary";
-        execute.textContent = "Onaylı işlemi yürüt";
+        execute.textContent = item.action === "modify_files" ? "İkinci onayı hazırla" : "Onaylı GitHub işlemini yürüt";
         execute.addEventListener("click", async () => {
-          if (!confirm("Bu GitHub işlemi dış sistemde değişiklik yapacak. Ayrıntıları ve hedef depoyu kontrol ettin mi?")) return;
+          const confirmation = item.action === "modify_files"
+            ? "Bu adım yalnızca ikinci push onayını oluşturur; dosya henüz GitHub'a gönderilmez. Devam edilsin mi?"
+            : "Bu GitHub işlemi dış sistemde değişiklik yapacak. Ayrıntıları ve hedef depoyu kontrol ettin mi?";
+          if (!confirm(confirmation)) return;
           execute.disabled = true;
           const result = await fetch(`/api/approvals/${encodeURIComponent(item.id)}/execute`, { method: "POST" });
           const payload = await result.json();
