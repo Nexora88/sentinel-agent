@@ -34,3 +34,17 @@ Mevcut benchmarks/mkaos-quality-tr-001.json küçük bir regresyon/smoke kümesi
 5. Yayın: model kartı, dataset card, ağırlık ve tokenizer hash'leri, lisanslar, bilinen sınırlamalar ve insan onaylı yayın/geri alma.
 
 Gerçek veri ve yeterli eğitim hesaplama kaynağı sağlanmadan kendi eğitilmiş LLM sonucu üretilemez. Sentetik CI ağırlıkları sadece motorun testidir; gerçek Türkçe bilgi/akıl yürütme yeteneği oluşturmaz.
+
+
+## Sıfırdan MKAOS modeli eğitimi
+
+`tools/train_mkaos_from_scratch.py` MKAOS'un kendi küçük GQA/SwiGLU decoder parametrelerini rastgele başlatır; harici checkpoint, model hub, üçüncü taraf tokenizer veya uzaktaki çıkarım servisi kullanmaz. Tokenizer sözleşmesi UTF-8 byte ID'leri (0–255) ve EOS=256'dır. Ağırlıklar, Rust okuyucusunun `MKAOSW1` ikili matris biçimine aktarılır.
+
+Önkoşullar:
+- Manifestte her kayıt için yetkili insan incelemesi, lisans/izin dayanağı, PII temizliği, içerik SHA-256 ve train/validation/test ayrımı bulunmalı.
+- JSONL korpusunda her satır `{"sample_id":"...","text":"..."}` biçimindedir. `text` alanının UTF-8 bayt SHA-256'sı manifest ile birebir eşleşmelidir.
+- Korpus ve manifest yerel dosyalardır; eğitim betiği veri indirmez. PyTorch yerel ortamda kurulu olmalıdır.
+- Başlatmadan önce: `python -m unittest discover -s tests -p "test_mkaos_from_scratch.py" -v`
+- Eğitim: `python tools/train_mkaos_from_scratch.py --corpus ./approved-tr.jsonl --manifest ./approved-manifest.json --output-dir ./artifacts/mkaos-tr`
+
+Eğitim betiği train split'i optimize eder, validation loss ile checkpoint seçer ve test metinlerini eğitim/optimizasyon/model seçimi için kullanmaz. Çıktı checkpoint'i deneysel modeldir. Bu hat tek başına veri lisansını doğrulamaz, Türkçe kaliteyi kanıtlamaz veya üretim servisine otomatik geçiş yapmaz. Üretim öncesi ayrıca Rust checkpoint round-trip, tokenizer uyumu, bağımsız insan puanlamalı test, güvenlik ve hedef donanım performans kapıları zorunludur.
