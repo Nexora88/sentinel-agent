@@ -24,6 +24,13 @@ class EncryptedAuthStoreTests(unittest.TestCase):
             reloaded = AuthManager(str(requested))
             self.assertIsNotNone(reloaded.authenticate("owner", "test-long-password"))
 
+    def test_encrypted_mode_requires_explicit_owner_password(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ, {"MKAOS_ENCRYPT_MEMORY_FILES": "true", "OWNER_PASSWORD": ""}
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Set OWNER_PASSWORD explicitly"):
+                AuthManager(str(Path(directory) / "users.json"))
+
     def test_plaintext_account_store_requires_explicit_migration(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(
             os.environ, {"MKAOS_ENCRYPT_MEMORY_FILES": "true", "OWNER_PASSWORD": "test-long-password"}
