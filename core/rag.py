@@ -114,8 +114,9 @@ class MemoryStore:
             if not isinstance(metadata, dict):
                 raise ValueError("Bilgi metadata alanı geçersiz.")
             scoped_metadata = dict(metadata)
-            if self.tenant_id:
-                scoped_metadata["tenant_id"] = self.tenant_id
+            tenant_id = getattr(self, "tenant_id", None)
+            if tenant_id:
+                scoped_metadata["tenant_id"] = tenant_id
             for document in self.splitter.create_documents([text], metadatas=[self._safe_metadata(scoped_metadata)]):
                 docs.append(document)
                 if len(docs) > self.max_chunks_per_ingest:
@@ -165,7 +166,7 @@ class MemoryStore:
             return []
         safe_k = max(1, min(int(k), 20))
         try:
-            return self.vectorstore.similarity_search(query.strip()[:4000], k=safe_k, **({"filter": {"tenant_id": self.tenant_id}} if self.tenant_id else {}))
+            return self.vectorstore.similarity_search(query.strip()[:4000], k=safe_k, **({"filter": {"tenant_id": getattr(self, "tenant_id", None)}} if getattr(self, "tenant_id", None) else {}))
         except Exception as exc:
             # Retrieval failure must not take down the chat panel.
             logger.warning("Yerel RAG araması kullanılamıyor (%s).", type(exc).__name__)
