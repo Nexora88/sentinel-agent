@@ -22,7 +22,10 @@ logger = logging.getLogger("sentinel.auth")
 
 class AuthManager:
     def __init__(self, users_file: str = "./memory/users.json"):
-        self.users_file = Path(users_file)
+        requested_path = Path(users_file)
+        self.encrypt_store = os.getenv("MKAOS_ENCRYPT_MEMORY_FILES", "").strip().lower() in {"1", "true", "yes", "on"}
+        self.legacy_users_file = requested_path
+        self.users_file = requested_path.with_suffix(".enc") if self.encrypt_store else requested_path
         self.users_file.parent.mkdir(parents=True, exist_ok=True)
         self.sessions: Dict[str, dict] = {}
         self._users = self._load()
@@ -67,14 +70,19 @@ class AuthManager:
                 os.unlink(temp_name)
 
     def _load(self) -> Dict:
+        if self.encrypt_store and self.legacy_users_file.exists() and not self.users_file.exists():
+            raise RuntimeError("Plaintext users.json exists while encrypted memory is enabled; migrate it explicitly.")
         if self.users_file.exists():
             try:
-                data = json.loads(self.users_file.read_text(encoding="utf-8"))
+                if self.encrypt_store:
+                    from core.encrypted_store import EncryptedFileStore
+                    data = json.loads(EncryptedFileStore(self.users_file).read_bytes().decode("utf-8"))
+                else:
+                    data = json.loads(self.users_file.read_text(encoding="utf-8"))
                 if not isinstance(data, dict):
                     raise ValueError("users store must be a JSON object")
                 return data
             except Exception as exc:
-                # Fail closed. Never silently replace a damaged user store with a new owner.
                 raise RuntimeError(
                     f"User store is unreadable; preserve and recover {self.users_file} before restarting."
                 ) from exc
@@ -82,6 +90,10 @@ class AuthManager:
 
     def _save(self) -> None:
         self.users_file.parent.mkdir(parents=True, exist_ok=True)
+        if self.encrypt_store:
+            from core.encrypted_store import EncryptedFileStore
+            EncryptedFileStore(self.users_file).write_bytes(json.dumps(self._users, ensure_ascii=False, indent=2).encode("utf-8"))
+            return
         payload = json.dumps(self._users, ensure_ascii=False, indent=2)
         temp_name = None
         try:
