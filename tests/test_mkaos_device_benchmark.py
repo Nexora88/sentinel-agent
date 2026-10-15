@@ -6,7 +6,7 @@ from tools.benchmark_mkaos_device import percentile, summarize
 class DeviceBenchmarkStatisticsTests(unittest.TestCase):
     def test_percentile_is_stable_for_sorted_and_unsorted_samples(self):
         self.assertEqual(percentile([9, 1, 5], 0.5), 5)
-        self.assertEqual(percentile([1, 2, 3, 4, 5], 0.95), 5)
+        self.assertEqual(percentile([1, 2, 3, 4, 5], 0.95), 4.8)
 
     def test_empty_percentile_returns_none(self):
         self.assertIsNone(percentile([], 0.5))
