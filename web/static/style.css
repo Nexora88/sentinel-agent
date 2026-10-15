@@ -541,3 +541,8 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .image-result { display: grid; justify-items: start; gap: 12px; overflow-wrap: anywhere; }
 .image-result img, .image-result video { display: block; max-width: 100%; max-height: 70vh; object-fit: contain; border: 1px solid var(--border); }
 .media-download { color: var(--accent); padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; text-decoration: none; }
+
+
+/* Truthful sovereignty indicator: green status is never assumed from branding alone. */
+.sovereignty-status { display:flex; align-items:center; gap:8px; margin:14px 0 10px; padding:9px 10px; border:1px solid rgba(251,191,36,.32); border-radius:9px; color:#fbbf24; font-size:.68rem; font-weight:700; letter-spacing:.04em; line-height:1.4; }
+.sovereignty-dot { width:8px; height:8px; flex:0 0 8px; border-radius:50%; background:#f59e0b; box-shadow:0 0 10px #f59e0b66; }
