@@ -31,8 +31,9 @@ class SignedApprovalProtocol:
         # Prevent replay of an already accepted request ID.
         if self.audit_path.exists():
             try:
-                for line in self.audit_path.read_text(encoding="utf-8").splitlines()[-5000:]:
-                    previous = json.loads(line)
+                with self.audit_path.open("r", encoding="utf-8") as audit_file:
+                    for line in audit_file:
+                        previous = json.loads(line)
                     if previous.get("request_id") == str(payload["request_id"]) and previous.get("result") == "signature_validated":
                         raise ApprovalProtocolError("Bu onay isteği daha önce kullanılmış; replay engellendi.")
             except ApprovalProtocolError:
