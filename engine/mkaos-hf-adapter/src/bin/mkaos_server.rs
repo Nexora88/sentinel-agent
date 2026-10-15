@@ -54,7 +54,7 @@ fn send_stream_headers(stream: &mut TcpStream) -> std::io::Result<()> {
 }
 
 fn send_stream_line(stream: &mut TcpStream, value: Value) -> std::io::Result<()> {
-    serde_json::to_writer(&mut *stream, &value)?;
+    serde_json::to_writer(&mut *stream, &value).map_err(std::io::Error::other)?;
     stream.write_all(b"\\n")?;
     stream.flush()
 }
@@ -453,6 +453,7 @@ mod tests {
         assert!((penalty - 1.2).abs() < 1e-6);
         assert!((temperature - 0.15).abs() < 1e-6);
         assert!((top_p - 0.9).abs() < 1e-6);
+        assert!(!streaming);
     }
 
     #[test]
