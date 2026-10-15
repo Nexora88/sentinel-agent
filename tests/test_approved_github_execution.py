@@ -37,6 +37,29 @@ class ApprovedGitHubExecutionTests(unittest.TestCase):
         )
         self.assertEqual(self.manager.get_request(request_id)["status"], "executed")
 
+    def test_file_change_requires_two_approvals_before_remote_write(self):
+        notice = self.client.create_or_update_file(
+            "example", "project", "docs/guide.md", "# Local draft", "Add guide", "feature/guide"
+        )
+        first_id = notice.split("Request ID: ", 1)[1].splitlines()[0]
+        self.assertTrue(self.manager.approve(first_id))
+        self.assertTrue(self.manager.begin_execution(first_id))
+        first = self.manager.get_request(first_id)
+        result = self.client.execute_approved_request(first)
+        self.assertIn("PUSH_TO_REMOTE", result)
+        self.assertTrue(self.manager.finish_execution(first_id, True, result, final_status="staged"))
+        self.client._put = Mock(return_value={"commit": {"html_url": "https://github.com/example/project/commit/abc"}})
+        second = next(item for item in self.manager.list_actionable() if item["action"] == Action.PUSH_TO_REMOTE.value)
+        self.assertEqual(second["context"]["content"], "# Local draft")
+        self.assertFalse(self.client._put.called)
+        self.assertTrue(self.manager.approve(second["id"]))
+        self.assertTrue(self.manager.begin_execution(second["id"]))
+        claimed = self.manager.get_request(second["id"])
+        result = self.client.execute_approved_request(claimed)
+        self.assertIn("/commit/abc", result)
+        self.assertTrue(self.manager.finish_execution(second["id"], True, result))
+        self.client._put.assert_called_once()
+
     def test_unknown_action_never_dispatches(self):
         request = {
             "status": "executing",
