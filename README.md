@@ -2,7 +2,7 @@
 
 **Yerel Türkçe ajan işletim sistemi altyapısı.** Uzun vadeli hedef; kendi model biçimi, tokenizer'ı ve çıkarım motoruyla harici çalışma zamanı bağımlılığını kaldırmaktır. Bu geçiş aşamalıdır: `engine/mkaos-inference/` altında bağımsız Rust CPU çekirdeği başlatılmıştır; mevcut uygulama henüz Ollama üzerinden model çalıştırır ve bu entegrasyon geçici uyumluluk katmanıdır. Yerine geçecek motor uçtan uca model çalıştırıp testleri geçmeden Ollama'yı silmek mevcut yerel sohbet işlevini kırar, bağımsızlık sağlamaz. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
-MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. “Kendi kararlarını vermek”, hedefler için plan önermek ve güvenli yerel işleri yürütmek anlamına gelir. Dosya değiştirme, commit, push, bildirim veya harici sisteme veri gönderme gibi etkiler açık onay gerektirir.
+MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. Sohbet varsayılan olarak mevcut yerel Ollama yolunda kalır; `MKAOS_ENABLED=true` ile ayrı, bellekte yaşayan Rust MKAOS servisine kontrollü olarak yönlendirilir. MKAOS yanıt vermezse otomatik olarak başka bir modele geçilmez; hata görünür kalır ve geri alma için bayrak kapatılır. “Kendi kararlarını vermek”, hedefler için plan önermek ve güvenli yerel işleri yürütmek anlamına gelir. Dosya değiştirme, commit, push, bildirim veya harici sisteme veri gönderme gibi etkiler açık onay gerektirir.
 
 ## Bağımsız çıkarım motoru — aşamalı geçiş
 
@@ -29,6 +29,18 @@ MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik t
    `docker compose exec sentinel python -c "import urllib.request; print(urllib.request.urlopen('http://mkaos:11435/health').read().decode())"`
 
 Geri alma için `.env` içinde `MKAOS_ENABLED=false` yapıp `docker compose up -d sentinel` çalıştırın. İlk model yüklemesi birkaç saniye veya daha uzun sürebilir; sonraki isteklerde süreç yeniden başlatılmadıkça ağırlıklar bellekte kalır. API şu an token-token streaming sağlamaz ve istekleri sıralı işler.
+
+**Hedef cihazda kalite ve sürekli-istek ölçümü (TTFT testi bu aşamada çalıştırılmaz):**
+
+```bash
+# Yalnızca yerel test için MKAOS ve Ollama portlarını host loopback'ine açar.
+docker compose -f docker-compose.yml -f docker-compose.mkaos-local-test.yml --profile mkaos up --build -d
+docker compose exec ollama ollama pull smollm2:135m-instruct-fp16
+python tools/evaluate_mkaos_quality.py --server-url http://127.0.0.1:11435 --output memory/benchmarks/mkaos-quality.json
+python tools/benchmark_mkaos_vs_ollama.py --mkaos-url http://127.0.0.1:11435 --ollama-url http://127.0.0.1:11434 --ollama-model smollm2:135m-instruct-fp16 --runs 2 --max-new-tokens 32
+```
+
+Bu test overlay'i yalnızca güvenilir, yerel geliştirme cihazında kullan; üretimde port yayınlamayan varsayılan Compose dosyasını kullan. Raporlar yanıt doğruluğu, istek süresi, token/s, istem önbelleği ve örneklenmiş bellek ölçümlerini içerir. Bunlar anlamsal uzman değerlendirmesi veya TTFT ölçümü değildir.
 
 - Yol haritası: [`docs/MKAOS_INDEPENDENCE_MILESTONES.md`](docs/MKAOS_INDEPENDENCE_MILESTONES.md).
 - Türkçe/tarihî veri menşei ve eğitim politikası: [`docs/MKAOS_TURKISH_DATA_GOVERNANCE.md`](docs/MKAOS_TURKISH_DATA_GOVERNANCE.md).
