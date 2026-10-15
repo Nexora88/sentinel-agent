@@ -546,3 +546,15 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 /* Truthful sovereignty indicator: green status is never assumed from branding alone. */
 .sovereignty-status { display:flex; align-items:center; gap:8px; margin:14px 0 10px; padding:9px 10px; border:1px solid rgba(251,191,36,.32); border-radius:9px; color:#fbbf24; font-size:.68rem; font-weight:700; letter-spacing:.04em; line-height:1.4; }
 .sovereignty-dot { width:8px; height:8px; flex:0 0 8px; border-radius:50%; background:#f59e0b; box-shadow:0 0 10px #f59e0b66; }
+
+
+/* MKAOS sovereignty and plan control room */
+.control-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:16px 0; }
+.control-card { min-width:0; margin:12px 0; padding:18px; border:1px solid rgba(91,116,155,.35); border-radius:16px; background:linear-gradient(145deg,rgba(21,33,55,.9),rgba(9,16,30,.88)); box-shadow:0 14px 38px rgba(0,0,0,.16); overflow-wrap:anywhere; }
+.control-card h3 { margin-top:0; }
+.control-card p,.control-card li { color:var(--text-muted); line-height:1.55; font-size:.9rem; }
+.control-card textarea,.control-card input { width:100%; box-sizing:border-box; margin:8px 0 12px; padding:11px; border:1px solid var(--border); border-radius:9px; background:var(--bg); color:var(--text); }
+.control-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.control-actions input { flex:1; min-width:170px; }
+.control-card pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:360px; overflow:auto; }
+@media (max-width:850px) { .control-grid { grid-template-columns:1fr; } }
