@@ -52,8 +52,8 @@ jobs:
             docker logs seka-web-smoke
             exit 1
           fi
-          password="$(docker exec seka-web-smoke cat /app/memory/first-run-password.txt)"
-          token="$(curl --fail --silent -X POST http://127.0.0.1:18000/api/login -H 'Content-Type: application/json' -d "{\"username\":\"owner\",\"password\":\"$password\"}" | python -c 'import json,sys; print(json.load(sys.stdin)["token"])')"
+          bootstrap_secret="$(docker exec seka-web-smoke cat /app/memory/first-run-password.txt)"
+          token="$(curl --fail --silent -X POST http://127.0.0.1:18000/api/login -H 'Content-Type: application/json' -d "{\"username\":\"owner\",\"password\":\"$bootstrap_secret\"}" | python -c 'import json,sys; print(json.load(sys.stdin)["token"])')"
           status="$(curl --fail --silent -H "Authorization: Bearer $token" http://127.0.0.1:18000/api/status)"
           printf '%s' "$status" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["status"] == "ok", d; assert d["ollama"]["status"] == "unavailable", d.get("ollama"); assert "rag" in d, d; print("Pipeline initializes; panel stays healthy and reports Ollama outage gracefully.")'
       - name: Run security regression tests
