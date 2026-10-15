@@ -11,10 +11,16 @@ import json
 import os
 import platform
 import statistics
+import sys
 import tempfile
 import time
 from pathlib import Path
 from typing import Any
+
+# Make direct script execution (python tools/...) resolve repository packages in CI and local runs.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 CASES = [
     {"id": "edr_soil", "text": "Edirne tarlasında toprak nemi ölçümü yapılmalı; kuru toprak sulama ihtiyacını gösterebilir.", "query": "Edirne tarlalarının toprağı kuru mu, nem ölçümü ve sulama", "expected": "edr_soil"},
