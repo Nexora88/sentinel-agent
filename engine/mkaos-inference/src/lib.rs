@@ -117,9 +117,82 @@ impl Tensor2 {
     }
 }
 
+    pub fn transpose(&self) -> Result<Self, KernelError> {
+        let mut out = vec![0.0_f32; self.rows * self.cols];
+        for r in 0..self.rows {
+            for c in 0..self.cols {
+                out[c * self.rows + r] = self.data[r * self.cols + c];
+            }
+        }
+        Self::new(self.cols, self.rows, out)
+    }
+
+    pub fn scale(&self, factor: f32) -> Result<Self, KernelError> {
+        if !factor.is_finite() {
+            return Err(KernelError::NonFiniteInput);
+        }
+        Self::new(self.rows, self.cols, self.data.iter().map(|v| v * factor).collect())
+    }
+}
+
+/// Compute attention(Q,K,V) = softmax(Q K^T / sqrt(d_k)) V.
+///
+/// This is a reference CPU kernel, not a complete Transformer layer:
+/// causal masking, positional encoding, batching, KV cache and fused kernels
+/// are intentionally left for later, separately tested increments.
+pub fn scaled_dot_product_attention(
+    query: &Tensor2,
+    key: &Tensor2,
+    value: &Tensor2,
+) -> Result<Tensor2, KernelError> {
+    if query.cols != key.cols {
+        return Err(KernelError::ShapeMismatch {
+            expected: query.cols,
+            actual: key.cols,
+        });
+    }
+    if key.rows != value.rows {
+        return Err(KernelError::ShapeMismatch {
+            expected: key.rows,
+            actual: value.rows,
+        });
+    }
+    let scores = query.matmul(&key.transpose()?)?;
+    let scaled = scores.scale((key.cols as f32).sqrt().recip())?;
+    scaled.softmax_rows()?.matmul(value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn transpose_round_trip_preserves_values() {
+        let x = Tensor2::new(2, 3, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
+        let y = x.transpose().unwrap();
+        assert_eq!((y.rows(), y.cols()), (3, 2));
+        assert_eq!(y.as_slice(), &[1.0, 4.0, 2.0, 5.0, 3.0, 6.0]);
+        assert_eq!(y.transpose().unwrap(), x);
+    }
+
+    #[test]
+    fn attention_returns_query_length_by_value_width() {
+        let q = Tensor2::new(2, 2, vec![1.0, 0.0, 0.0, 1.0]).unwrap();
+        let k = Tensor2::new(2, 2, vec![1.0, 0.0, 0.0, 1.0]).unwrap();
+        let v = Tensor2::new(2, 1, vec![10.0, 20.0]).unwrap();
+        let out = scaled_dot_product_attention(&q, &k, &v).unwrap();
+        assert_eq!((out.rows(), out.cols()), (2, 1));
+        assert!(out.as_slice()[0] > 10.0 && out.as_slice()[0] < 20.0);
+        assert!(out.as_slice()[1] > 10.0 && out.as_slice()[1] < 20.0);
+    }
+
+    #[test]
+    fn attention_rejects_incompatible_dimensions() {
+        let q = Tensor2::new(1, 2, vec![1.0, 0.0]).unwrap();
+        let k = Tensor2::new(1, 3, vec![1.0, 0.0, 1.0]).unwrap();
+        let v = Tensor2::new(1, 1, vec![1.0]).unwrap();
+        assert!(scaled_dot_product_attention(&q, &k, &v).is_err());
+    }
 
     #[test]
     fn matrix_multiplication_has_expected_shape_and_values() {
