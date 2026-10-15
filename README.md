@@ -1,54 +1,80 @@
-# SEKA v5 — Sentinel Egemen Kişisel Ajan
+# SEKA v6 — Sentinel Agent
 
-**Yerel süper ajan.** Ücretli API yok. Veri sende kalır. Türkçe komut merkezi.
+**Yerel Türkçe ajan altyapısı.** Ollama üzerinden yerel çıkarım; bulut model API'si zorunlu değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
-Sıradan chatbot değil:
+SEKA; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. “Kendi kararlarını vermek”, hedefler için plan önermek ve güvenli yerel işleri yürütmek anlamına gelir. Dosya değiştirme, commit, push, bildirim veya harici sisteme veri gönderme gibi etkiler açık onay gerektirir.
 
-| Devrim katmanı | Ne işe yarar |
-|----------------|--------------|
-| **Canlı iş kuyruğu (SSE)** | Genişlet / gece / plan ilerlemesini anlık gör |
-| **Plan motoru** | `planla: hedef` → çok adım, riskli olanlar onay ister |
-| **Bilgi paketi** | Paylaşılabilir sanitize JSON/MD (kişisel veri yok) |
-| **Model router** | Hızlı sohbet / derin analiz (Ollama) |
-| **Bilgi evreni** | Güven skoru + injection filtresi ile büyür |
-| **Paper finans** | Sanal portföy, kilitli risk |
-| **Merak + gece + podcast taslağı** | Otonom araştırma, otomatik yayın yok |
-| **İzin modeli** | Push/yazma asla sessizce olmaz |
+## Gizlilik modeli ve sınırlar
 
-## Kurulum
+- **Yerel çıkarım:** Ollama modelleri kendi cihazında çalışır. Varsayılan model \`qwen2.5-coder:7b\`; embedding modeli \`nomic-embed-text\`.
+- **Yerel saklama:** bellek, kullanıcılar ve vektör deposu yerel proje/volume içinde tutulur. Bu dizini şifreli disk üzerinde tut ve yedekle.
+- **Ağ kullanımı isteğe bağlıdır:** araştırma özellikleri web'e bağlanabilir; GitHub token'ı GitHub'a istek gönderir. Üçüncü taraf bildirim sağlayıcıları da veri dışarı çıkarır. Tam çevrimdışı kullanım için bu özellikleri çalıştırma, kimlik bilgilerini tanımlama ve ağ çıkışını işletim sistemi/firewall seviyesinde kısıtla.
+- **Onay varsayılanı açık:** GitHub yazma, commit, push ve dosya değişiklikleri otomatik yapılmamalıdır. Her onay kararlı bir istek kimliğine bağlıdır.
+- **Savunmacı tarama:** web tarayıcısı yerel/özel IP'leri ve doğrulanmayan yönlendirmeleri engeller. Yalnızca sahibi olduğun veya tarama iznin olan hedeflerde kullan.
+- **Güvenlik dürüstlüğü:** uygulama tek başına “veri asla dışarı çıkamaz” garantisi veremez. Bu; uygulama ayarlarına, işletim sistemi/firewall'a, model endpoint'ine, yedeklemeye ve etkinleştirilen entegrasyonlara bağlıdır.
 
-```bash
+## Güvenli kurulum
+
+1. Python 3.12 ve Ollama kur.
+2. Yerel modeli ve embedding modelini indir:
+
+\`\`\`bash
 ollama serve
 ollama pull qwen2.5-coder:7b
 ollama pull nomic-embed-text
+\`\`\`
 
+3. Repoyu indir ve sanal ortam kur:
+
+\`\`\`bash
 git clone https://github.com/Nexora88/sentinel-agent.git
 cd sentinel-agent
+python -m venv .venv
+# Windows: .venv\\Scripts\\activate
+# macOS/Linux: source .venv/bin/activate
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 cp .env.example .env
-python -m scripts.run web
-# http://localhost:8000
-```
+\`\`\`
 
-Docker: `docker compose up -d --build`
+4. \`.env\` dosyasında **uzun, benzersiz bir \`OWNER_PASSWORD\`** belirle. GitHub/WhatsApp anahtarlarını yerel-only kullanım için boş bırak. \`.env\` dosyasını Git'e ekleme.
+5. Başlat:
 
-## Hızlı komutlar
+\`\`\`bash
+python -m scripts.run web --host 127.0.0.1 --port 8000
+\`\`\`
 
-```bash
-python -m scripts.run web
-python -m scripts.run expand
-python -m scripts.run curiosity
-python -m scripts.run night && python -m scripts.run podcast
-python -m scripts.run finance
-python -m scripts.run schedule
-```
+Sonra \`http://127.0.0.1:8000\` adresini aç. Kimlik doğrulama varsayılan olarak açıktır. Docker kullanırken de \`OWNER_PASSWORD\` değerini belirle; port varsayılan olarak yalnızca loopback arayüzüne bağlanır.
 
-Web’de: **Nabız** paneli (manifesto + canlı işler), **Plan Motoru**, köprü kartları.
+## Komutlar
+
+\`\`\`bash
+python -m scripts.run web --host 127.0.0.1
+python -m scripts.run review path/to/file.py
+python -m scripts.run secrets --path .
+python -m scripts.run licenses --path .
+python -m scripts.run permissions
+python -m unittest discover -s tests -v
+\`\`\`
+
+## Kalıcı veri ve yedek
+
+- Uygulamayı durdurduktan sonra \`memory/\` dizinini ve yerel \`.env\` dosyasını ayrı, şifreli bir yedekleme politikasına göre yedekle. \`.env\` yedeğini kaynak kod deposuna yükleme.
+- Yedek geri yüklemeyi periyodik olarak test et. Yedek oluşturmak tek başına geri yüklemenin başarılı olduğunu kanıtlamaz.
+- Şifre/erişim bilgilerini değiştirirken eski yedeğin güvenli saklandığından emin ol.
+
+## Geliştirme ilkeleri
+
+1. Yerel model, yerel bellek, açık entegrasyonlar.
+2. Varsayılan reddetme ve en az ayrıcalık.
+3. Kararlı kimlikli onaylar; push ve harici yan etkiler için insan kontrolü.
+4. Güvenli hata mesajları, sınırlandırılmış dosya yükleme, SSRF savunması.
+5. Test, bağımlılık ve güvenlik taramalarıyla doğrulama.
+6. Bilgi “öğrenimi” otomatik model ağırlıklarını değiştirmez; araştırma girdileri doğrulanır, kaynakları izlenir ve yalnızca açıkça etkinleştirilmişse internet kullanılır.
 
 ## Bilinçli sınırlar
 
-Otonom şirket, gerçek trading, açık P2P sürü, IoT kontrolü **yok** — bilinçli.
+Otonom şirket, gerçek para ile alım-satım, izinsiz uzaktan kod çalıştırma, açık P2P ajan sürüsü ve izinsiz IoT kontrolü kapsam dışıdır. Finans modülü sanal/paper modunda kalmalıdır.
 
 ## Lisans
-
 MIT
