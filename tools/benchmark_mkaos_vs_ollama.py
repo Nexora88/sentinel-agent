@@ -19,7 +19,7 @@ PROMPTS = [
 
 def parse_memory_mb(value: str) -> float | None:
     try:
-        number, unit = value.strip().split()[0].split("/") [0], ""
+        number = value.strip().split()[0].split("/")[0]
         # docker stats returns e.g. '123.4MiB / 7.6GiB'; ps returns a numeric KiB value.
         import re
         match = re.fullmatch(r"([0-9.]+)\s*([KMGT]?i?B)?", number, re.IGNORECASE)
