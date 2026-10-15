@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -51,9 +53,15 @@ class PersonalMemory:
     def _load_profile(self) -> Dict[str, Any]:
         if self.profile_path.exists():
             try:
-                return json.loads(self.profile_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
+                data = json.loads(self.profile_path.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    raise ValueError("profile must be a JSON object")
+                return data
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Local profile is unreadable; preserve and recover {self.profile_path} before restarting."
+                ) from exc
+        now = datetime.utcnow().isoformat()
         return {
             "name": None,
             "preferred_language": "tr",
@@ -61,16 +69,35 @@ class PersonalMemory:
             "projects": [],
             "preferences": {},
             "facts": [],
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": now,
+            "updated_at": now,
         }
 
     def _save_profile(self) -> None:
         self._profile["updated_at"] = datetime.utcnow().isoformat()
-        self.profile_path.write_text(
-            json.dumps(self._profile, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        self.profile_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_name = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=str(self.profile_path.parent),
+                prefix=".profile-", suffix=".tmp", delete=False
+            ) as temp:
+                json.dump(self._profile, temp, ensure_ascii=False, indent=2)
+                temp.flush()
+                os.fsync(temp.fileno())
+                temp_name = temp.name
+            try:
+                os.chmod(temp_name, 0o600)
+            except OSError:
+                pass
+            os.replace(temp_name, self.profile_path)
+            try:
+                os.chmod(self.profile_path, 0o600)
+            except OSError:
+                pass
+        finally:
+            if temp_name and os.path.exists(temp_name):
+                os.unlink(temp_name)
 
     @property
     def profile(self) -> Dict[str, Any]:
