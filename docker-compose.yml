@@ -1,24 +1,24 @@
-version: "3.8"
-
 services:
   sentinel:
     build: .
     container_name: sentinel-agent
     ports:
-      - "${WEB_PORT:-8000}:8000"
+      - "127.0.0.1:${WEB_PORT:-8000}:8000"
     environment:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5-coder:32b}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5-coder:7b}
+      - OLLAMA_MODEL_FAST=${OLLAMA_MODEL_FAST:-qwen2.5-coder:7b}
+      - OLLAMA_MODEL_DEEP=${OLLAMA_MODEL_DEEP:-qwen2.5-coder:7b}
       - OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - WHATSAPP_PHONE=${WHATSAPP_PHONE:-}
       - WHATSAPP_APIKEY=${WHATSAPP_APIKEY:-}
-      - OWNER_PASSWORD=${OWNER_PASSWORD:-sentinel-change-me}
-      - AUTH_REQUIRED=${AUTH_REQUIRED:-false}
+      - OWNER_PASSWORD=${OWNER_PASSWORD:-}
+      - AUTH_REQUIRED=${AUTH_REQUIRED:-true}
       - REQUIRE_APPROVAL=${REQUIRE_APPROVAL:-true}
       - WEB_PORT=8000
     volumes:
-      # Persistent growing knowledge + personal memory (cloud disk space)
+      # Persistent local knowledge and memory. Keep this volume backed up.
       - sentinel_memory:/app/memory
       - ./config:/app/config:ro
     restart: unless-stopped
