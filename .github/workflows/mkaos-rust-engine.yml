@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "engine/mkaos-inference/**"
+      - "engine/mkaos-hf-adapter/**"
       - ".github/workflows/mkaos-rust-engine.yml"
       - "tools/fetch_model.py"
       - "tools/convert_safetensors_to_mkaosw1.py"
@@ -31,5 +32,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Check Python tool syntax
         run: python -m py_compile tools/fetch_model.py tools/convert_safetensors_to_mkaosw1.py
-      - name: Run unit tests
+      - name: Run core unit tests
         run: cargo test --manifest-path engine/mkaos-inference/Cargo.toml
+      - name: Run Hugging Face adapter tests
+        run: cargo test --manifest-path engine/mkaos-hf-adapter/Cargo.toml
