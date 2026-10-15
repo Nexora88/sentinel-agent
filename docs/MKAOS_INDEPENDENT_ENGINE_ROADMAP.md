@@ -1,39 +1,31 @@
 # MKAOS bağımsız çıkarım motoru yol haritası
 
-## Hedef ve dürüst durum
+## Hedef ve doğrulanmış kapsam
 
-MKAOS'un uzun vadeli hedefi, model çalışma zamanı üzerinde mimari kontrolü artırmak ve Ollama gibi harici çalışma zamanlarına zorunlu bağımlılığı zaman içinde azaltmaktır. Bu, tek bir PR ile tamamlanmış değildir. `engine/mkaos-inference` altında harici crate bağımlılığı olmayan, `unsafe` kodu yasaklayan Rust CPU çekirdeği bulunur.
+Amaç, model çalışma zamanı üzerindeki mimari kontrolü artırıp Ollama gibi harici çalışma zamanlarına zorunlu bağımlılığı kontrollü biçimde azaltmaktır. Tek bir değişiklikle tam bağımsızlık iddiası yapılmaz.
 
-**Şu anki gerçek kapsam:** F32 tensör işlemleri, matris çarpımı/transpoz, softmax, RMSNorm, token embedding lookup, RoPE, gelecek tokenları maskeleyen causal attention, çok başlıklı attention, residual bağlantıları, SwiGLU ve tek decoder bloğu için forward pass. Kaynak koduna deterministik testler eklendi. Bu, eğitilmiş bir LLM'nin çalıştığı anlamına gelmez: henüz tokenizer, doğrulanmış checkpoint okuyucu, birden çok decoder bloğu, final norm + LM head/logit üretimi, token sampling, KV cache, kuantizasyon, SIMD/GPU ve uçtan uca metin üretimi yoktur. Testler CI'da çalışıp sonuçları doğrulanmadan başarılı kabul edilmemelidir.
+Şu an çekirdekte F32 tensörler, embedding lookup, RoPE, causal attention, tek decoder bloğu, SHA-256, sınırlandırılmış özel checkpoint okuyucusu, byte tokenizer ve token sampling yardımcıları bulunur. Bunlar temel altyapıdır; henüz eğitilmiş bir dil modelini uçtan uca çalıştıran runtime değildir.
 
-## Aşamalı plan
+## Aşamalar
 
-1. **Denetlenebilir çekirdek:** boyut/taşma/NaN kontrolleri, deterministik CPU işlemleri, birim testleri ve referans sonuçlarla karşılaştırma.
-2. **Decoder katmanı:** embedding, RoPE, causal mask, çok başlıklı attention, RMSNorm, residual ve SwiGLU için uçtan uca referans forward pass. Sonraki iş: referans uygulamayla diferansiyel sayısal testler ve sınır koşulları.
-3. **Model sözleşmesi ve yükleyici:** sürümlü manifest; tensör adları/şekilleri, tokenizer kimliği, ağırlık hash'leri, sayısal tür ve lisans/menşe alanları. Dosya boyutu, hash, sınırlar ve tahsisler doğrulanmadan ağırlıklar yüklenmemeli.
-4. **Tokenizer ve küçük referans model:** küçük, açık lisanslı test modeliyle uçtan uca tokenleştirme ve üretim; mevcut model aileleriyle uyumluluk ancak lisans ve format incelemesinden sonra.
-5. **Tam model döngüsü:** çok katmanlı decoder, final norm + LM head, logits/sampling, EOS/stop koşulları ve ardından KV cache. Aynı token dizisiyle full-pass ve incremental decode sonuçları karşılaştırılmalı.
-6. **Bellek ve performans:** önce F32 doğruluğu, sonra F16/BF16/INT8/INT4 gibi türler için ölçümlü optimizasyon. SIMD ve GPU/NPU yolları yalnızca gerçek cihaz benchmark'ı varsa desteklenmiş ilan edilir.
-7. **Model uyarlama:** önce izinli veri ve uygun lisanslı temel ağırlık üzerinde LoRA/QLoRA; sıfırdan temel model eğitimi ayrı GPU/veri/uzmanlık bütçesi ister.
-8. **Kontrollü sürekli gelişim:** üretim konuşmaları varsayılan olarak eğitim verisi olmaz. İzin, kaynağın lisansı, kişisel veri temizliği, insan değerlendirmesi ve sabit holdout testleri gerekir. Aday ağırlıklar otomatik olarak kararlı sürümün üzerine yazılmaz.
-9. **Kademeli bağımsızlık:** aynı sabit değerlendirme kümesinde doğruluk, güvenlik, RAM/VRAM, gecikme ve enerji ölçümleri karşılaştırılır. Bağımsız motor eşit veya daha iyi sonuçları tekrarlanabilir biçimde verene kadar mevcut backend geri dönüş seçeneği olarak kalır.
+1. **Denetlenebilir CPU çekirdeği:** boyut/taşma/NaN denetimleri, deterministik testler ve referans karşılaştırmaları.
+2. **Checkpoint güvenliği:** dosya boyutu sınırı, SHA-256, sürümlü container, tensor isim/şekil doğrulaması ve lisans/menşe manifesti. Hash tek başına kaynak veya lisans doğrulaması değildir.
+3. **Tokenizer + lisanslı küçük model:** model kartı, lisans, kaynak URL, tokenizer dosyaları ve ağırlık hash'leri birlikte sabitlenir. ByteTokenizer yalnızca altyapı/test tokenizer'ıdır; BPE/SentencePiece yerine geçtiği iddia edilmez.
+4. **Tam decoder:** birden fazla katman, final norm, LM head, logits, EOS/stop yönetimi, greedy/top-k/top-p örnekleme ve gerçek K/V cache. Artımlı decode ile tüm prefix'i yeniden hesaplayan referans çıktıları tolerans içinde karşılaştırılır.
+5. **Güvenli model bağlama:** manifestteki her tensor adı ve şekli beklenen mimariyle karşılaştırılır; eksik, fazla veya uyuşmayan tensorlar yüklenmez.
+6. **Benchmark:** aynı prompt/test kümesinde metin çıktısı, görev doğruluğu, ilk token gecikmesi, token/s, toplam gecikme, tepe RSS/RAM, model boyutu ve hata oranı kaydedilir. Donanım, işletim sistemi, build profili, seed ve model hash'i rapora eklenir.
+7. **Kademeli geçiş:** bağımsız motor önce opt-in/deneysel seçenek, sonra kontrollü küçük kullanıcı grubu; kalite ve kararlılık eşiklerini tekrar tekrar geçtiğinde varsayılan. Ollama ancak bağımsız yolun işlevsel eşdeğerliği kanıtlanırsa kaldırılır.
+8. **Ölçümlü optimizasyon:** F32 referansından sonra quantization/SIMD/GPU. Her optimizasyon önceki sonuçla doğruluk ve bellek karşılaştırmasına tabi tutulur.
+9. **Sürekli gelişim:** kullanıcı konuşmaları varsayılan eğitim verisi olmaz. Açık izin, lisans, kişisel veri temizliği, insan değerlendirmesi ve sabit holdout seti gerekir; aday model otomatik olarak kararlı sürümün üzerine yazılmaz.
 
-## Türkçe ve kültürel veri egemenliği
+## Türkçe veri ve egemenlik
 
-- Kaynaklar kurum adıyla değil, her bir veri kaydının somut URL/kimlik, tarih, lisans/kullanım izni ve bütünlük hash'i ile kayıt altına alınır.
-- Türk Tarih Kurumu, devlet arşivleri ve akademik yayınlar için toplu veri alma veya eğitim izni varsayılmaz; her kaynağın telif, erişim şartları ve yeniden kullanım koşulları ayrı doğrulanır.
-- Tarihî olgulara mümkün olduğunda birincil kaynak, kaynaklar arası çapraz kontrol, dönem bağlamı ve güven düzeyi eklenir. Tartışmalı iddialar olgu gibi etiketlenmez; kaynak gösterimi model değerlendirmesinin parçasıdır.
-- Eğitim veri seti kaynak ve lisans bazında bölünür; aynı kaynaktan gelen metinlerin train/test'e dağılmasıyla oluşabilecek sızıntı önlenir.
-- Kullanıcı konuşmaları açık izin ve belgelenmiş saklama/silme politikası olmadan eğitime alınmaz. Veri seti manifesti ve reddedilen kayıt raporu sürümlenir.
-- Kumru AI veya başka Türkçe modellerle olası entegrasyon/ortaklık, teknik uyumluluk ve lisans koşulları incelenmeden var kabul edilmez.
+- Her veri kaydı için kaynak, tarih, lisans/izin ve bütünlük hash'i kaydedilir; kurum adı tek başına yeniden kullanım hakkı değildir.
+- Arşivler ve akademik yayınlar için toplu alma/eğitim izni varsayılmaz.
+- Tarihî iddialar mümkün olduğunda birincil kaynak ve çapraz kontrol ile değerlendirilir; tartışmalı iddialar olgu gibi etiketlenmez.
+- Train/test veri sızıntısı engellenir; veri seti manifesti ve reddedilen kayıt raporu sürümlenir.
+- Air-gapped iddiası sadece uygulama ayarıyla değil, işletim sistemi/firewall, DNS/egress kontrolleri ve ağ testleriyle doğrulanır.
 
-## Güvenlik ve çevrimdışı çalışma
+## Başarı ölçütleri
 
-- Derleme ve testler ağ erişimi gerektirmemelidir; bağımlılıksız Rust çekirdeği bu hedef için başlangıç noktasıdır.
-- Air-gapped iddiası yalnızca uygulama ayarıyla değil, işletim sistemi/firewall, konteyner ağı, DNS/egress denetimi ve gözlemlenebilir ağ testleriyle doğrulanır.
-- Siber güvenlik verileri savunmacı kullanım, izinli laboratuvar senaryoları, güvenli yama ve kod inceleme odaklı seçilir; gerçek hedeflere izinsiz saldırı yönergeleri eğitim hedefi yapılmaz.
-- Model cevapları güvenlik kararı veya tarihsel doğruluk garantisi sayılmaz; kaynak, belirsizlik ve insan doğrulaması gerekir.
-
-## Katkı ve araştırma iş akışı
-
-Her yeni kernel için: (1) matematiksel tanım, (2) sınır koşulları, (3) referans test, (4) CPU benchmark, (5) güvenlik incelemesi, (6) model lisans/menşe kontrolü eklenir. İyileştirme önerileri ölçüm raporuyla açılır; performans iddiası gerçek donanımda tekrarlanabilir sonuç olmadan yapılmaz.
+Her benchmark raporu model hash'i, lisans, donanım, OS, derleme ayarları, prompt/test seti sürümü, seed, token sayısı, doğruluk, ilk-token ve toplam gecikme, token/s, tepe RAM ve hata oranını içermelidir. Ollama karşılaştırması aynı makine ve aynı test setiyle yapılmalıdır. Sonuçlar elde edilmeden performans veya kalite üstünlüğü iddia edilmez.
