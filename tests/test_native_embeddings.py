@@ -116,7 +116,7 @@ class NativeHashEmbeddingTests(unittest.TestCase):
                 legacy = MemoryStore(
                     persist_directory=str(Path(temp) / "ollama"),
                     collection_name="shared_logical_memory",
-                    ollama=Mock(),
+                    ollama=Mock(embeddings=NativeHashEmbeddings()),
                 )
             self.assertNotEqual(native.storage_collection_name, legacy.storage_collection_name)
             self.assertTrue(native.storage_collection_name.endswith("_native_hash_v1"))
