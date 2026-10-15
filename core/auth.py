@@ -148,6 +148,21 @@ class AuthManager:
         }
         return token
 
+    def create_session_for_verified_user(self, username: str) -> Optional[str]:
+        """Create a session only after an external authenticator has verified the account."""
+        username = username.lower().strip()
+        user = self._users.get(username)
+        if not user or not user.get("active"):
+            return None
+        token = secrets.token_urlsafe(32)
+        self.sessions[token] = {
+            "username": username,
+            "role": user["role"],
+            "display_name": user["display_name"],
+            "expires": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+        }
+        return token
+
     def validate(self, token: Optional[str]) -> Optional[dict]:
         if not token:
             return None
