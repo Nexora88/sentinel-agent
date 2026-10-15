@@ -26,4 +26,4 @@ Automated substring checks are smoke tests, not a substitute for semantic evalua
 
 ## Current status
 
-The prompt set exists, but there are no benchmark measurements yet because the Rust runtime cannot currently load the selected pretrained model. Ollama remains enabled as the fallback. Do not fill results with estimates or synthetic numbers.
+The fixed Turkish smoke set is `mkaos_quality_v1.json`; it covers instruction following, arithmetic, coding, honesty and a date-reasoning check. CI runs it against MKAOS and a local Ollama model, then uploads `mkaos-quality-report.json` alongside the latency benchmark. These checks are lexical diagnostics, not expert semantic grading. The report's process wall time includes MKAOS model/tokenizer loading; use `inference_total_ms` for the generation interval. Ollama remains enabled as the fallback until quality and device acceptance gates pass. CI results are not target-device measurements.
