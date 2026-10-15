@@ -25,8 +25,8 @@ class ApprovedGitHubExecutionTests(unittest.TestCase):
         )
         request_id = notice.split("Request ID: ", 1)[1].splitlines()[0]
         self.assertTrue(self.manager.approve(request_id))
-        request = self.manager.get_request(request_id)
         self.assertTrue(self.manager.begin_execution(request_id))
+        request = self.manager.get_request(request_id)
         result = self.client.execute_approved_request(request)
         self.assertIn("https://github.com/example/project/issues/1", result)
         self.assertTrue(self.manager.finish_execution(request_id, True, result))
@@ -39,6 +39,7 @@ class ApprovedGitHubExecutionTests(unittest.TestCase):
 
     def test_unknown_action_never_dispatches(self):
         request = {
+            "status": "executing",
             "action": "push_to_remote",
             "context": {"owner": "example", "repo": "project", "title": "unexpected"},
         }
@@ -46,8 +47,19 @@ class ApprovedGitHubExecutionTests(unittest.TestCase):
             self.client.execute_approved_request(request)
         self.client._post.assert_not_called()
 
+    def test_unclaimed_approval_is_rejected(self):
+        request = {
+            "status": "approved",
+            "action": Action.OPEN_GITHUB_ISSUE.value,
+            "context": {"owner": "example", "repo": "project", "title": "test"},
+        }
+        with self.assertRaises(ValueError):
+            self.client.execute_approved_request(request)
+        self.client._post.assert_not_called()
+
     def test_invalid_repository_name_is_rejected(self):
         request = {
+            "status": "executing",
             "action": Action.OPEN_GITHUB_ISSUE.value,
             "context": {"owner": "example", "repo": "../secret", "title": "test"},
         }
