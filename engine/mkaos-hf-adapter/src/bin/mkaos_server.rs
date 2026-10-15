@@ -49,13 +49,13 @@ fn send_response(stream: &mut TcpStream, status: &str, content_type: &str, body:
 }
 
 fn send_stream_headers(stream: &mut TcpStream) -> std::io::Result<()> {
-    write!(stream, "HTTP/1.1 200 OK\\r\\nContent-Type: application/x-ndjson\\r\\nConnection: close\\r\\nCache-Control: no-cache, no-store\\r\\nX-Accel-Buffering: no\\r\\n\\r\\n")?;
+    write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\nConnection: close\r\nCache-Control: no-cache, no-store\r\nX-Accel-Buffering: no\r\n\r\n")?;
     stream.flush()
 }
 
 fn send_stream_line(stream: &mut TcpStream, value: Value) -> std::io::Result<()> {
     serde_json::to_writer(&mut *stream, &value).map_err(std::io::Error::other)?;
-    stream.write_all(b"\\n")?;
+    stream.write_all(b"\n")?;
     stream.flush()
 }
 
