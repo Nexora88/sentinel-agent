@@ -84,14 +84,14 @@ class NightScheduler:
         if not self._run_lock.acquire(blocking=False):
             raise RuntimeError("Gece denetimi zaten çalışıyor; ikinci döngü başlatılmadı.")
         started = self._now()
-        self._write_state({
-            "status": "running",
-            "started_at": started,
-            "finished_at": None,
-            "summary": "Yerel denetim sürüyor.",
-            "error": None,
-        })
         try:
+            self._write_state({
+                "status": "running",
+                "started_at": started,
+                "finished_at": None,
+                "summary": "Yerel denetim sürüyor.",
+                "error": None,
+            })
             result = self.runner() or {}
             summary = str(result.get("summary") or "Denetim tamamlandı.")[:800]
             state = {
