@@ -38,10 +38,14 @@ window.fetch = async (input, init = {}) => {
   const headers = new Headers(sourceHeaders);
   if (authToken) headers.set("Authorization", "Bearer " + authToken);
   let response = await nativeFetch(input, { ...init, headers });
-  if (response.status === 401 && await requestLogin()) {
-    const retryHeaders = new Headers(sourceHeaders);
-    retryHeaders.set("Authorization", "Bearer " + authToken);
-    response = await nativeFetch(input, { ...init, headers: retryHeaders });
+  if (response.status === 401) {
+    authToken = "";
+    sessionStorage.removeItem("seka.session");
+    if (await requestLogin()) {
+      const retryHeaders = new Headers(sourceHeaders);
+      retryHeaders.set("Authorization", "Bearer " + authToken);
+      response = await nativeFetch(input, { ...init, headers: retryHeaders });
+    }
   }
   return response;
 };
