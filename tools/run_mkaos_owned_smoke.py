@@ -61,6 +61,14 @@ def main() -> int:
              "--context-length", "16", "--width", "8", "--layers", "1", "--heads", "2",
              "--kv-heads", "1", "--intermediate-size", "16", "--min-records-per-split", "2",
              "--device", "cpu"])
+        training_report = json.loads((checkpoint_dir / "training-report.json").read_text(encoding="utf-8"))
+        if training_report.get("test_split_used_for_training") is not False:
+            raise AssertionError("held-out test split was not explicitly excluded from training")
+        heldout_loss = training_report.get("heldout_test_loss")
+        if not isinstance(heldout_loss, (int, float)) or not math.isfinite(heldout_loss):
+            raise AssertionError("finite held-out test loss was not recorded")
+        if training_report.get("heldout_test_target_tokens", 0) <= 0:
+            raise AssertionError("held-out test evaluation counted no target tokens")
         run([sys.executable, "tools/export_mkaos_rust_checkpoint.py", "--checkpoint",
              str(checkpoint_dir / "mkaos-rust-compatible.pt"), "--output-dir", str(export_dir)])
         sidecar = json.loads((export_dir / "mkaos-rust-gqa-v1.manifest.json").read_text(encoding="utf-8"))
@@ -146,7 +154,7 @@ def main() -> int:
                   "quality_claims_permitted": False, "test_split_used_for_training": False,
                   "checkpoint_sha256": sidecar["checkpoint_sha256"], "prefix_utf8": "MKAOS",
                   "vocab_size": len(py_logits), "max_absolute_logit_error": max_abs,
-                  "tolerance": 1e-3, "training_steps": 4,
+                  "tolerance": 1e-3, "training_steps": 4, "synthetic_heldout_test_loss": heldout_loss,
                   "note": "Pipeline and numerical parity smoke only; not an independent Turkish quality evaluation."}
         print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0
