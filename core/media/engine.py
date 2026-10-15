@@ -110,7 +110,7 @@ class MediaEngine:
         try:
             from PIL import Image, ImageDraw, ImageFont
             import textwrap
-            output_dir = Path("./memory/generated_images").resolve()
+            output_dir = (self.state_path.parent / "generated_images").resolve()
             output_dir.mkdir(parents=True, exist_ok=True)
             image = Image.new("RGB", (1200, 675), (8, 17, 33))
             draw = ImageDraw.Draw(image)
