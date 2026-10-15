@@ -64,6 +64,80 @@ pub struct GqaDecoder {
     kv_width: usize,
 }
 impl GqaDecoder {
+    /// Assemble a decoder only when the checkpoint has the exact owned-model tensor contract.
+    /// The caller must verify checkpoint SHA-256 before invoking this function.
+    pub fn from_checkpoint(
+        config: GqaConfig,
+        checkpoint: &crate::checkpoint::Checkpoint,
+    ) -> Result<Self, KernelError> {
+        use std::collections::BTreeMap;
+        let embedding = checkpoint.tensors.get("token_embedding.weight")
+            .ok_or(KernelError::InvalidConfig)?;
+        let vocab = embedding.rows();
+        let d = embedding.cols();
+        let mut layer_count = 0usize;
+        while checkpoint.tensors.contains_key(&format!("layers.{layer_count}.q_proj.weight")) {
+            layer_count += 1;
+            if layer_count > 1024 { return Err(KernelError::InvalidConfig); }
+        }
+        if layer_count == 0 { return Err(KernelError::InvalidConfig); }
+        let head_dim = d.checked_div(config.query_heads).ok_or(KernelError::InvalidConfig)?;
+        if config.query_heads == 0 || config.kv_heads == 0
+            || config.query_heads % config.kv_heads != 0 || d % config.query_heads != 0 {
+            return Err(KernelError::InvalidConfig);
+        }
+        let kv_width = config.kv_heads.checked_mul(head_dim).ok_or(KernelError::InvalidDimension)?;
+        let intermediate = checkpoint.tensors.get("layers.0.gate_proj.weight")
+            .ok_or(KernelError::InvalidConfig)?.cols();
+        let mut expected = BTreeMap::new();
+        expected.insert("token_embedding.weight".to_owned(), (vocab, d));
+        expected.insert("final_norm.weight".to_owned(), (1, d));
+        expected.insert("lm_head.weight".to_owned(), (d, vocab));
+        for i in 0..layer_count {
+            let p = format!("layers.{i}.");
+            expected.insert(format!("{p}input_norm.weight"), (1, d));
+            expected.insert(format!("{p}q_proj.weight"), (d, d));
+            expected.insert(format!("{p}k_proj.weight"), (d, kv_width));
+            expected.insert(format!("{p}v_proj.weight"), (d, kv_width));
+            expected.insert(format!("{p}o_proj.weight"), (d, d));
+            expected.insert(format!("{p}post_attention_norm.weight"), (1, d));
+            expected.insert(format!("{p}gate_proj.weight"), (d, intermediate));
+            expected.insert(format!("{p}up_proj.weight"), (d, intermediate));
+            expected.insert(format!("{p}down_proj.weight"), (intermediate, d));
+        }
+        crate::checkpoint::validate_tensor_shapes(checkpoint, &expected)
+            .map_err(|_| KernelError::InvalidConfig)?;
+        let tensor = |name: &str| -> Result<Tensor2, KernelError> {
+            checkpoint.tensors.get(name).cloned().ok_or(KernelError::InvalidConfig)
+        };
+        let norm = |name: &str| -> Result<Vec<f32>, KernelError> {
+            let t = checkpoint.tensors.get(name).ok_or(KernelError::InvalidConfig)?;
+            if t.rows() != 1 || t.cols() != d { return Err(KernelError::InvalidConfig); }
+            Ok(t.as_slice().to_vec())
+        };
+        let mut layers = Vec::with_capacity(layer_count);
+        for i in 0..layer_count {
+            let p = format!("layers.{i}.");
+            layers.push(GqaLayerWeights {
+                q_proj: tensor(&format!("{p}q_proj.weight"))?,
+                k_proj: tensor(&format!("{p}k_proj.weight"))?,
+                v_proj: tensor(&format!("{p}v_proj.weight"))?,
+                o_proj: tensor(&format!("{p}o_proj.weight"))?,
+                input_norm: norm(&format!("{p}input_norm.weight"))?,
+                post_attention_norm: norm(&format!("{p}post_attention_norm.weight"))?,
+                gate_proj: tensor(&format!("{p}gate_proj.weight"))?,
+                up_proj: tensor(&format!("{p}up_proj.weight"))?,
+                down_proj: tensor(&format!("{p}down_proj.weight"))?,
+            });
+        }
+        Self::new(config, GqaDecoderWeights {
+            token_embedding: tensor("token_embedding.weight")?,
+            layers,
+            final_norm: norm("final_norm.weight")?,
+            lm_head: tensor("lm_head.weight")?,
+        })
+    }
+
     pub fn new(config: GqaConfig, weights: GqaDecoderWeights) -> Result<Self, KernelError> {
         let d = weights.token_embedding.cols();
         if d == 0 || config.query_heads == 0 || config.kv_heads == 0
