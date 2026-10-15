@@ -5,6 +5,7 @@ services:
     ports:
       - "127.0.0.1:${WEB_PORT:-8000}:8000"
     environment:
+      - SEKA_EMBEDDINGS_PROVIDER=${SEKA_EMBEDDINGS_PROVIDER:-mkaos-native}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
       - MKAOS_BASE_URL=${MKAOS_BASE_URL:-http://mkaos:11435}
       - MKAOS_MODEL_NAME=${MKAOS_MODEL_NAME:-mkaos-local}
@@ -86,8 +87,9 @@ services:
       retries: 3
       start_period: 120s
 
-  # Temporary embedding-only dependency; chat generation never uses this service.
+  # Optional legacy embedding provider; not started unless its profile is enabled.
   ollama:
+    profiles: ["legacy-ollama-embeddings"]
     image: ollama/ollama:0.12.6
     container_name: seka-ollama
     volumes:
