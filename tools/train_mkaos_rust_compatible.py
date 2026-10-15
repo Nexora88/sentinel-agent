@@ -86,10 +86,11 @@ def main():
     random.seed(a.seed); torch.manual_seed(a.seed)
     if torch.cuda.is_available(): torch.cuda.manual_seed_all(a.seed)
     def stream(records):
-        out = bytearray()
+        # EOS=256 is outside bytearray's 0..255 range; keep token IDs as integers.
+        out = []
         for record in records:
             out.extend(record.encode("utf-8")); out.append(EOS_ID)
-        return torch.tensor(list(out), dtype=torch.long)
+        return torch.tensor(out, dtype=torch.long)
     train = stream(splits["train"]); valid = stream(splits["validation"])
     if len(train) <= a.context_length or len(valid) <= a.context_length:
         p.exit(2, "Train and validation streams must exceed context-length.\n")
