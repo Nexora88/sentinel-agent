@@ -217,7 +217,7 @@ async def startup():
     # Keep the web process available even if Ollama/models are temporarily offline.
     # Nightly maintenance writes reports/proposals only; it never edits or pushes code.
     global night_scheduler
-    logger.info("MKAOS v6.4 — lazy local model initialization")
+    logger.info("MKAOS v6.5 — lazy local model initialization")
     enabled = os.getenv("SEKA_NIGHT_AUTORUN", "true").strip().lower() in {"1", "true", "yes", "on"}
     try:
         night_scheduler = NightScheduler(
