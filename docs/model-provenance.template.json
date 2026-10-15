@@ -1,0 +1,18 @@
+{
+  "model_name": "",
+  "version": "",
+  "quantization": "",
+  "license_name": "",
+  "license_url": "",
+  "upstream_repository_url": "",
+  "origin_evidence_url": "",
+  "weights_sha256": "",
+  "weights_file_name": "",
+  "weights_size_bytes": null,
+  "downloaded_at_utc": "",
+  "tested_device": "",
+  "tested_runtime": "",
+  "verification_status": "unverified",
+  "verification_notes": "",
+  "turkish_evaluation_report": ""
+}
