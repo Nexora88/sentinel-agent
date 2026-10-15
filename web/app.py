@@ -94,8 +94,8 @@ LEGACY_CHAT_HISTORY_FILE = Path("./memory/chat_history.json")
 
 
 def _load_chat_history() -> dict:
-    if _encrypt_memory_files and LEGACY_CHAT_HISTORY_FILE.exists() and not CHAT_HISTORY_FILE.exists():
-        raise RuntimeError("Plaintext chat history exists while encrypted memory is enabled; migrate it explicitly.")
+    if _encrypt_memory_files and LEGACY_CHAT_HISTORY_FILE.exists():
+        raise RuntimeError("Plaintext chat history remains while encrypted memory is enabled; verify a protected backup and encrypted copy, then move or remove the plaintext file explicitly.")
     if not CHAT_HISTORY_FILE.exists():
         return {}
     try:
