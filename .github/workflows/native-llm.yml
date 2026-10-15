@@ -23,13 +23,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Format source in runner and test
+      - name: Check and test native runtime foundation
         working-directory: mkaos-llm
         run: |
           cargo fmt --all
           cargo test
-      - name: Upload formatted source for review
-        uses: actions/upload-artifact@v4
-        with:
-          name: mkaos-llm-formatted-source
-          path: mkaos-llm/src/lib.rs
+          cargo clippy --all-targets
