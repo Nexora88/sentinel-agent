@@ -10,6 +10,27 @@ permissions:
   contents: read
 
 jobs:
+  portable-unit-tests:
+    name: Portable unit tests (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.11', '3.12']
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Test portable hardware profile and integration policy
+        run: |
+          python -m unittest discover -s tests -p test_runtime_profile.py -v
+          python -m unittest discover -s tests -p test_integration_catalog.py -v
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
