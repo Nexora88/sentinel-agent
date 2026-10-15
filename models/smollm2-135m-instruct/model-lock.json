@@ -21,7 +21,7 @@
   },
   "architecture": {
     "transformers_architecture": "LlamaForCausalLM",
-    "note": "Grouped-query attention and model-native BPE/chat template are not yet supported by the current Rust decoder."
+    "note": "Rust SafeTensors loader, GQA decoder, and BPE adapter are implemented but not yet validated against real pinned artifacts; compatibility is not established until tokenizer and logits parity scripts pass."
   },
   "safety": "Only safetensors and JSON files are in scope. Never load pickle-based training_args.bin."
 }
