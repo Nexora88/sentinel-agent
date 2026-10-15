@@ -3,10 +3,11 @@
 //! implementation so BPE/ByteLevel behavior comes from the pinned tokenizer artifact.
 use std::path::Path;
 use tokenizers::{Encoding, Tokenizer};
+type TokenizerError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Debug)]
 pub enum AdapterError {
-    Tokenizer(tokenizers::Error),
+    Tokenizer(TokenizerError),
     InvalidRole(String),
     EmptyMessages,
 }
@@ -20,8 +21,8 @@ impl std::fmt::Display for AdapterError {
     }
 }
 impl std::error::Error for AdapterError {}
-impl From<tokenizers::Error> for AdapterError {
-    fn from(value: tokenizers::Error) -> Self { Self::Tokenizer(value) }
+impl From<TokenizerError> for AdapterError {
+    fn from(value: TokenizerError) -> Self { Self::Tokenizer(value) }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
