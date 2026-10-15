@@ -1,7 +1,7 @@
 //! MKAOS: dependency-free, auditable CPU inference primitives.
 //! Reference implementation for small models, not a fast production runtime.
-//! Supports one decoder layer and one token sequence per call. No tokenizer,
-//! checkpoint loader, batching, KV cache, quantization or GPU backend yet.
+//! Includes a single synthetic decoder block, bounded checkpoint reader, byte tokenizer,
+//! sampling helpers, and a full-prefix generation driver. No real model adapter or KV cache yet.
 #![forbid(unsafe_code)]
 
 pub mod checkpoint;
