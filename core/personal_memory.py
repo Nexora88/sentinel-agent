@@ -241,12 +241,13 @@ class PersonalMemory:
             if remove:
                 collection.delete(ids=remove)
                 deleted_vectors = len(remove)
-        before = len(self._profile.get("facts", []))
-        self._profile["facts"] = [fact for fact in self._profile.get("facts", []) if phrase not in str(fact).casefold()]
-        deleted_facts = before - len(self._profile["facts"])
-        if deleted_facts:
-            self._save_profile()
+        # Profile facts have no per-fact timestamp in the existing schema. Preserve them
+        # during bounded-window deletion because their age cannot be established.
+        deleted_facts = 0
+        preserved_facts = sum(1 for fact in self._profile.get("facts", []) if phrase in str(fact).casefold())
         return {"deleted_vector_records": deleted_vectors, "deleted_profile_facts": deleted_facts,
-                "scope": "personal vector memory and profile facts; exact phrase match; requested time window",
-                "limitations": ["Bu işlem yedekleri, dışa aktarımları, sistem günlüklerini veya model ağırlıklarını temizlemez.",
+                "unscoped_profile_facts_preserved": preserved_facts,
+                "scope": "timestamped personal vector records; exact phrase match; requested time window",
+                "limitations": ["Zaman damgası olmayan profil gerçekleri korunur; ayrıca incelenmelidir.",
+                                "Bu işlem yedekleri, dışa aktarımları, sistem günlüklerini veya model ağırlıklarını temizlemez.",
                                 "Bu bir adli veri imha/SSD secure erase garantisi değildir."]}
