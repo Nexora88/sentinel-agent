@@ -85,6 +85,7 @@ def run_server_case(case: dict, args: argparse.Namespace) -> tuple[dict, float]:
         "prefill_ms": int(raw.get("prompt_eval_duration", 0) or 0) / 1e6,
         "first_token_ms": None,
         "tokens_per_second": eval_count / (eval_ns / 1e9) if eval_ns > 0 else None,
+        "prefix_cache_hit": raw.get("mkaos_prefix_cache_hit"),
     }
     return output, elapsed_ms
 
@@ -136,6 +137,7 @@ def main() -> int:
             "prefill_ms": output.get("prefill_ms"),
             "first_token_ms": output.get("first_token_ms"),
             "tokens_per_second": output.get("tokens_per_second"),
+            "prefix_cache_hit": output.get("prefix_cache_hit"),
             "wall_time_ms_including_process_and_request": round(elapsed_ms, 2),
         })
 
