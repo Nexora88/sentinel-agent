@@ -86,6 +86,7 @@ function switchPanel(name) {
   if (name === "universe") loadUniverse();
   if (name === "approvals") loadApprovals();
   if (name === "status") loadStatus();
+  if (name === "control") loadControlRoom();
   if (name === "github") loadGithub();
   if (name === "finance") loadPortfolio();
   if (name === "curiosity") loadCuriosity();
@@ -1047,3 +1048,65 @@ addMessage(
     "• Paper finans · merak · gece · podcast taslağı\n\n" +
     "Ağ özellikleri varsayılan kapalıdır; çevrimdışı profil internet çıkışını sınırlar."
 );
+
+
+async function loadControlRoom() {
+  const statusBox = $("#sovereignty-status-card");
+  const capsBox = $("#media-capabilities");
+  if (!statusBox || !capsBox) return;
+  try {
+    const [sr, mr, jr] = await Promise.all([
+      fetch("/api/sovereignty"), fetch("/api/media/capabilities"), fetch("/api/media/jobs")
+    ]);
+    const sovereignty = await sr.json(), media = await mr.json(), jobs = await jr.json();
+    statusBox.replaceChildren();
+    const title = document.createElement("h3");
+    title.textContent = String(sovereignty.label || "Egemenlik doğrulanamadı");
+    const state = document.createElement("p");
+    state.textContent = "Durum: " + String(sovereignty.state || "unknown") +
+      " · Tam egemen: " + (sovereignty.fully_sovereign ? "evet" : "doğrulanmadı") +
+      " · AIR-GAPPED: " + (sovereignty.air_gapped_verified ? "evet" : "doğrulanmadı");
+    const limits = document.createElement("ul");
+    (sovereignty.limitations || []).forEach((line) => { const li=document.createElement("li"); li.textContent=String(line); limits.appendChild(li); });
+    statusBox.append(title, state, limits);
+    capsBox.textContent = JSON.stringify({bridge:media.bridge,engine:media.engine,video_mode:media.video_mode}, null, 2);
+    const list=$("#media-jobs-list"); list.replaceChildren();
+    if (!(jobs.jobs || []).length) { const empty=document.createElement("p"); empty.className="empty"; empty.textContent="Henüz medya görevi yok."; list.appendChild(empty); }
+    (jobs.jobs || []).forEach((job) => {
+      const card=document.createElement("div"); card.className="approval-card";
+      const detail=document.createElement("div"); detail.className="details";
+      const name=document.createElement("div"); name.className="action-name"; name.textContent=job.operation+" · "+job.id;
+      const desc=document.createElement("div"); desc.textContent=job.status+" — "+(job.reason||"");
+      detail.append(name,desc); card.appendChild(detail);
+      if (job.status==="queued") {
+        const run=document.createElement("button"); run.textContent="Kaynak uygunsa çalıştır";
+        run.addEventListener("click", async()=>{ const res=await fetch("/api/media/jobs/"+encodeURIComponent(job.id)+"/run",{method:"POST"}); const d=await res.json(); desc.textContent=d.status+" — "+(d.reason||d.result?.error||""); loadControlRoom(); });
+        card.appendChild(run);
+      }
+      list.appendChild(card);
+    });
+  } catch (_) { statusBox.textContent="Egemenlik/medya durumu alınamadı."; }
+}
+$("#queue-media-btn")?.addEventListener("click", async () => {
+  const prompt=$("#queue-media-prompt").value.trim();
+  const out=$("#media-capabilities");
+  if(!prompt){out.textContent="Önce bir görsel tarifi yaz.";return;}
+  const response=await fetch("/api/media/queue",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({operation:"generate",prompt})});
+  const data=await response.json();
+  out.textContent=response.ok ? "Görev kuyruğa eklendi: "+data.id+" · durum: "+data.status : (data.detail||"Görev eklenemedi.");
+  loadControlRoom();
+});
+$("#refresh-media-btn")?.addEventListener("click",loadControlRoom);
+$("#verify-approval-btn")?.addEventListener("click",async()=>{
+  const out=$("#approval-verify-result");
+  try {
+    const payload=JSON.parse($("#approval-payload").value);
+    const response=await fetch("/api/approval/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({payload,signature_b64:$("#approval-signature").value.trim()})});
+    const data=await response.json(); out.textContent=JSON.stringify(data,null,2);
+  } catch(error){out.textContent="Payload JSON geçersiz veya doğrulama başarısız.";}
+});
+$("#clean-room-audit-btn")?.addEventListener("click",async()=>{
+  const out=$("#clean-room-audit-result"); out.textContent="Yerel lisans ipuçları taranıyor…";
+  try{const response=await fetch("/api/audit/clean-room");const data=await response.json();out.textContent=JSON.stringify(data,null,2);}
+  catch(_){out.textContent="Denetim çalıştırılamadı.";}
+});
