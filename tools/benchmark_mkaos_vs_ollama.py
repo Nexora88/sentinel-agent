@@ -14,6 +14,8 @@ import threading
 import time
 import urllib.request
 
+SYSTEM_PROMPT = "Answer accurately and concisely. Respond in Turkish when the user writes in Turkish."
+
 PROMPTS = [
     "In one sentence, what is photosynthesis?",
     "Bir cümleyle Türkiye'nin başkentini söyle.",
@@ -40,7 +42,7 @@ def sample_ollama_rss(stop_event: threading.Event, peak: list) -> None:
 def ollama_once(base_url: str, model: str, prompt: str) -> dict:
     payload = json.dumps({
         "model": model, "prompt": prompt,
-        "system": "Answer accurately and concisely.", "stream": True,
+        "system": SYSTEM_PROMPT, "stream": True,
         "options": {"temperature": 0},
     }).encode()
     request = urllib.request.Request(
@@ -93,7 +95,9 @@ def mkaos_once(model_dir: str, prompt: str) -> dict:
         "--manifest-path", "engine/mkaos-hf-adapter/Cargo.toml",
         "--bin", "mkaos_generate", "--", model_dir, prompt, "96",
     ]
-    result = subprocess.run(command, capture_output=True, text=True, timeout=900)
+    child_env = dict(__import__("os").environ)
+    child_env["MKAOS_SYSTEM_PROMPT"] = SYSTEM_PROMPT
+    result = subprocess.run(command, capture_output=True, text=True, timeout=900, env=child_env)
     if result.returncode:
         raise RuntimeError(f"MKAOS run failed: {result.stderr[-4000:]}")
     try:
@@ -133,6 +137,7 @@ def main() -> int:
         "ollama_model": args.ollama_model,
         "runs": args.runs,
         "prompt_count_per_run": len(PROMPTS),
+        "system_prompt": SYSTEM_PROMPT,
         "results": results,
         "warning": "Greedy output equality is not a full quality metric. Compare task correctness, latency, token/s and RAM over repeated runs before removing Ollama.",
     }
