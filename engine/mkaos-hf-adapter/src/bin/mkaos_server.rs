@@ -205,10 +205,13 @@ fn generate(
     prefill_ns += prefill_start.elapsed().as_nanos();
     let decode_start = Instant::now();
     let mut generated = Vec::<u32>::new();
+    // Penalize repeats against the prompt and generated answer, not just tokens
+    // emitted in this response. Maintain the history incrementally to avoid a
+    // per-token allocation/copy on the decode hot path.
+    let mut repetition_context = prompt_ids.clone();
     for index in 0..max_new {
         let mut adjusted_logits = logits.clone();
-        let previous: Vec<usize> = generated.iter().map(|&token| token as usize).collect();
-        sampling::apply_repetition_penalty(&mut adjusted_logits, &previous, penalty).map_err(|e| e.to_string())?;
+        sampling::apply_repetition_penalty(&mut adjusted_logits, &repetition_context, penalty).map_err(|e| e.to_string())?;
         let sampled = if temperature <= 0.0 {
             sampling::greedy_sample(&adjusted_logits)
         } else {
@@ -217,6 +220,7 @@ fn generate(
         let token = sampled.map_err(|e| e.to_string())? as u32;
         if eos_ids.contains(&token) { break; }
         generated.push(token);
+        repetition_context.push(token as usize);
         if index + 1 < max_new {
             logits = model.step(token as usize, &mut cache).map_err(|e| e.to_string())?;
         }
@@ -316,9 +320,17 @@ fn main() {
     }
     let bind: SocketAddr = args.get(1).map(String::as_str).unwrap_or("127.0.0.1:11435")
         .parse().unwrap_or_else(|_| { eprintln!("invalid bind address"); process::exit(2) });
-    if !bind.ip().is_loopback() {
-        eprintln!("MKAOS server binds only to a loopback address; refusing network exposure");
+    // Default is loopback-only. Container deployments may opt in to a private,
+    // non-published Docker network using MKAOS_ALLOW_PRIVATE_BIND=true.
+    let allow_private_bind = env::var("MKAOS_ALLOW_PRIVATE_BIND")
+        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false);
+    if !bind.ip().is_loopback() && !(allow_private_bind && bind.ip().is_unspecified()) {
+        eprintln!("MKAOS server binds only to loopback by default; non-loopback bind requires MKAOS_ALLOW_PRIVATE_BIND=true");
         process::exit(2);
+    }
+    if !bind.ip().is_loopback() {
+        eprintln!("WARNING: MKAOS is bound to a container interface. Do not publish its port; use only on a trusted private Docker network.");
     }
     let model_dir = &args[0];
     let load_start = Instant::now();
