@@ -171,6 +171,19 @@ def main():
             with torch.no_grad():
                 vx,vy = batch(valid); valid_loss = float(F.cross_entropy(model(vx).reshape(-1,VOCAB_SIZE),vy.reshape(-1)).cpu())
             print(json.dumps({"step":step,"train_loss":round(last_loss,5),"validation_loss":round(valid_loss,5)}))
+    # Deterministic, full-stream held-out next-token loss; test records never enter optimizer batches.
+    model.eval(); test_loss_sum = 0.0; test_token_count = 0
+    with torch.no_grad():
+        for start in range(0, len(test) - 1, a.context_length):
+            count = min(a.context_length, len(test) - start - 1)
+            if count <= 0: break
+            tx = test[start:start + count].unsqueeze(0).to(device)
+            ty = test[start + 1:start + count + 1].unsqueeze(0).to(device)
+            tl = model(tx)
+            test_loss_sum += float(F.cross_entropy(tl.reshape(-1, VOCAB_SIZE), ty.reshape(-1), reduction="sum").cpu())
+            test_token_count += count
+    test_loss = test_loss_sum / max(1, test_token_count)
+
     a.output_dir.mkdir(parents=True, exist_ok=False)
     ckpt = a.output_dir / "mkaos-rust-compatible.pt"
     cfg = {"vocab_size":VOCAB_SIZE,"eos_token_id":EOS_ID,"hidden_size":a.width,"num_layers":a.layers,
@@ -185,7 +198,7 @@ def main():
       "tokenizer":{"kind":"project-owned-utf8-byte","vocab_size":VOCAB_SIZE,"eos_token_id":EOS_ID},
       "architecture":cfg,"optimizer":"AdamW","learning_rate":a.learning_rate,"seed":a.seed,"steps":a.steps,
       "device":device,"train_loss_first":round(first_loss,6),"train_loss_last":round(last_loss,6),
-      "validation_loss_last":round(valid_loss,6) if valid_loss is not None else None,
+      "validation_loss_last":round(valid_loss,6) if valid_loss is not None else None,\n      "heldout_test_loss":round(test_loss,6),"heldout_test_target_tokens":test_token_count,
       "elapsed_seconds":round(time.time()-started,3),"torch_version":torch.__version__,
       "rust_tensor_contract":"mkaos-rust-gqa-v1","production_ready":False,
       "note":"Architecture-compatible training checkpoint; run exporter, Rust shape validation, and held-out evaluation before use."}
