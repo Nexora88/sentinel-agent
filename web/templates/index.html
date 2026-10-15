@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SEKA v6.3 — Yerel Türkçe Ajan</title>
+  <title>MKAOS — Mustafa Kemal Atatürk Operating System</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -12,8 +12,8 @@
       <div class="logo">
         <span class="logo-icon">◈</span>
         <div class="logo-text">
-          <span class="brand">SEKA</span>
-          <span class="tag">v6.3 · yerel · güvenli</span>
+          <span class="brand">MKAOS</span>
+          <span class="tag">v6.4 · yerel ajan OS</span>
         </div>
       </div>
       <nav>
@@ -42,7 +42,7 @@
       <section id="panel-bridge" class="panel active">
         <header class="panel-header">
           <h1>Komut Köprüsü</h1>
-          <p>SEKA v6.3 — yerel Türkçe ajan. Ağ özellikleri varsayılan olarak kapalıdır.</p>
+          <p>MKAOS · İstikbal Siber Göklerdedir. Ağ durumu doğrulanmadan “tam egemen” sayılmaz.</p>
         </header>
         <div class="quick-grid">
           <button class="qcard" data-cmd="expand">🌌 Bilgi genişlet</button>
@@ -82,7 +82,7 @@
 
       <section id="panel-pulse" class="panel">
         <header class="panel-header">
-          <h1>Nabız — Neden SEKA?</h1>
+          <h1>MKAOS Nabız — İstikbal Siber Göklerdedir</h1>
           <p>İnternetteki sıradan chatbot’lardan farkın burada.</p>
         </header>
         <div id="manifesto-pillars" class="pillars"></div>
@@ -225,13 +225,33 @@
 
       <section id="panel-image" class="panel">
         <header class="panel-header">
-          <h1>Görsel</h1>
+          <h1>MKAOS Medya Stüdyosu</h1>
+          <p>Yerel görsel üretimi, görsel düzenleme, arka plan ve kısa video. Dış API yedeği yoktur.</p>
         </header>
-        <div class="universe-actions">
-          <input type="text" id="image-prompt" placeholder="Tarif..." />
-          <button id="image-btn" class="primary">Üret</button>
+        <div class="media-studio">
+          <div class="media-mode-row">
+            <label for="media-mode">İşlem</label>
+            <select id="media-mode">
+              <option value="generate">Metinden görsel üret</option>
+              <option value="edit">Görseli yapay zekâyla düzenle</option>
+              <option value="background">Arka planı değiştir</option>
+            </select>
+          </div>
+          <label for="media-file">Kaynak görsel (düzenleme / arka plan)</label>
+          <input id="media-file" type="file" accept="image/png,image/jpeg,image/webp" />
+          <label for="image-prompt">Görsel tarifi / düzenleme talimatı</label>
+          <textarea id="image-prompt" placeholder="Örn. sinematik, gerçekçi bir Kapadokya gün doğumu..." rows="3"></textarea>
+          <div class="media-mode-row">
+            <label for="background-color">Yeni arka plan rengi</label>
+            <input id="background-color" type="color" value="#172033" />
+          </div>
+          <div class="media-actions">
+            <button id="image-btn" class="primary">Yerel olarak işle</button>
+            <button id="video-btn" type="button">Son görselden kısa video</button>
+          </div>
+          <p class="media-note">Video, yerel ffmpeg ile görsele hareket efekti verir; bu aşamada metinden tam video modeli değildir. Gerçek model üretimi için kendi SD_API_URL sunucun ve model ağırlıkların gerekir.</p>
+          <div id="image-result" class="image-result" aria-live="polite"></div>
         </div>
-        <div id="image-result" class="image-result"></div>
       </section>
 
       <section id="panel-github" class="panel">
