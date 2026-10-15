@@ -32,7 +32,7 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Check Python tool syntax
-        run: python -m py_compile tools/fetch_model.py tools/convert_safetensors_to_mkaosw1.py tools/validate_tokenizer.py tools/validate_model_logits.py
+        run: python -m py_compile tools/fetch_model.py tools/convert_safetensors_to_mkaosw1.py tools/validate_tokenizer.py tools/validate_model_logits.py tools/benchmark_mkaos_vs_ollama.py
       - name: Run core unit tests
         run: cargo test --manifest-path engine/mkaos-inference/Cargo.toml
       - name: Run Hugging Face adapter tests
