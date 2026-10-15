@@ -34,8 +34,8 @@ class SignedApprovalProtocol:
                 with self.audit_path.open("r", encoding="utf-8") as audit_file:
                     for line in audit_file:
                         previous = json.loads(line)
-                    if previous.get("request_id") == str(payload["request_id"]) and previous.get("result") == "signature_validated":
-                        raise ApprovalProtocolError("Bu onay isteği daha önce kullanılmış; replay engellendi.")
+                        if previous.get("request_id") == str(payload["request_id"]) and previous.get("result") == "signature_validated":
+                            raise ApprovalProtocolError("Bu onay isteği daha önce kullanılmış; replay engellendi.")
             except ApprovalProtocolError:
                 raise
             except (OSError, ValueError):
