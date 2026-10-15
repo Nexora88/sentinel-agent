@@ -59,7 +59,22 @@ def voice_status() -> dict:
     }
 
 
-def synthesize(text: str, voice: str = "male", cat_mode: bool = False) -> bytes:
+def speech_length_scale(voice: str, pace: float = 1.0) -> float:
+    """Return a bounded Piper length scale for a voice character and speaking pace."""
+    if voice not in VOICE_MODELS:
+        raise LocalVoiceError("Ses seçimi geçersiz.")
+    try:
+        pace_value = float(pace)
+    except (TypeError, ValueError) as exc:
+        raise LocalVoiceError("Konuşma hızı 0,85 ile 1,15 arasında olmalı.") from exc
+    if not 0.85 <= pace_value <= 1.15:
+        raise LocalVoiceError("Konuşma hızı 0,85 ile 1,15 arasında olmalı.")
+    # Male profile is deliberately slower/deeper; female profile is brisker.
+    base_scale = 1.08 if voice == "male" else 0.92
+    return round(base_scale / pace_value, 3)
+
+
+def synthesize(text: str, voice: str = "male", cat_mode: bool = False, pace: float = 1.0) -> bytes:
     clean = " ".join(str(text).split())
     if not clean:
         raise LocalVoiceError("Seslendirilecek metin boş.")
@@ -69,12 +84,20 @@ def synthesize(text: str, voice: str = "male", cat_mode: bool = False) -> bytes:
     if not executable:
         raise LocalVoiceError("Yerel Piper kurulmamış. PIPER_EXECUTABLE ayarını kontrol et.")
     model = _model_path(voice)
+    length_scale = speech_length_scale(voice, pace)
     output_dir = Path("./memory/voice")
     output_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="seka-voice-", dir=str(output_dir)) as temp_dir:
         wav_path = Path(temp_dir) / "speech.wav"
         result = subprocess.run(
-            [executable, "--model", str(model), "--length_scale", "0.90" if voice == "female" else "1.0", "--output_file", str(wav_path)],
+            [
+                executable, "--model", str(model),
+                "--length_scale", str(length_scale),
+                "--noise_scale", "0.667",
+                "--noise_w", "0.8",
+                "--sentence_silence", "0.18",
+                "--output_file", str(wav_path),
+            ],
             input=clean.encode("utf-8"),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
