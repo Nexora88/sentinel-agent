@@ -132,7 +132,7 @@ fn parse_messages(path: &str, body: &Value, default_system: &str) -> Result<(Vec
 }
 
 fn generate(
-    model: &mkaos_hf_adapter::model_loader::SmolLM2Model,
+    model: &mkaos_inference::stacked_decoder::GqaDecoder,
     tokenizer: &HuggingFaceTokenizer,
     eos_ids: &[u32],
     messages: &[ChatMessage],
@@ -167,7 +167,7 @@ fn generate(
 
 fn handle(
     mut stream: TcpStream,
-    model: &mkaos_hf_adapter::model_loader::SmolLM2Model,
+    model: &mkaos_inference::stacked_decoder::GqaDecoder,
     tokenizer: &HuggingFaceTokenizer,
     eos_ids: &[u32],
     default_system: &str,
