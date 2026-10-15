@@ -590,7 +590,9 @@ async def api_ingest(file: UploadFile = File(...), authorization: Optional[str] 
     if suffix not in {".pdf", ".md", ".txt", ".csv"}:
         raise HTTPException(400, "Sadece PDF, MD, TXT, CSV")
     max_bytes = 20 * 1024 * 1024
-    tenant_upload_dir = tenant_root("./memory/uploads", user["username"])\n    tenant_upload_dir.mkdir(parents=True, exist_ok=True)\n    dest = tenant_upload_dir / f"{uuid.uuid4().hex}{suffix}"
+    tenant_upload_dir = tenant_root("./memory/uploads", user["username"])
+    tenant_upload_dir.mkdir(parents=True, exist_ok=True)
+    dest = tenant_upload_dir / f"{uuid.uuid4().hex}{suffix}"
     total = 0
     try:
         with dest.open("wb") as f:
@@ -723,7 +725,9 @@ async def api_media_edit(prompt: str = Form(...), file: UploadFile = File(...), 
     try:
         p = get_pipeline(user["username"])
         if p.media_engine.should_defer_heavy():
-            tenant_upload_dir = tenant_root("./memory/uploads", user["username"])\n            tenant_upload_dir.mkdir(parents=True, exist_ok=True)\n            saved = tenant_upload_dir / ("media_" + uuid.uuid4().hex + ".upload")
+            tenant_upload_dir = tenant_root("./memory/uploads", user["username"])
+            tenant_upload_dir.mkdir(parents=True, exist_ok=True)
+            saved = tenant_upload_dir / ("media_" + uuid.uuid4().hex + ".upload")
             saved.write_bytes(raw)
             return p.media_engine.submit("edit", {"prompt": prompt[:2000], "image_path": str(saved.resolve())})
         return await asyncio.to_thread(p.media_bridge.execute, "edit", {"prompt": prompt, "image_bytes": raw})
