@@ -1156,7 +1156,19 @@ async function loadControlRoom() {
       const desc=document.createElement("div"); desc.textContent=job.status+" — "+(job.reason||"");
       detail.append(name,desc); card.appendChild(detail);
       if (job.status === "done" && /^[A-Za-z0-9_-]{1,80}\\.(png|jpg|jpeg|webp|mp4)$/i.test(String(job.result?.filename || ""))) {
-        const link=document.createElement("a"); link.href="/api/images/"+encodeURIComponent(job.result.filename); link.target="_blank"; link.rel="noopener noreferrer"; link.textContent="Üretilen dosyayı aç"; link.className="media-download"; card.appendChild(link);
+        const link=document.createElement("a"); link.href="/api/images/"+encodeURIComponent(job.result.filename); link.textContent="Üretilen dosyayı aç"; link.className="media-download";
+        link.addEventListener("click", async (event) => {
+          event.preventDefault();
+          try {
+            const response = await fetch(link.href, { cache: "no-store" });
+            if (!response.ok) throw new Error("Dosyaya erişilemiyor.");
+            const objectUrl = URL.createObjectURL(await response.blob());
+            const download = document.createElement("a"); download.href = objectUrl;
+            download.download = job.result.filename; download.click();
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
+          } catch (_) { desc.textContent = "Dosya güvenli biçimde alınamadı."; }
+        });
+        card.appendChild(link);
       }
       if (job.status==="queued") {
         const run=document.createElement("button"); run.textContent="Kaynak uygunsa çalıştır";
