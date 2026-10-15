@@ -14,6 +14,24 @@ class MediaEngine:
         self.min_free_ram_mb = max(512, min(int(min_free_ram_mb or os.getenv("MKAOS_MEDIA_MIN_FREE_RAM_MB", "2048")), 65536))
         self._lock = threading.RLock()
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
+        self._recover_stale_jobs()
+
+    def _recover_stale_jobs(self) -> None:
+        if not self.state_path.exists():
+            return
+        jobs = self._read()
+        changed = False
+        for job in jobs:
+            if job.get("status") == "running":
+                job["status"] = "queued"
+                job["reason"] = "Önceki süreç kesildi; güvenli yeniden deneme için kuyruğa alındı."
+                changed = True
+        if changed:
+            self._write(jobs)
+
+    def should_defer_heavy(self) -> bool:
+        resources = self._resources()
+        return resources["free_ram_mb"] is not None and resources["free_ram_mb"] < self.min_free_ram_mb
 
     def _read(self) -> list[dict]:
         if not self.state_path.exists(): return []
