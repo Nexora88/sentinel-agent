@@ -21,7 +21,7 @@ class Notifier:
         # User needs to activate once by messaging the bot
         self.whatsapp_phone = os.getenv("WHATSAPP_PHONE")  # e.g. 905xxxxxxxxx
         self.whatsapp_apikey = os.getenv("WHATSAPP_APIKEY")
-        self.enabled = bool(self.whatsapp_phone and self.whatsapp_apikey)
+        self.enabled = bool(self.whatsapp_phone and self.whatsapp_apikey and os.getenv("ALLOW_EXTERNAL_NOTIFICATIONS", "false").lower() == "true")
 
     def send_console(self, message: str):
         print("\n" + "=" * 60)
@@ -31,7 +31,7 @@ class Notifier:
     def send_whatsapp(self, message: str) -> bool:
         """Send message via CallMeBot free WhatsApp API."""
         if not self.enabled:
-            logger.warning("WhatsApp not configured (WHATSAPP_PHONE / WHATSAPP_APIKEY missing)")
+            logger.info("External notifications disabled; no data was sent.")
             return False
 
         # CallMeBot has a 1000 char limit roughly, so we truncate safely
