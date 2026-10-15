@@ -49,12 +49,14 @@ class MemoryStore:
         self.tenant_id = str(tenant_id).strip().lower() if tenant_id else None
         self.persist_directory = Path(persist_directory)
         self.persist_directory.mkdir(parents=True, exist_ok=True)
-        self.ollama = ollama or OllamaClient()
-        self.embedding_provider = os.getenv("SEKA_EMBEDDINGS_PROVIDER", "ollama").strip().lower()
+        # Offline lexical retrieval is the default. Ollama embeddings are explicit opt-in.
+        self.embedding_provider = os.getenv("SEKA_EMBEDDINGS_PROVIDER", "mkaos-native").strip().lower()
         if self.embedding_provider == "mkaos-native":
             from core.native_embeddings import NativeHashEmbeddings
             embedding_function = NativeHashEmbeddings()
+            self.ollama = ollama  # Do not construct or contact a model server in native mode.
         elif self.embedding_provider == "ollama":
+            self.ollama = ollama or OllamaClient()
             embedding_function = self.ollama.embeddings
         else:
             raise ValueError("SEKA_EMBEDDINGS_PROVIDER must be ollama or mkaos-native")
