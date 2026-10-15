@@ -11,6 +11,8 @@ import json
 import logging
 import os
 import secrets
+import hmac
+import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -40,16 +42,42 @@ class AuthManager:
     def _load(self) -> Dict:
         if self.users_file.exists():
             try:
-                return json.loads(self.users_file.read_text(encoding="utf-8"))
-            except Exception:
-                pass
+                data = json.loads(self.users_file.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    raise ValueError("users store must be a JSON object")
+                return data
+            except Exception as exc:
+                # Fail closed. Never silently replace a damaged user store with a new owner.
+                raise RuntimeError(
+                    f"User store is unreadable; preserve and recover {self.users_file} before restarting."
+                ) from exc
         return {}
 
     def _save(self) -> None:
-        self.users_file.write_text(
-            json.dumps(self._users, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        self.users_file.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps(self._users, ensure_ascii=False, indent=2)
+        temp_name = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=str(self.users_file.parent),
+                prefix=".users-", suffix=".tmp", delete=False
+            ) as temp:
+                temp.write(payload)
+                temp.flush()
+                os.fsync(temp.fileno())
+                temp_name = temp.name
+            try:
+                os.chmod(temp_name, 0o600)
+            except OSError:
+                pass
+            os.replace(temp_name, self.users_file)
+            try:
+                os.chmod(self.users_file, 0o600)
+            except OSError:
+                pass
+        finally:
+            if temp_name and os.path.exists(temp_name):
+                os.unlink(temp_name)
 
     @staticmethod
     def _hash(password: str, salt: str) -> str:
@@ -82,7 +110,7 @@ class AuthManager:
         user = self._users.get(username)
         if not user or not user.get("active"):
             return None
-        if self._hash(password, user["salt"]) != user["password_hash"]:
+        if not hmac.compare_digest(self._hash(password, user["salt"]), user["password_hash"]):
             return None
         token = secrets.token_urlsafe(32)
         self.sessions[token] = {
