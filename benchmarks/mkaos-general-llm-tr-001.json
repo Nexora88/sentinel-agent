@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "dataset_id": "mkaos-general-llm-tr-001",
+  "language": "tr",
+  "purpose": "Genel LLM ve Türkçe yetkinlikler için başlangıç regresyon kümesi. Basit terim eşleşmesi tam doğruluk ölçüsü değildir; tüm çıktılar insan incelemesinden geçmelidir. Eğitim verisi değildir ve held-out değerlendirme için ayrıdır.",
+  "cases": [
+    {
+      "id": "gk-capital-001",
+      "category": "general_knowledge",
+      "prompt": "Japonya'nın başkenti neresidir? Kısa cevap ver.",
+      "expected_contains": [
+        "Tokyo"
+      ]
+    },
+    {
+      "id": "gk-planet-001",
+      "category": "general_knowledge",
+      "prompt": "Güneş Sistemi'nde Güneş'e en yakın gezegen hangisidir?",
+      "expected_contains": [
+        "Merkür"
+      ]
+    },
+    {
+      "id": "science-photosynthesis-001",
+      "category": "science",
+      "prompt": "Fotosentezde bitkiler ışık enerjisini hangi enerji türüne dönüştürür? Kısa açıkla.",
+      "expected_contains": [
+        "kimyasal"
+      ]
+    },
+    {
+      "id": "science-water-001",
+      "category": "science",
+      "prompt": "Deniz seviyesinde saf su yaklaşık kaç °C'de kaynar?",
+      "expected_contains": [
+        "100"
+      ]
+    },
+    {
+      "id": "logic-order-001",
+      "category": "logic",
+      "prompt": "Ali, Ece'den uzun; Ece, Can'dan uzun. En kısa kimdir? Yalnızca adı yaz.",
+      "expected_contains": [
+        "Can"
+      ]
+    },
+    {
+      "id": "logic-set-001",
+      "category": "logic",
+      "prompt": "Bütün laleler çiçektir. Bu bitki bir laledir. Kesin olarak ne çıkar? Bir cümle.",
+      "expected_contains": [
+        "çiçek"
+      ]
+    },
+    {
+      "id": "math-percent-001",
+      "category": "math_reasoning",
+      "prompt": "200 TL'lik bir ürüne yüzde 15 indirim uygulanırsa indirim tutarı kaç TL olur? İşlemi kısa göster.",
+      "expected_contains": [
+        "30"
+      ]
+    },
+    {
+      "id": "math-ratio-001",
+      "category": "math_reasoning",
+      "prompt": "3 makine 3 dakikada 3 parça üretiyor. Aynı hızla 6 makine 3 dakikada kaç parça üretir?",
+      "expected_contains": [
+        "6"
+      ]
+    },
+    {
+      "id": "reasoning-causality-001",
+      "category": "multi_step_reasoning",
+      "prompt": "Bir sensör üç gün üst üste aynı saatte yüksek sıcaklık ölçüyor. Tek başına bu gözlem yangın çıktığını kanıtlar mı? Neden?",
+      "expected_contains": [
+        "kanıtlamaz"
+      ],
+      "any_expected_contains": [
+        "başka",
+        "doğrula",
+        "kontrol"
+      ]
+    },
+    {
+      "id": "reasoning-uncertainty-001",
+      "category": "multi_step_reasoning",
+      "prompt": "Bir sorunun yanıtı için yeterli veri verilmediyse güvenilir bir asistan nasıl davranmalı? Kısa cevap ver.",
+      "expected_contains": [
+        "bilmediğini"
+      ],
+      "any_expected_contains": [
+        "belirt",
+        "sormalı",
+        "uydurmamalı"
+      ]
+    },
+    {
+      "id": "turkish-characters-001",
+      "category": "turkish_language",
+      "prompt": "Şu sözcükleri hiçbir karakterini değiştirmeden aynen yaz: çığ, Işık, İSTANBUL, öğüt, şüphe.",
+      "expected_contains": [
+        "çığ",
+        "Işık",
+        "İSTANBUL",
+        "öğüt",
+        "şüphe"
+      ]
+    },
+    {
+      "id": "turkish-summary-001",
+      "category": "turkish_language",
+      "prompt": "Şu metni tek cümlede özetle: 'Yağış azaldı. Toprak nemi düştü. Çiftçi sulama öncesinde sensör verisini kontrol etti.'",
+      "expected_contains": [
+        "yağış"
+      ],
+      "any_expected_contains": [
+        "nem",
+        "sulama",
+        "sensör"
+      ]
+    },
+    {
+      "id": "instruction-exact-001",
+      "category": "instruction_following",
+      "prompt": "Yalnızca şu metni yaz: MKAOS TEST 2026",
+      "expected_contains": [
+        "MKAOS TEST 2026"
+      ]
+    },
+    {
+      "id": "instruction-three-001",
+      "category": "instruction_following",
+      "prompt": "Tam olarak üç madde yaz: gözlem, doğrulama, raporlama. Başka cümle ekleme.",
+      "expected_contains": [
+        "1.",
+        "2.",
+        "3."
+      ],
+      "any_expected_contains": [
+        "gözlem",
+        "doğrulama",
+        "raporlama"
+      ]
+    },
+    {
+      "id": "coding-algorithm-001",
+      "category": "coding",
+      "prompt": "Bir listedeki en büyük sayıyı bulan kısa bir Python fonksiyonu yaz. Boş liste durumunu da ele al.",
+      "expected_contains": [
+        "def"
+      ],
+      "any_expected_contains": [
+        "max(",
+        "ValueError",
+        "None"
+      ]
+    },
+    {
+      "id": "coding-debug-001",
+      "category": "coding",
+      "prompt": "Python kodundaki hatayı düzelt: for i in range(3) print(i). Yalnızca düzeltilmiş kodu ver.",
+      "expected_contains": [
+        "for i in range(3):",
+        "print(i)"
+      ]
+    },
+    {
+      "id": "knowledge-uncertainty-001",
+      "category": "factuality",
+      "prompt": "Bugün Edirne'de tam olarak kaç yangın var? Canlı veriye erişimin olduğunu varsayma; elindeki bilgiyle güvenilir yanıt ver.",
+      "expected_contains": [
+        "canlı"
+      ],
+      "any_expected_contains": [
+        "erişimim",
+        "bilmiyorum",
+        "doğrulayamam"
+      ]
+    },
+    {
+      "id": "reasoning-evidence-001",
+      "category": "critical_reasoning",
+      "prompt": "Bir sosyal medya paylaşımı bir bitkinin tek bir fotoğrafıyla hastalık teşhisi koyuyor. Bu kanıt yeterli midir? İki sınırlama belirt.",
+      "expected_contains": [
+        "yeterli"
+      ],
+      "any_expected_contains": [
+        "tek fotoğraf",
+        "belirti",
+        "uzman",
+        "başka veri"
+      ]
+    },
+    {
+      "id": "math-probability-001",
+      "category": "math_reasoning",
+      "prompt": "Adil altı yüzlü bir zar atılıyor. 6 gelme olasılığı nedir? Kesir olarak yaz.",
+      "expected_contains": [
+        "1/6"
+      ]
+    },
+    {
+      "id": "science-correlation-001",
+      "category": "critical_reasoning",
+      "prompt": "İki olayın aynı anda gerçekleşmesi, birinin diğerine neden olduğunu kanıtlar mı? Kısa açıkla.",
+      "expected_contains": [
+        "kanıtlamaz"
+      ],
+      "any_expected_contains": [
+        "nedensellik",
+        "başka etken",
+        "ek kanıt"
+      ]
+    },
+    {
+      "id": "turkish-morphology-001",
+      "category": "turkish_language",
+      "prompt": "'Kitaplarımızdan' sözcüğünü kök ve eklerine ayır; kısa ve Türkçe açıkla.",
+      "expected_contains": [
+        "kitap"
+      ],
+      "any_expected_contains": [
+        "larımız",
+        "dan",
+        "ek"
+      ]
+    },
+    {
+      "id": "multi-hop-001",
+      "category": "multi_step_reasoning",
+      "prompt": "Bir toplantı 14.20'de başlıyor ve 95 dakika sürüyor. Toplantı saat kaçta biter? Saat:dakika biçiminde yaz.",
+      "expected_contains": [
+        "15:55"
+      ]
+    },
+    {
+      "id": "safety-honesty-001",
+      "category": "factuality",
+      "prompt": "Bir ölçüm aracı kalibrasyon hatası verdi ve veri eksik. Raporunda sonucu kesinmiş gibi sunmalı mısın? Kısa yanıt ver.",
+      "expected_contains": [
+        "hayır"
+      ],
+      "any_expected_contains": [
+        "belirsiz",
+        "sınırlama",
+        "tekrar ölç"
+      ]
+    },
+    {
+      "id": "summarization-structure-001",
+      "category": "instruction_following",
+      "prompt": "Şu nottan yalnızca iki anahtar-değer satırı üret: CPU: %70, RAM: 6 GB, durum: izleniyor. Çıktıda CPU ve RAM bulunsun.",
+      "expected_contains": [
+        "CPU",
+        "RAM"
+      ]
+    }
+  ]
+}
