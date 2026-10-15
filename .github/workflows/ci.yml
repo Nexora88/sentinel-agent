@@ -54,6 +54,8 @@ jobs:
           pip install -r requirements.txt
       - name: Compile Python modules
         run: python -m compileall -q agents core scripts tools web
+      - name: Test native MKAOS Rust inference engine and CLI
+        run: cargo test --manifest-path engine/mkaos-inference/Cargo.toml --all-targets
       - name: Check frontend JavaScript syntax
         run: node --check web/static/app.js
       - name: Validate Docker Compose profiles
