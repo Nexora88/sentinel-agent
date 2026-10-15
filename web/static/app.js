@@ -870,7 +870,9 @@ async function loadStatus() {
       <strong>SEKA ${data.version || ""}</strong><br>
       Bilgi: ${u.total_pages || 0}<br>
       Paper: ${f.equity ?? "—"}<br>
-      Onay: ${data.pending_approvals || 0}`;
+      Onay: ${data.pending_approvals || 0}<br>
+      Ağ: ${data.privacy?.web_research ? "web açık" : "web kapalı"} · ${data.privacy?.external_finance_data ? "finans açık" : "finans kapalı"} · ${data.privacy?.site_scanning ? "tarama açık" : "tarama kapalı"}<br>
+      Bildirim: ${data.privacy?.external_notifications ? "açık" : "kapalı"}`;
     renderJobs(data.jobs || []);
   } catch (e) {}
 }
@@ -880,11 +882,11 @@ loadStatus();
 setInterval(loadStatus, 30000);
 addMessage(
   "assistant",
-  "SEKA v6 online.\n" +
+  "SEKA v6.1 online · yerel Türkçe ajan.\n" +
     "• Canlı iş kuyruğu (SSE)\n" +
     "• Plan motoru → planla: hedef\n" +
     "• Bilgi paketi dışa aktar (paylaşılabilir)\n" +
     "• Hızlı/derin model yönlendirme\n" +
     "• Paper finans · merak · gece · podcast taslağı\n\n" +
-    "Ücretli API yok. Veri sende kalır."
+    "Ağ özellikleri varsayılan kapalıdır; çevrimdışı profil internet çıkışını sınırlar."
 );
