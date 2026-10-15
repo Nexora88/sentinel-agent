@@ -1,0 +1,62 @@
+name: MKAOS offline inference and same-runner benchmark
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mkaos-offline-and-benchmark.yml"
+      - "engine/mkaos-inference/**"
+      - "engine/mkaos-hf-adapter/**"
+      - "tools/benchmark_mkaos_vs_ollama.py"
+      - "tools/fetch_model.py"
+      - "models/smollm2-135m-instruct/model-lock.json"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-and-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download and verify pinned model files
+        run: python tools/fetch_model.py --output-dir artifacts/smollm2-135m-instruct --lock-file models/smollm2-135m-instruct/model-lock.json
+      - name: Build the native MKAOS CLI before network isolation
+        run: cargo build --release --manifest-path engine/mkaos-hf-adapter/Cargo.toml --bin mkaos_generate
+      - name: Run real-weight inference in a network-disabled container
+        run: |
+          docker run --rm --network none \
+            -v "$PWD/artifacts/smollm2-135m-instruct:/model:ro" \
+            -v "$PWD/target/release/mkaos_generate:/usr/local/bin/mkaos_generate:ro" \
+            ubuntu:24.04 \
+            /usr/local/bin/mkaos_generate /model "Merhaba. Bir cümleyle Türkiye'nin başkentini söyle." 24
+      - name: Start pinned Ollama comparison runtime
+        run: |
+          docker run -d --name ollama -p 127.0.0.1:11434:11434 ollama/ollama:0.12.6
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:11434/api/tags >/dev/null
+          docker exec ollama ollama pull smollm2:135m-instruct
+      - name: Run same-runner MKAOS vs Ollama benchmark
+        run: python tools/benchmark_mkaos_vs_ollama.py --model-dir artifacts/smollm2-135m-instruct --ollama-model smollm2:135m-instruct --runs 2
+      - name: Upload benchmark report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkaos-offline-and-ollama-benchmark
+          if-no-files-found: warn
+          path: mkaos-ollama-benchmark.json
+      - name: Clean up Ollama container
+        if: always()
+        run: docker rm -f ollama >/dev/null 2>&1 || true
