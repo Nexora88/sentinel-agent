@@ -4,13 +4,34 @@
 
 MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. “Kendi kararlarını vermek”, hedefler için plan önermek ve güvenli yerel işleri yürütmek anlamına gelir. Dosya değiştirme, commit, push, bildirim veya harici sisteme veri gönderme gibi etkiler açık onay gerektirir.
 
-## Bağımsız çıkarım motoru — aktif geliştirme
+## Bağımsız çıkarım motoru — aşamalı geçiş
 
-- Yeni çekirdek: [`engine/mkaos-inference/`](engine/mkaos-inference/) — harici crate bağımlılığı olmadan Rust CPU tensör işlemleri ve referans attention kernel'i.
-- Model biçimi ve bütünlük sözleşmesi: [`model-manifest.schema.json`](engine/mkaos-inference/model-manifest.schema.json).
-- Aşamalı geçiş ve Ollama'yı kaldırma kabul ölçütleri: [`MKAOS_INDEPENDENCE_MILESTONES.md`](docs/MKAOS_INDEPENDENCE_MILESTONES.md).
-- Türkçe/tarihî veri menşei ve eğitim politikası: [`MKAOS_TURKISH_DATA_GOVERNANCE.md`](docs/MKAOS_TURKISH_DATA_GOVERNANCE.md).
-- Şimdiki Rust çekirdeği henüz tam LLM runtime değildir; tokenizer, ağırlık okuyucu, Transformer decoder, KV cache ve sohbet API'si eksiktir. Bu nedenle mevcut Ollama entegrasyonu şimdilik yalnızca geçiş yolu olarak tutulur.
+- Çekirdek: [`engine/mkaos-inference/`](engine/mkaos-inference/) — Rust CPU tensör işlemleri, Transformer decoder ve KV cache.
+- HF uyumluluk katmanı: [`engine/mkaos-hf-adapter/`](engine/mkaos-hf-adapter/).
+- Yerleşik servis: `mkaos_server` model ağırlıklarını/tokenizer'ı başlangıçta bir kez yükler ve yerel HTTP API'si sağlar. Aynı sistem istemi için sınırlı KV önek önbelleği kullanır.
+- Uygulama bağlantısı isteğe bağlıdır: `MKAOS_ENABLED=false` varsayılandır; `true` yalnızca deneysel MKAOS sohbet yönlendirmesini açar. `false` ile sohbet önceki yerel Ollama yoluna döner. Embedding'ler şimdilik Ollama'da kalır.
+- Sunucu varsayılan olarak loopback'e bağlanır. Docker Compose dağıtımı, portu host'a yayınlamadan yalnızca dahili ağa bağlar; container arayüzüne bağlanmak için açık bir ayar gerekir.
+- Şimdiki aday ağırlıklar üçüncü taraf SmolLM2-135M-Instruct'tır. Motorun bağımsız kodu geliştirilse de model ağırlıkları henüz MKAOS tarafından eğitilmiş değildir. Türkçe anlamsal kalite ve hedef cihaz performansı geçiş kapılarıdır.
+
+### İsteğe bağlı Docker Compose kurulumu
+
+1. Sabitlenmiş model dosyalarını indirin ve hash raporunu oluşturun:
+
+   `python tools/fetch_model.py --output-dir models/smollm2-135m-instruct`
+
+2. `.env.example` dosyasını `.env` olarak kopyalayın; `MKAOS_ENABLED=true` yapın. Ollama embedding modelinin mevcut olduğundan emin olun; embedding yolu şu an hâlâ Ollama kullanır.
+3. Servisi dahili Docker ağı üzerinde başlatın:
+
+   `docker compose --profile mkaos up --build`
+
+4. Sağlık uç noktasını kontrol edin:
+
+   `docker compose exec sentinel python -c "import urllib.request; print(urllib.request.urlopen('http://mkaos:11435/health').read().decode())"`
+
+Geri alma için `.env` içinde `MKAOS_ENABLED=false` yapıp `docker compose up -d sentinel` çalıştırın. İlk model yüklemesi birkaç saniye veya daha uzun sürebilir; sonraki isteklerde süreç yeniden başlatılmadıkça ağırlıklar bellekte kalır. API şu an token-token streaming sağlamaz ve istekleri sıralı işler.
+
+- Yol haritası: [`docs/MKAOS_INDEPENDENCE_MILESTONES.md`](docs/MKAOS_INDEPENDENCE_MILESTONES.md).
+- Türkçe/tarihî veri menşei ve eğitim politikası: [`docs/MKAOS_TURKISH_DATA_GOVERNANCE.md`](docs/MKAOS_TURKISH_DATA_GOVERNANCE.md).
 
 ## Marka ve tasarım ilkesi
 
