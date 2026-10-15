@@ -43,7 +43,7 @@ MKAOS, *Mustafa Kemal Atatürk Operating System* anlamıyla yerel egemenlik, bil
 
 ## Yerel akıl yürütme, donanım ve ajan kümesi
 
-- `core/reasoning_engine.py): Yerel modelle sınırlı taslak → eleştiri → sonuç akışı. Gizli düşünce zincirini döndürmez; kısa değerlendirme, belirsizlik ve sonraki adımlar verir. Araç çalıştırmaz, dosya değiştirmez ve PR birleştirmez.
+- `core/reasoning_engine.py): Yerel modeller arasında taslak → eleştiri → sonuç görev yönlendirmesi (isteğe bağlı farklı modeller). Gizli düşünce zincirini döndürmez; kısa değerlendirme, belirsizlik ve sonraki adımlar verir. Araç çalıştırmaz, dosya değiştirmez ve PR birleştirmez.
 - `core/hardware_backends.py): CPU, NVIDIA CUDA, AMD ROCm, Apple Metal, Intel Gaudi ve NPU/TPU için dürüst yetenek kaydı. CUDA/ROCm/Metal/Gaudi/NPU desteği donanımda doğrulanana kadar “doğrulanmadı” olarak kalır.
 - `core/agent_mesh.py): Ed25519 imzalı, süre ve boyut sınırı olan, tekrar oynatma korumalı veri görevleri. Bu modül ağ taşıması, şifreleme veya uzaktan kod çalıştırma sağlamaz; gerçek mesh için mTLS, anahtar iptali ve açık eş listesi gerekir.
 - `scripts/benchmark_local_reasoning.py): Türkçe kalite görevlerini yerel Ollama modelinde çalıştırıp süre ve yanıtları yerel rapora yazar.
