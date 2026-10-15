@@ -345,3 +345,53 @@ mod tests {
         assert!(m.step(1,&mut cache).is_err());
     }
 }
+
+#[cfg(test)]
+mod owned_checkpoint_assembly_tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    fn put(tensors: &mut BTreeMap<String, Tensor2>, name: &str, rows: usize, cols: usize) {
+        tensors.insert(name.to_owned(), Tensor2::new(rows, cols, vec![0.01; rows * cols]).unwrap());
+    }
+
+    fn valid_checkpoint() -> crate::checkpoint::Checkpoint {
+        let (vocab, d, kv_width, ff) = (257, 8, 4, 12);
+        let mut tensors = BTreeMap::new();
+        put(&mut tensors, "token_embedding.weight", vocab, d);
+        put(&mut tensors, "lm_head.weight", d, vocab);
+        put(&mut tensors, "final_norm.weight", 1, d);
+        put(&mut tensors, "layers.0.input_norm.weight", 1, d);
+        put(&mut tensors, "layers.0.q_proj.weight", d, d);
+        put(&mut tensors, "layers.0.k_proj.weight", d, kv_width);
+        put(&mut tensors, "layers.0.v_proj.weight", d, kv_width);
+        put(&mut tensors, "layers.0.o_proj.weight", d, d);
+        put(&mut tensors, "layers.0.post_attention_norm.weight", 1, d);
+        put(&mut tensors, "layers.0.gate_proj.weight", d, ff);
+        put(&mut tensors, "layers.0.up_proj.weight", d, ff);
+        put(&mut tensors, "layers.0.down_proj.weight", ff, d);
+        crate::checkpoint::Checkpoint { tensors, sha256: "synthetic-test-only".to_owned() }
+    }
+
+    #[test]
+    fn assembles_contract_shaped_checkpoint_and_runs_eos_id() {
+        let cp = valid_checkpoint();
+        let model = GqaDecoder::from_checkpoint(
+            GqaConfig { query_heads: 4, kv_heads: 2, rms_epsilon: 1e-5,
+                rope_theta: 10000.0, max_sequence_len: 16 }, &cp,
+        ).unwrap();
+        let logits = model.logits_for_prefix_reference(&[b'M' as usize, 256]).unwrap();
+        assert_eq!(logits.len(), 257);
+        assert!(logits.iter().all(|x| x.is_finite()));
+    }
+
+    #[test]
+    fn rejects_unexpected_checkpoint_tensors() {
+        let mut cp = valid_checkpoint();
+        put(&mut cp.tensors, "layers.0.unexpected.weight", 1, 1);
+        assert!(GqaDecoder::from_checkpoint(
+            GqaConfig { query_heads: 4, kv_heads: 2, rms_epsilon: 1e-5,
+                rope_theta: 10000.0, max_sequence_len: 16 }, &cp,
+        ).is_err());
+    }
+}
