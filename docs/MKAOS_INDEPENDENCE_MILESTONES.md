@@ -10,6 +10,8 @@ Uzun vadeli hedef, MKAOS'un kendi model dosya biçimi, tokenizer'ı, CPU çıkar
 - [x] Harici crate kullanmayan Rust crate
 - [x] Matris çarpımı, transpoz, softmax, RMSNorm
 - [x] Referans scaled dot-product attention
+- [x] Token embedding lookup, RoPE, causal mask, çok başlıklı attention, residual ve SwiGLU
+- [x] Tek decoder bloğu için sentetik ağırlıklarla uçtan uca forward-pass testi
 - [ ] CI'da doğrulanmış başarılı çalışma
 - [ ] Python/reference implementasyonuyla tolerans tabanlı diferansiyel testler
 
@@ -20,10 +22,12 @@ Uzun vadeli hedef, MKAOS'un kendi model dosya biçimi, tokenizer'ı, CPU çıkar
 - [ ] Tokenizer implementasyonu ve test vektörleri
 
 ### C — Uçtan uca küçük model
-- [ ] Embedding, RoPE ve causal mask
-- [ ] Transformer decoder bloğu ve KV cache
-- [ ] Logits ve greedy decoding
-- [ ] Küçük, açık lisanslı test ağırlıklarıyla deterministik smoke test
+- [x] Temel embedding, RoPE ve causal mask
+- [x] Tek Transformer decoder bloğu (eğitilmiş model ağırlıkları değil, test amaçlı sentetik ağırlıklar)
+- [ ] Çok katmanlı decoder ve KV cache
+- [ ] Final norm, LM head/logits ve greedy decoding
+- [ ] Tokenizer ile uçtan uca metin üretimi
+- [ ] Küçük, açık lisanslı gerçek model ağırlıklarıyla deterministik smoke test
 - [ ] Kötü biçimlendirilmiş model dosyası testleri
 
 ### D — Kullanılabilirlik ve performans
