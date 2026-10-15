@@ -695,7 +695,10 @@ async def api_finance_cycle(authorization: Optional[str] = Header(None)):
 async def api_image(req: ImageRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
     try:
-        return await asyncio.to_thread(get_pipeline().media_bridge.execute, "generate", {"prompt": req.prompt, "width": req.width, "height": req.height})
+        p = get_pipeline()
+        if p.media_engine.should_defer_heavy():
+            return p.media_engine.submit("generate", {"prompt": req.prompt[:2000], "width": req.width, "height": req.height})
+        return await asyncio.to_thread(p.media_bridge.execute, "generate", {"prompt": req.prompt, "width": req.width, "height": req.height})
     except Exception as exc:
         from tools.image_gen import MediaToolError
         if isinstance(exc, MediaToolError):
@@ -711,7 +714,12 @@ async def api_media_edit(prompt: str = Form(...), file: UploadFile = File(...), 
     if len(raw) > 12 * 1024 * 1024:
         raise HTTPException(413, "Görsel en fazla 12 MB olabilir.")
     try:
-        return await asyncio.to_thread(get_pipeline().media_bridge.execute, "edit", {"prompt": prompt, "image_bytes": raw})
+        p = get_pipeline()
+        if p.media_engine.should_defer_heavy():
+            saved = UPLOAD_DIR / ("media_" + uuid.uuid4().hex + ".upload")
+            saved.write_bytes(raw)
+            return p.media_engine.submit("edit", {"prompt": prompt[:2000], "image_path": str(saved.resolve())})
+        return await asyncio.to_thread(p.media_bridge.execute, "edit", {"prompt": prompt, "image_bytes": raw})
     except Exception as exc:
         from tools.image_gen import MediaToolError
         if isinstance(exc, MediaToolError):
@@ -727,7 +735,12 @@ async def api_media_background(file: UploadFile = File(...), color: str = Form("
     if len(raw) > 12 * 1024 * 1024:
         raise HTTPException(413, "Görsel en fazla 12 MB olabilir.")
     try:
-        return await asyncio.to_thread(get_pipeline().media_bridge.execute, "background", {"image_bytes": raw, "color": color})
+        p = get_pipeline()
+        if p.media_engine.should_defer_heavy():
+            saved = UPLOAD_DIR / ("media_" + uuid.uuid4().hex + ".upload")
+            saved.write_bytes(raw)
+            return p.media_engine.submit("background", {"image_path": str(saved.resolve()), "color": color})
+        return await asyncio.to_thread(p.media_bridge.execute, "background", {"image_bytes": raw, "color": color})
     except Exception as exc:
         from tools.image_gen import MediaToolError
         if isinstance(exc, MediaToolError):
