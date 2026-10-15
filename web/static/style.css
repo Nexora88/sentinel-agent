@@ -512,3 +512,9 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+
+
+.approval-content-details { margin-top: 10px; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+.approval-content-details summary { cursor: pointer; color: var(--accent); padding: 9px 11px; background: rgba(2, 6, 23, .35); font-size: .8rem; }
+.approval-preview { max-height: 360px; overflow: auto; white-space: pre; padding: 12px; font-size: .75rem; line-height: 1.45; color: #dbeafe; background: #060b14; }
+.audit-row { border-left: 3px solid var(--accent-2); }
