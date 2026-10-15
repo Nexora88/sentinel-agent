@@ -30,7 +30,11 @@ def validate_public_url(url: str) -> str:
         raise UnsafeTarget("Only http and https URLs are allowed.")
     if not parsed.hostname or parsed.username or parsed.password:
         raise UnsafeTarget("URL must include a hostname and must not contain credentials.")
-    if parsed.port and not (1 <= parsed.port <= 65535):
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise UnsafeTarget("Invalid destination port.") from exc
+    if port is not None and not (1 <= port <= 65535):
         raise UnsafeTarget("Invalid destination port.")
     host = parsed.hostname.rstrip(".").lower()
     if host in {"localhost", "localhost.localdomain", "metadata.google.internal"}:
@@ -72,6 +76,7 @@ class WebsiteScanner:
             if not location:
                 return response
             next_url = urljoin(current, location)
+            response.close()
             validate_public_url(next_url)
             current = next_url
         raise UnsafeTarget("Too many redirects; scan stopped safely.")
