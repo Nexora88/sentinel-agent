@@ -184,8 +184,9 @@ class SentinelPipeline:
         result = self.doc_assistant.analyze_text(text)
         return self.doc_assistant.format_report(result)
 
-    def legacy_export(self, passphrase: str, out_path: str = "./memory/legacy_backup.bin") -> str:
-        path = self.legacy.export(passphrase, out_path=out_path)
+    def legacy_export(self, passphrase: str, out_path: Optional[str] = None) -> str:
+        target = out_path or str(self.storage_root / "legacy_backup.bin")
+        path = self.legacy.export(passphrase, out_path=target)
         return f"Legacy yedek yazıldı: {path}"
 
     def ingest_document(self, file_path: str) -> dict:
