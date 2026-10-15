@@ -16,8 +16,7 @@ retrieval baseline, including for Turkish suffix variation.
 **Important limitation:** this is not a neural semantic model and does not make
 MKAOS a trained language model. Lexical overlap is not semantic understanding;
 the baseline may rank paraphrases or conceptually related documents poorly.
-The default remains `SEKA_EMBEDDINGS_PROVIDER=ollama` until native retrieval
-passes a larger, frozen Turkish benchmark and the other gates below.
+The default is `SEKA_EMBEDDINGS_PROVIDER=mkaos-native` to permit offline operation. This is an operational-independence choice, not a claim that retrieval quality matches a trained embedding model; follow the evaluation gates below before claiming semantic parity.
 
 ## Reproducible smoke benchmark
 
@@ -59,7 +58,4 @@ also be measured on target hardware before claiming performance parity.
 6. Only then decide whether a trained MKAOS-owned embedding model is needed.
    This hashing baseline alone is not evidence of parity.
 
-The environment variable is opt-in; unknown provider values fail closed. Chat
-generation remains MKAOS-only and has no Ollama chat fallback. Ollama remains
-temporarily available for embeddings until the quality and operational gates
-pass.
+Native hashing is now the default provider so the RAG path does not instantiate or contact Ollama. Set `SEKA_EMBEDDINGS_PROVIDER=ollama` only when explicitly choosing the legacy embedding model. Unknown provider values fail closed. Chat generation remains MKAOS-only and has no Ollama chat fallback. This removes the runtime dependency, not the quality gap: native hashing remains a lexical baseline and must not be described as neural semantic embeddings.
