@@ -91,9 +91,9 @@ def main():
         for record in records:
             out.extend(record.encode("utf-8")); out.append(EOS_ID)
         return torch.tensor(out, dtype=torch.long)
-    train = stream(splits["train"]); valid = stream(splits["validation"])
-    if len(train) <= a.context_length or len(valid) <= a.context_length:
-        p.exit(2, "Train and validation streams must exceed context-length.\n")
+    train = stream(splits["train"]); valid = stream(splits["validation"]); test = stream(splits["test"])
+    if min(len(train), len(valid), len(test)) <= a.context_length:
+        p.exit(2, "Train, validation, and held-out test streams must exceed context-length.\n")
 
     class RMSNorm(nn.Module):
         def __init__(self, width):
@@ -198,7 +198,8 @@ def main():
       "tokenizer":{"kind":"project-owned-utf8-byte","vocab_size":VOCAB_SIZE,"eos_token_id":EOS_ID},
       "architecture":cfg,"optimizer":"AdamW","learning_rate":a.learning_rate,"seed":a.seed,"steps":a.steps,
       "device":device,"train_loss_first":round(first_loss,6),"train_loss_last":round(last_loss,6),
-      "validation_loss_last":round(valid_loss,6) if valid_loss is not None else None,\n      "heldout_test_loss":round(test_loss,6),"heldout_test_target_tokens":test_token_count,
+      "validation_loss_last":round(valid_loss,6) if valid_loss is not None else None,
+      "heldout_test_loss":round(test_loss,6),"heldout_test_target_tokens":test_token_count,
       "elapsed_seconds":round(time.time()-started,3),"torch_version":torch.__version__,
       "rust_tensor_contract":"mkaos-rust-gqa-v1","production_ready":False,
       "note":"Architecture-compatible training checkpoint; run exporter, Rust shape validation, and held-out evaluation before use."}
