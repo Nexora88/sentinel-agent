@@ -1,0 +1,32 @@
+# Strict offline runtime overlay.
+# Build/download images and pull model files BEFORE enabling this profile.
+# Runtime services can communicate with each other but cannot reach the internet.
+services:
+  sentinel:
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      GITHUB_TOKEN: ""
+      GH_TOKEN: ""
+      ALLOW_WEB_RESEARCH: "false"
+      ALLOW_EXTERNAL_NOTIFICATIONS: "false"
+      WHATSAPP_PHONE: ""
+      WHATSAPP_APIKEY: ""
+      SD_API_URL: ""
+    depends_on:
+      - ollama
+    networks:
+      - offline_internal
+  ollama:
+    image: ollama/ollama:latest
+    container_name: seka-ollama-offline
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - offline_internal
+    restart: unless-stopped
+networks:
+  offline_internal:
+    internal: true
+volumes:
+  ollama_models:
+    driver: local
