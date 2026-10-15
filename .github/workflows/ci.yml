@@ -27,5 +27,7 @@ jobs:
           pip install -r requirements.txt
       - name: Compile Python modules
         run: python -m compileall -q agents core scripts tools web
+      - name: Check frontend JavaScript syntax
+        run: node --check web/static/app.js
       - name: Run security regression tests
         run: python -m unittest discover -s tests -v
