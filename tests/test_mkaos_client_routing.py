@@ -53,7 +53,8 @@ class MkaosClientRoutingTests(unittest.TestCase):
             answer = client.chat("Merhaba", system="Türkçe yanıt ver.")
         self.assertEqual(answer, "Merhaba")
         factory.assert_called_once_with(
-            model="mkaos-local", base_url="http://127.0.0.1:11435", temperature=0.2
+            model="mkaos-local", base_url="http://127.0.0.1:11435", temperature=0.15,
+            repeat_penalty=1.1, top_p=0.9
         )
         messages = llm.invoke.call_args.args[0]
         self.assertIsInstance(messages[0], SystemMessage)
