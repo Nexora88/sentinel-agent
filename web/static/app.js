@@ -676,7 +676,7 @@ loadStatus();
 setInterval(loadStatus, 30000);
 addMessage(
   "assistant",
-  "SEKA v5 online.\n" +
+  "SEKA v6 online.\n" +
     "• Canlı iş kuyruğu (SSE)\n" +
     "• Plan motoru → planla: hedef\n" +
     "• Bilgi paketi dışa aktar (paylaşılabilir)\n" +
