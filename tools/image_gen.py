@@ -5,7 +5,7 @@ There is no public image API fallback. Background removal is optional (rembg wit
 pre-downloaded local model); video rendering uses local ffmpeg.
 """
 from __future__ import annotations
-import base64, ipaddress, logging, os, re, shutil, subprocess, uuid
+import base64, ipaddress, logging, os, re, shutil, subprocess, tempfile, uuid
 from pathlib import Path
 from urllib.parse import urlparse
 import requests
@@ -44,20 +44,55 @@ class ImageGenerator:
         return self.sd_url
 
     def _save_b64_image(self, encoded: str, prefix: str, prompt: str = "") -> dict:
+        """Validate, decode and normalize model output to a clean PNG atomically."""
         try:
             raw = base64.b64decode(encoded, validate=True)
             if not raw or len(raw) > 25 * 1024 * 1024:
                 raise MediaToolError("Model çıktısı boş veya 25 MB sınırını aşıyor.")
             from PIL import Image
             import io
-            with Image.open(io.BytesIO(raw)) as im:
-                if im.width * im.height > 20_000_000:
+            with Image.open(io.BytesIO(raw)) as image:
+                image.verify()
+            with Image.open(io.BytesIO(raw)) as image:
+                if image.width * image.height > 20_000_000:
                     raise MediaToolError("Model çıktısı 20 megapiksel sınırını aşıyor.")
-                im.verify()
+                # Decode pixels and re-encode rather than trusting the source container,
+                # extension, metadata or ancillary chunks returned by the model.
+                image.load()
+                normalized = image.convert("RGBA" if "A" in image.getbands() else "RGB")
+                buffer = io.BytesIO()
+                normalized.save(buffer, format="PNG", optimize=True)
+                clean_png = buffer.getvalue()
+            if not clean_png or len(clean_png) > 25 * 1024 * 1024:
+                raise MediaToolError("Temizlenmiş görsel boş veya 25 MB sınırını aşıyor.")
+        except MediaToolError:
+            raise
         except Exception as exc:
             raise MediaToolError("Model geçerli bir görsel döndürmedi.") from exc
+
         filename = f"{prefix}_{uuid.uuid4().hex[:12]}.png"
-        (self.output_dir / filename).write_bytes(raw)
+        target = self.output_dir / filename
+        temp_name = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="wb", dir=str(self.output_dir), prefix=".image-", suffix=".tmp", delete=False
+            ) as handle:
+                temp_name = handle.name
+                handle.write(clean_png)
+                handle.flush()
+                os.fsync(handle.fileno())
+            try:
+                os.chmod(temp_name, 0o600)
+            except OSError:
+                pass
+            os.replace(temp_name, target)
+            try:
+                os.chmod(target, 0o600)
+            except OSError:
+                pass
+        finally:
+            if temp_name and os.path.exists(temp_name):
+                os.unlink(temp_name)
         return {"success": True, "filename": filename, "source": "self_hosted_sd", "prompt": prompt}
 
     def _image_response(self, endpoint: str, payload: dict, prefix: str, prompt: str = "") -> dict:

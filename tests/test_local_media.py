@@ -56,5 +56,28 @@ class LocalMediaTests(unittest.TestCase):
             self.assertIn("not neural text-to-video", result["mode"])
             self.assertTrue((Path(directory) / result["filename"]).is_file())
 
+    def test_generated_image_is_normalized_to_real_png(self):
+        import base64
+        import io
+        from pathlib import Path
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as directory:
+            generator = ImageGenerator(directory)
+            source = io.BytesIO()
+            Image.new("RGB", (32, 24), (20, 40, 60)).save(source, format="JPEG")
+            result = generator._save_b64_image(base64.b64encode(source.getvalue()).decode("ascii"), "test")
+            target = Path(directory) / result["filename"]
+            with Image.open(target) as image:
+                self.assertEqual(image.format, "PNG")
+                self.assertEqual(image.size, (32, 24))
+            self.assertEqual(list(Path(directory).glob(".image-*.tmp")), [])
+
+    def test_generated_image_rejects_invalid_base64_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            generator = ImageGenerator(directory)
+            with self.assertRaises(MediaToolError):
+                generator._save_b64_image("not-valid-base64!", "test")
+
 if __name__ == "__main__":
     unittest.main()

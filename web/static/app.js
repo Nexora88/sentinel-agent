@@ -5,6 +5,79 @@ const $$ = (sel) => document.querySelectorAll(sel);
 const nativeFetch = window.fetch.bind(window);
 let authToken = sessionStorage.getItem("seka.session") || "";
 let authPromptActive = false;
+
+const b64urlToBytes = (value) => {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - value.length % 4) % 4);
+  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+};
+const bytesToB64url = (value) => {
+  const bytes = new Uint8Array(value);
+  let binary = "";
+  bytes.forEach((b) => { binary += String.fromCharCode(b); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+};
+function prepareCredentialOptions(publicKey, registration) {
+  const options = { ...publicKey, challenge: b64urlToBytes(publicKey.challenge) };
+  if (registration && publicKey.user?.id) options.user = { ...publicKey.user, id: b64urlToBytes(publicKey.user.id) };
+  const key = registration ? "excludeCredentials" : "allowCredentials";
+  if (Array.isArray(publicKey[key])) options[key] = publicKey[key].map((item) => ({ ...item, id: b64urlToBytes(item.id) }));
+  return options;
+}
+function serializeCredential(credential) {
+  const response = credential.response;
+  const encoded = (value) => value ? bytesToB64url(value) : null;
+  const data = {
+    id: credential.id,
+    rawId: bytesToB64url(credential.rawId),
+    type: credential.type,
+    authenticatorAttachment: credential.authenticatorAttachment || null,
+    clientExtensionResults: credential.getClientExtensionResults(),
+    response: { clientDataJSON: encoded(response.clientDataJSON) }
+  };
+  if ("attestationObject" in response) data.response.attestationObject = encoded(response.attestationObject);
+  if ("authenticatorData" in response) data.response.authenticatorData = encoded(response.authenticatorData);
+  if ("signature" in response) data.response.signature = encoded(response.signature);
+  if ("userHandle" in response) data.response.userHandle = encoded(response.userHandle);
+  if ("transports" in response && typeof response.getTransports === "function") data.response.transports = response.getTransports();
+  return data;
+}
+async function passkeyLogin(username, errorNode) {
+  if (!window.PublicKeyCredential || !navigator.credentials) throw new Error("Bu tarayıcı passkey/WebAuthn desteklemiyor.");
+  const optionsResponse = await nativeFetch("/api/webauthn/login/options", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username })
+  });
+  if (!optionsResponse.ok) throw new Error("Bu hesap için kayıtlı passkey bulunamadı veya giriş başlatılamadı.");
+  const optionsData = await optionsResponse.json();
+  const credential = await navigator.credentials.get({ publicKey: prepareCredentialOptions(optionsData.publicKey, false) });
+  if (!credential) throw new Error("Passkey işlemi iptal edildi.");
+  const verifyResponse = await nativeFetch("/api/webauthn/login/verify", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ challenge_id: optionsData.challenge_id, credential: serializeCredential(credential) })
+  });
+  if (!verifyResponse.ok) throw new Error("Passkey doğrulaması başarısız oldu.");
+  const data = await verifyResponse.json();
+  authToken = data.token || "";
+  if (authToken) sessionStorage.setItem("seka.session", authToken);
+  const enrollmentButton = document.querySelector("#passkey-register");
+  if (enrollmentButton) enrollmentButton.hidden = !authToken;
+  return Boolean(authToken);
+}
+async function registerPasskey() {
+  if (!authToken) throw new Error("Önce parolayla giriş yapmalısın.");
+  if (!window.PublicKeyCredential || !navigator.credentials) throw new Error("Bu tarayıcı passkey/WebAuthn desteklemiyor.");
+  const optionsResponse = await nativeFetch("/api/webauthn/register/options", { headers: { Authorization: "Bearer " + authToken } });
+  if (!optionsResponse.ok) throw new Error("Passkey kayıt seçenekleri alınamadı.");
+  const optionsData = await optionsResponse.json();
+  const credential = await navigator.credentials.create({ publicKey: prepareCredentialOptions(optionsData.publicKey, true) });
+  if (!credential) throw new Error("Passkey kaydı iptal edildi.");
+  const verifyResponse = await nativeFetch("/api/webauthn/register/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + authToken },
+    body: JSON.stringify({ challenge_id: optionsData.challenge_id, credential: serializeCredential(credential) })
+  });
+  if (!verifyResponse.ok) throw new Error("Passkey kayıt doğrulaması başarısız oldu.");
+  return await verifyResponse.json();
+}
 async function requestLogin() {
   if (authToken) return true;
   if (authPromptActive) return false;
@@ -21,10 +94,23 @@ async function requestLogin() {
       const overlay = document.createElement("div");
       overlay.id = "seka-auth-overlay";
       overlay.style.cssText = "position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(3,8,18,.88);padding:20px";
-      overlay.innerHTML = '<form id="seka-auth-form" style="width:min(420px,100%);box-sizing:border-box;background:#111827;color:#f8fafc;border:1px solid #334155;border-radius:16px;padding:24px;font:14px system-ui;box-shadow:0 20px 70px #0009"><h2 style="margin:0 0 8px">MKAOS güvenli oturum</h2><p style="color:#94a3b8;margin:0 0 18px">Kimlik bilgileri bu cihazda doğrulanır. MKAOS yerel ajan işletim sistemi.</p><label style="display:block;margin:10px 0 6px">Kullanıcı adı</label><input id="seka-auth-user" autocomplete="username" required value="owner" style="box-sizing:border-box;width:100%;padding:12px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff"><label style="display:block;margin:14px 0 6px">Parola</label><input id="seka-auth-password" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff"><p id="seka-auth-error" role="alert" style="color:#fca5a5;min-height:18px"></p><div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" id="seka-auth-cancel" style="padding:10px 14px;border-radius:8px">İptal</button><button type="submit" style="padding:10px 16px;border-radius:8px;background:#14b8a6;color:#042f2e;font-weight:700;border:0">Giriş yap</button></div></form>';
+      overlay.innerHTML = '<form id="seka-auth-form" style="width:min(420px,100%);box-sizing:border-box;background:#111827;color:#f8fafc;border:1px solid #334155;border-radius:16px;padding:24px;font:14px system-ui;box-shadow:0 20px 70px #0009"><h2 style="margin:0 0 8px">MKAOS güvenli oturum</h2><p style="color:#94a3b8;margin:0 0 18px">Kimlik bilgileri bu cihazda doğrulanır. MKAOS yerel ajan işletim sistemi.</p><label style="display:block;margin:10px 0 6px">Kullanıcı adı</label><input id="seka-auth-user" autocomplete="username" required value="owner" style="box-sizing:border-box;width:100%;padding:12px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff"><label style="display:block;margin:14px 0 6px">Parola</label><input id="seka-auth-password" type="password" autocomplete="current-password" required style="box-sizing:border-box;width:100%;padding:12px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#fff"><p id="seka-auth-error" role="alert" style="color:#fca5a5;min-height:18px"></p><div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" id="seka-auth-cancel" style="padding:10px 14px;border-radius:8px">İptal</button><button type="button" id="seka-auth-passkey" style="padding:10px 14px;border-radius:8px;background:#334155;color:#f8fafc;border:1px solid #64748b">Passkey ile giriş</button><button type="submit" style="padding:10px 16px;border-radius:8px;background:#14b8a6;color:#042f2e;font-weight:700;border:0">Giriş yap</button></div></form>';
       document.body.appendChild(overlay);
       const form = overlay.querySelector("#seka-auth-form");
       overlay.querySelector("#seka-auth-cancel").addEventListener("click", () => finish(false));
+      overlay.querySelector("#seka-auth-passkey").addEventListener("click", async () => {
+        const username = overlay.querySelector("#seka-auth-user").value.trim();
+        const button = overlay.querySelector("#seka-auth-passkey");
+        const errorNode = overlay.querySelector("#seka-auth-error");
+        button.disabled = true;
+        try {
+          if (await passkeyLogin(username, errorNode)) finish(true);
+          else button.disabled = false;
+        } catch (error) {
+          errorNode.textContent = error?.message || "Passkey ile giriş başarısız.";
+          button.disabled = false;
+        }
+      });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const username = overlay.querySelector("#seka-auth-user").value.trim();
@@ -45,6 +131,8 @@ async function requestLogin() {
           const data = await response.json();
           authToken = data.token || "";
           if (authToken) sessionStorage.setItem("seka.session", authToken);
+          const passkeyButton = document.querySelector("#passkey-register");
+          if (passkeyButton) passkeyButton.hidden = !authToken;
           finish(Boolean(authToken));
         } catch (error) {
           overlay.querySelector("#seka-auth-error").textContent = "Sunucuya bağlanılamadı.";
@@ -75,6 +163,22 @@ window.fetch = async (input, init = {}) => {
   }
   return response;
 };
+
+const passkeyEnrollmentButton = document.querySelector("#passkey-register");
+if (passkeyEnrollmentButton) {
+  passkeyEnrollmentButton.hidden = !authToken;
+  passkeyEnrollmentButton.addEventListener("click", async () => {
+    passkeyEnrollmentButton.disabled = true;
+    try {
+      const result = await registerPasskey();
+      alert("Passkey bu hesaba kaydedildi. Kayıtlı kimlik bilgisi sayısı: " + result.credential_count);
+    } catch (error) {
+      alert(error?.message || "Passkey kaydı tamamlanamadı.");
+    } finally {
+      passkeyEnrollmentButton.disabled = false;
+    }
+  });
+}
 
 function switchPanel(name) {
   $$(".nav-btn").forEach((b) => b.classList.remove("active"));
