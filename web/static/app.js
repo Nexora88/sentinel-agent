@@ -58,6 +58,8 @@ async function passkeyLogin(username, errorNode) {
   const data = await verifyResponse.json();
   authToken = data.token || "";
   if (authToken) sessionStorage.setItem("seka.session", authToken);
+  const enrollmentButton = document.querySelector("#passkey-register");
+  if (enrollmentButton) enrollmentButton.hidden = !authToken;
   return Boolean(authToken);
 }
 async function registerPasskey() {
