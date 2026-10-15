@@ -18,7 +18,7 @@ A local-first assistant and agent runtime built around local Ollama inference, e
 
 ## Local reasoning, hardware and agent-cluster foundations
 
-- `core/reasoning_engine.py` provides a bounded local-model draft → critique → synthesis flow. It returns concise findings and uncertainty, not hidden chain-of-thought. It does not execute tools, mutate files or merge pull requests.
+- `core/reasoning_engine.py` provides a bounded local-model draft → critique → synthesis flow, optionally routing each role to a different local model. It returns concise findings and uncertainty, not hidden chain-of-thought. It does not execute tools, mutate files or merge pull requests.
 - `core/hardware_backends.py` lists CPU, NVIDIA CUDA, AMD ROCm, Apple Metal, Intel Gaudi and NPU/TPU capabilities conservatively. Accelerator support remains unverified until tested on the exact hardware and runtime.
 - `core/agent_mesh.py` creates Ed25519-signed, time-limited, size-bounded task envelopes with replay protection and a narrow data-only task allowlist. It does not provide transport, encryption, discovery or remote execution. A real mesh still needs mTLS, peer enrollment, key revocation and explicit allowlists.
 - `scripts/benchmark_local_reasoning.py` runs the Turkish quality prompt set against local Ollama and saves response/latency data for manual review.
