@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from core.pipeline import SentinelPipeline
-from core.tenant_storage import tenant_root
+from core.tenant_storage import tenant_root, tenant_storage_id
 from core.auth import AuthManager
 from core.energy_policy import policy_status
 from core.job_bus import job_bus
@@ -132,7 +132,7 @@ MANIFESTO = {
 
 def get_pipeline(tenant_id: str = "owner") -> SentinelPipeline:
     identity = str(tenant_id or "owner").strip().lower()
-    tenant_root("./memory/tenants", identity)
+    tenant_root("./memory/tenants", tenant_storage_id(identity))
     if identity not in pipelines:
         pipelines[identity] = SentinelPipeline(tenant_id=identity)
     return pipelines[identity]
@@ -590,7 +590,7 @@ async def api_ingest(file: UploadFile = File(...), authorization: Optional[str] 
     if suffix not in {".pdf", ".md", ".txt", ".csv"}:
         raise HTTPException(400, "Sadece PDF, MD, TXT, CSV")
     max_bytes = 20 * 1024 * 1024
-    tenant_upload_dir = tenant_root("./memory/uploads", user["username"])
+    tenant_upload_dir = tenant_root("./memory/uploads", tenant_storage_id(user["username"]))
     tenant_upload_dir.mkdir(parents=True, exist_ok=True)
     dest = tenant_upload_dir / f"{uuid.uuid4().hex}{suffix}"
     total = 0
@@ -788,7 +788,7 @@ async def serve_image(filename: str, authorization: Optional[str] = Header(None)
     user = get_user(authorization)
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}\.(png|jpg|jpeg|webp|mp4)", filename, re.IGNORECASE):
         raise HTTPException(404)
-    root = (tenant_root("./memory/tenants", user["username"]) / "generated_images").resolve()
+    root = (tenant_root("./memory/tenants", tenant_storage_id(user["username"])) / "generated_images").resolve()
     path = (root / filename).resolve()
     if root in path.parents and path.is_file():
         return FileResponse(path, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
