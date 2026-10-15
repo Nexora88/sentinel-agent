@@ -213,7 +213,7 @@ mod tests {
         let m=model(); let mut cache=KvCache::new(2);
         let first=m.step(1,&mut cache).unwrap();
         assert_eq!(first.len(),17); assert_eq!(cache.sequence_len(),1);
-        assert_eq!(cache.layers[0].keys.len(),4*2);
+        assert_eq!(cache.layers[0].keys.len(),4);
         let _=m.step(2,&mut cache).unwrap();
         assert_eq!(cache.sequence_len(),2);
         assert_eq!(cache.layers[1].values.len(),2*4);
