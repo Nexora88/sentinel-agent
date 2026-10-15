@@ -37,6 +37,9 @@ from core.energy_policy import policy_status
 from core.job_bus import job_bus
 from core.local_voice import LocalVoiceError, voice_status, synthesize as synthesize_local_voice, transcribe as transcribe_local_voice
 from core.night_scheduler import NightScheduler
+from core.safety.sovereignty import sovereignty_status
+from core.approval_protocol import SignedApprovalProtocol, ApprovalProtocolError
+from tools.clean_room_audit import scan_code_cleanliness
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("seka.web")
@@ -103,7 +106,7 @@ chat_history = _load_chat_history()
 
 MANIFESTO = {
     "name": "MKAOS",
-    "version": "6.3",
+    "version": "6.5",
     "tagline": "Mustafa Kemal Atatürk Operating System · İstikbal Siber Göklerdedir · yerel egemenlik",
     "pillars": [
         "Yerel model çekirdeği ve denetlenebilir ajan planları",
@@ -173,6 +176,16 @@ class PlanRequest(BaseModel):
 
 class PackRequest(BaseModel):
     title: Optional[str] = "MKAOS Araştırma Paketi"
+
+class MediaQueueRequest(BaseModel):
+    operation: str = "generate"
+    prompt: str
+    width: int = 768
+    height: int = 768
+
+class ApprovalVerifyRequest(BaseModel):
+    payload: dict
+    signature_b64: str
 
 class VoiceRequest(BaseModel):
     text: str
@@ -313,11 +326,12 @@ async def api_status(authorization: Optional[str] = Header(None)):
     except Exception as exc:
         logger.warning("MKAOS bileşenleri başlatılamadı (%s).", type(exc).__name__)
         return {
-            "brand": "MKAOS", "version": "6.4", "status": "degraded", "user": user,
+            "brand": "MKAOS", "version": "6.5", "status": "degraded", "user": user,
             "assistant": {"status": "degraded", "message": "MKAOS paneli açık; yerel bellek veya model bileşeni başlatılamadı. Veriler otomatik silinmedi."},
             "ollama": {"status": "unavailable", "message": "Ollama bağlantısı hazır değil. Ollama hizmetini, model kurulumunu ve yerel bellek dizinini kontrol et."},
             "privacy": {"web_research": False, "external_finance_data": False, "site_scanning": False, "external_notifications": False, "github_network_access": False},
             "night_scheduler": night_scheduler.status() if night_scheduler else {"enabled": False, "running": False},
+            "sovereignty": sovereignty_status(),
         }
     uni = p.expander.get_status()
     fin = p.finance_status()
@@ -326,6 +340,7 @@ async def api_status(authorization: Optional[str] = Header(None)):
         "brand": "MKAOS",
         "version": "6.5",
         "status": "ok",
+        "sovereignty": sovereignty_status(),
         "ollama": _ollama_status(p),
         "rag": p.memory.stats(),
         "user": user,
@@ -661,7 +676,7 @@ async def api_finance_cycle(authorization: Optional[str] = Header(None)):
 async def api_image(req: ImageRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
     try:
-        return get_pipeline().image_gen.generate(req.prompt, width=req.width, height=req.height)
+        return get_pipeline().media_bridge.execute("generate", {"prompt": req.prompt, "width": req.width, "height": req.height})
     except Exception as exc:
         from tools.image_gen import MediaToolError
         if isinstance(exc, MediaToolError):
@@ -677,7 +692,7 @@ async def api_media_edit(prompt: str = Form(...), file: UploadFile = File(...), 
     if len(raw) > 12 * 1024 * 1024:
         raise HTTPException(413, "Görsel en fazla 12 MB olabilir.")
     try:
-        return get_pipeline().image_gen.edit(prompt, raw)
+        return get_pipeline().media_bridge.execute("edit", {"prompt": prompt, "image_bytes": raw})
     except Exception as exc:
         from tools.image_gen import MediaToolError
         if isinstance(exc, MediaToolError):
@@ -693,7 +708,7 @@ async def api_media_background(file: UploadFile = File(...), color: str = Form("
     if len(raw) > 12 * 1024 * 1024:
         raise HTTPException(413, "Görsel en fazla 12 MB olabilir.")
     try:
-        return get_pipeline().image_gen.replace_background(raw, color)
+        return get_pipeline().media_bridge.execute("background", {"image_bytes": raw, "color": color})
     except Exception as exc:
         from tools.image_gen import MediaToolError
         if isinstance(exc, MediaToolError):
@@ -711,7 +726,7 @@ class VideoRequest(BaseModel):
 async def api_media_video(req: VideoRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
     try:
-        return get_pipeline().image_gen.create_video(req.filename, req.duration)
+        return get_pipeline().media_bridge.execute("video", {"filename": req.filename, "duration": req.duration})
     except Exception as exc:
         from tools.image_gen import MediaToolError
         if isinstance(exc, MediaToolError):
@@ -729,6 +744,63 @@ async def serve_image(filename: str):
     if root in path.parents and path.is_file():
         return FileResponse(path)
     raise HTTPException(404)
+
+
+@app.get("/api/sovereignty")
+async def api_sovereignty(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return sovereignty_status()
+
+
+@app.get("/api/media/capabilities")
+async def api_media_capabilities(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    p = get_pipeline()
+    return {"bridge": p.media_bridge.capabilities(), "engine": p.media_engine.capabilities(),
+            "jobs": p.media_engine.list_jobs(20), "video_mode": "local ffmpeg motion effect, not text-to-video"}
+
+
+@app.post("/api/media/queue")
+async def api_media_queue(req: MediaQueueRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    if req.operation != "generate":
+        raise HTTPException(400, "Kuyruğa şu an yalnızca metinden görsel üretim görevi alınır.")
+    try:
+        return get_pipeline().media_engine.submit("generate", {"prompt": req.prompt[:2000],
+            "width": req.width, "height": req.height})
+    except Exception as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/media/jobs/{job_id}/run")
+async def api_media_run_job(job_id: str, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    try:
+        return get_pipeline().media_engine.run_job(job_id)
+    except Exception as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.get("/api/media/jobs")
+async def api_media_jobs(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return {"jobs": get_pipeline().media_engine.list_jobs(30)}
+
+
+@app.post("/api/approval/verify")
+async def api_approval_verify(req: ApprovalVerifyRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    try:
+        result = SignedApprovalProtocol().verify(req.payload, req.signature_b64)
+        return {**result, "execution": "not_started", "message": "İmza doğrulandı; bu uç nokta push/merge yürütmez."}
+    except ApprovalProtocolError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.get("/api/audit/clean-room")
+async def api_clean_room_audit(authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    return scan_code_cleanliness(os.getenv("MKAOS_AUDIT_ROOT", "."), max_files=300)
 
 
 @app.get("/api/users")
