@@ -24,10 +24,13 @@ def generate_native_reply(prompt: str, env: Mapping[str, str] | None = None) -> 
 
     checkpoint_value = settings.get("MKAOS_NATIVE_CHECKPOINT", "").strip()
     expected_hash = settings.get("MKAOS_NATIVE_SHA256", "").strip().lower()
-    if not checkpoint_value or not expected_hash:
+    if not checkpoint_value:
         raise NativeMkaosUnavailable(
-            "Native MKAOS checkpoint is not configured. Train and approve a local checkpoint, "
-            "then set MKAOS_NATIVE_CHECKPOINT and MKAOS_NATIVE_SHA256."
+            "Native MKAOS checkpoint is not configured. Set MKAOS_NATIVE_CHECKPOINT to a reviewed local checkpoint."
+        )
+    if not expected_hash:
+        raise NativeMkaosUnavailable(
+            "MKAOS_NATIVE_SHA256 is required; set the reviewed checkpoint's SHA-256 digest."
         )
     checkpoint = Path(checkpoint_value).expanduser().resolve()
     if not checkpoint.is_file():
