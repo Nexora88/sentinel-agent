@@ -6,6 +6,7 @@ on:
       - "Dockerfile.mkaos"
       - "docker-compose.yml"
       - "docker-compose.offline.yml"
+      - "docker-compose.mkaos-local-test.yml"
       - "core/ollama_client.py"
       - "engine/mkaos-hf-adapter/src/bin/mkaos_server.rs"
       - ".github/workflows/mkaos-container-build.yml"
@@ -24,5 +25,7 @@ jobs:
         run: docker compose config --quiet
       - name: Validate strict offline Compose overlay
         run: docker compose --file docker-compose.yml --file docker-compose.offline.yml --profile mkaos config --quiet
+      - name: Validate loopback-only MKAOS test overlay
+        run: docker compose --file docker-compose.yml --file docker-compose.mkaos-local-test.yml --profile mkaos config --quiet
       - name: Build resident MKAOS image
         run: docker build --file Dockerfile.mkaos --tag mkaos-resident:ci .
