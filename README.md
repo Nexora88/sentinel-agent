@@ -196,7 +196,7 @@ Ağ gizliliği, çalışma zamanı çıkış testi ve işletim sistemi güvenlik
 
 ## Deneysel MKAOS yerel motoru (isteğe bağlı)
 
-MKAOS'un yerleşik HTTP sunucusu model ağırlıklarını ve tokenizer'ı başlangıçta bir kez yükler; istek başına yalnızca KV önbelleğini oluşturur. Sunucu güvenlik için yalnızca loopback adresine bağlanır:
+MKAOS'un yerleşik HTTP sunucusu model ağırlıklarını ve tokenizer'ı başlangıçta bir kez yükler; aynı sistem istemi tekrar kullanıldığında sınırlı bir KV önek önbelleğinden yararlanır, her isteğin kullanıcı bağlamı için ayrı KV durumu oluşturur. Sunucu güvenlik için yalnızca loopback adresine bağlanır:
 
 ```bash
 python tools/fetch_model.py
