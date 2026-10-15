@@ -302,6 +302,18 @@
           </div>
         </div>
         <div class="control-card">
+          <h3>Yerel Hafıza Amnezisi</h3>
+          <p>Son X saat içindeki kişisel hafıza ve sohbet kayıtlarında tam ifade eşleşmelerini siler. Yedekleri veya SSD bloklarını güvenli biçimde imha ettiği anlamına gelmez.</p>
+          <label for="forget-topic">Silinecek ifade (en az 3 karakter)</label>
+          <input id="forget-topic" type="text" placeholder="Tam ifade veya konu"/>
+          <label for="forget-hours">Zaman aralığı (saat)</label>
+          <input id="forget-hours" type="number" min="1" max="8760" value="24"/>
+          <label for="forget-confirm">Onay metni: DELETE_MATCHING_MEMORY</label>
+          <input id="forget-confirm" type="text" placeholder="DELETE_MATCHING_MEMORY"/>
+          <button id="forget-memory-btn">Eşleşen yerel kayıtları sil</button>
+          <pre id="forget-memory-result" class="status-box">Açık onay verilmeden silme yapılmaz.</pre>
+        </div>
+        <div class="control-card">
           <h3>Temiz kod / lisans uyarı taraması</h3>
           <p>SPDX ve lisans bildirimi ipuçlarını yerelde arar. Semantik benzerlik ölçmez; yasal karar veya telif garantisi değildir.</p>
           <button id="clean-room-audit-btn">Yerel lisans denetimini çalıştır</button>
