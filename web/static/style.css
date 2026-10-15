@@ -520,3 +520,11 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .audit-row { border-left: 3px solid var(--accent-2); }
 
 .quick-status.is-degraded { border-color: rgba(248, 113, 113, .5); box-shadow: inset 3px 0 0 var(--danger); }
+
+/* Voice studio controls: legible, keyboard-accessible local speech tuning. */
+#voice-pace { accent-color: var(--accent); width: min(180px, 100%); cursor: pointer; }
+#voice-pace-value { color: var(--accent); font-variant-numeric: tabular-nums; min-width: 3.5em; display: inline-block; }
+.voice-controls label[for="voice-pace"] { display: inline-flex; align-items: center; gap: 6px; }
+.voice-controls select, .voice-controls input { min-height: 38px; }
+.voice-status { line-height: 1.45; }
+@media (max-width: 700px) { .voice-controls { align-items: stretch; } #voice-pace { width: 100%; } }
