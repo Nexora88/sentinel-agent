@@ -205,10 +205,13 @@ fn generate(
     prefill_ns += prefill_start.elapsed().as_nanos();
     let decode_start = Instant::now();
     let mut generated = Vec::<u32>::new();
+    // Penalize repeats against the prompt and generated answer, not just tokens
+    // emitted in this response. Maintain the history incrementally to avoid a
+    // per-token allocation/copy on the decode hot path.
+    let mut repetition_context = prompt_ids.clone();
     for index in 0..max_new {
         let mut adjusted_logits = logits.clone();
-        let previous: Vec<usize> = generated.iter().map(|&token| token as usize).collect();
-        sampling::apply_repetition_penalty(&mut adjusted_logits, &previous, penalty).map_err(|e| e.to_string())?;
+        sampling::apply_repetition_penalty(&mut adjusted_logits, &repetition_context, penalty).map_err(|e| e.to_string())?;
         let sampled = if temperature <= 0.0 {
             sampling::greedy_sample(&adjusted_logits)
         } else {
@@ -217,6 +220,7 @@ fn generate(
         let token = sampled.map_err(|e| e.to_string())? as u32;
         if eos_ids.contains(&token) { break; }
         generated.push(token);
+        repetition_context.push(token as usize);
         if index + 1 < max_new {
             logits = model.step(token as usize, &mut cache).map_err(|e| e.to_string())?;
         }
