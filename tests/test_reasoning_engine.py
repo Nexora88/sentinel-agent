@@ -36,6 +36,22 @@ class ReasoningEngineTests(unittest.TestCase):
         self.assertEqual(len(model.calls), 1)
         self.assertIn("Not run", result.critique_summary)
 
+    def test_can_route_passes_to_distinct_local_models(self):
+        draft = FakeModel()
+        critic = FakeModel()
+        synthesis = FakeModel()
+        draft.model_name = "local-fast"
+        critic.model_name = "local-critic"
+        synthesis.model_name = "local-synthesis"
+        result = LocalReasoningEngine(
+            draft, critic_model=critic, synthesis_model=synthesis, max_passes=3
+        ).run("Review a patch")
+        self.assertEqual(len(draft.calls), 1)
+        self.assertEqual(len(critic.calls), 1)
+        self.assertEqual(len(synthesis.calls), 1)
+        self.assertIn("local-critic", result.model_name)
+        self.assertIn("local-synthesis", result.model_name)
+
     def test_empty_task_rejected(self):
         with self.assertRaises(ValueError):
             LocalReasoningEngine(FakeModel()).run("  ")
