@@ -68,6 +68,18 @@ class ImprovementProposalStore:
         self._write(self._path(proposal_id), record)
         return {k: v for k, v in record.items() if k != "patch"}
 
+    def get(self, proposal_id: str) -> dict:
+        path = self._path(proposal_id)
+        if not path.is_file():
+            raise ImprovementProposalError("Öneri bulunamadı.")
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ImprovementProposalError("Öneri kaydı okunamadı.") from exc
+        if not isinstance(data, dict) or data.get("id") != proposal_id:
+            raise ImprovementProposalError("Öneri kaydı doğrulanamadı.")
+        return data
+
     def list(self, limit: int = 50) -> list[dict]:
         items = []
         for path in sorted(self.root.glob("????????????????.json"), key=lambda p: p.stat().st_mtime, reverse=True):
