@@ -19,6 +19,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from core.ollama_client import OllamaClient
+from core.encrypted_store import EncryptedFileStore, EncryptedStoreError
 
 logger = logging.getLogger("sentinel.personal_memory")
 
@@ -35,7 +36,9 @@ class PersonalMemory:
         self.tenant_id = str(tenant_id).strip().lower() if tenant_id else None
         self.persist_directory = Path(persist_directory)
         self.persist_directory.mkdir(parents=True, exist_ok=True)
-        self.profile_path = self.persist_directory / "profile.json"
+        self.encrypt_profile = os.getenv("MKAOS_ENCRYPT_PERSONAL_PROFILE", "").strip().lower() in {"1", "true", "yes", "on"}
+        self.profile_path = self.persist_directory / ("profile.enc" if self.encrypt_profile else "profile.json")
+        self.legacy_profile_path = self.persist_directory / "profile.json"
 
         self.ollama = ollama or OllamaClient()
 
@@ -53,7 +56,24 @@ class PersonalMemory:
         self._profile: Dict[str, Any] = self._load_profile()
 
     def _load_profile(self) -> Dict[str, Any]:
-        if self.profile_path.exists():
+        if self.encrypt_profile:
+            if self.legacy_profile_path.exists() and not self.profile_path.exists():
+                raise RuntimeError(
+                    "Plaintext profile.json exists while encrypted profiles are enabled. "
+                    "Back it up and migrate it explicitly; automatic migration is disabled."
+                )
+            if self.profile_path.exists():
+                try:
+                    raw = EncryptedFileStore(self.profile_path).read_bytes()
+                    data = json.loads(raw.decode("utf-8"))
+                    if not isinstance(data, dict):
+                        raise ValueError("profile must be a JSON object")
+                    return data
+                except (EncryptedStoreError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+                    raise RuntimeError(
+                        f"Encrypted local profile is unreadable; preserve and recover {self.profile_path} before restarting."
+                    ) from exc
+        elif self.profile_path.exists():
             try:
                 data = json.loads(self.profile_path.read_text(encoding="utf-8"))
                 if not isinstance(data, dict):
@@ -78,13 +98,18 @@ class PersonalMemory:
     def _save_profile(self) -> None:
         self._profile["updated_at"] = datetime.utcnow().isoformat()
         self.profile_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps(self._profile, ensure_ascii=False, indent=2).encode("utf-8")
+        if self.encrypt_profile:
+            # EncryptedFileStore uses atomic replacement and fails closed when the key is absent.
+            EncryptedFileStore(self.profile_path).write_bytes(payload)
+            return
         temp_name = None
         try:
             with tempfile.NamedTemporaryFile(
                 "w", encoding="utf-8", dir=str(self.profile_path.parent),
                 prefix=".profile-", suffix=".tmp", delete=False
             ) as temp:
-                json.dump(self._profile, temp, ensure_ascii=False, indent=2)
+                temp.write(payload.decode("utf-8"))
                 temp.flush()
                 os.fsync(temp.fileno())
                 temp_name = temp.name
