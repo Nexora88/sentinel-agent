@@ -86,6 +86,25 @@ pub fn load_checkpoint(path: impl AsRef<Path>, expected_sha256: &str, max_bytes:
     Ok(Checkpoint { tensors, sha256: actual })
 }
 
+/// Compare loaded tensor names and dimensions with the architecture's expected manifest.
+/// Every expected tensor must exist with the exact shape; unexpected tensors are rejected by default.
+pub fn validate_tensor_shapes(
+    checkpoint: &Checkpoint,
+    expected: &BTreeMap<String, (usize, usize)>,
+) -> Result<(), CheckpointError> {
+    if checkpoint.tensors.len() != expected.len() {
+        return Err(CheckpointError::Malformed("tensor set does not match model manifest"));
+    }
+    for (name, &(rows, cols)) in expected {
+        let tensor = checkpoint.tensors.get(name)
+            .ok_or(CheckpointError::Malformed("required tensor missing from checkpoint"))?;
+        if tensor.rows() != rows || tensor.cols() != cols {
+            return Err(CheckpointError::Malformed("tensor shape does not match model manifest"));
+        }
+    }
+    Ok(())
+}
+
 struct Cursor<'a> { bytes: &'a [u8], pos: usize }
 impl<'a> Cursor<'a> {
     fn take(&mut self, n: usize) -> Result<&'a [u8], CheckpointError> {
