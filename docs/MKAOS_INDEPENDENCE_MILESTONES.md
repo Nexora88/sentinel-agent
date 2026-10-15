@@ -90,3 +90,14 @@ Bu adım bir **eğitim altyapısı** ekler; eğitimin gerçekten çalıştırıl
 
 - [x] Özel checkpoint hash doğrulamasından sonra `GqaDecoder` ile greedy token üretimi yapan yerel Rust CLI eklendi: `engine/mkaos-inference/src/bin/mkaos-generate.rs`.
 - [x] CI, yeni Python bütünlük testleri ve Rust crate'in tüm hedeflerini derleyip test edecek şekilde genişletildi; yeni CI sonucu henüz gözlenmedi.
+
+
+## 2026-10-16 — menşe ve egemenlik güvence programı
+- [x] Veri, tokenizer, model ağırlıkları, kaynak kod, transitif bağımlılıklar, derleme, dağıtım, donanım ve dağıtık güvenlik katmanları için kanıt tabanlı kabul kapıları belgelendi: docs/MKAOS_SOVEREIGNTY_ASSURANCE_PROGRAM.md.
+- [x] Ağ kullanmadan yerel dosya envanteri, SHA-256, bağımlılık manifestleri, model dosyaları ve üçüncü taraf model/runtime referanslarını raporlayan denetim aracı eklendi: tools/audit_mkaos_provenance.py.
+- [x] Denetim aracı için testler ve CI adımı eklendi; bu testler aracın davranışını doğrular, bağımsızlık iddiasını doğrulamaz.
+- [ ] Rapor gerçek bir sürüm üzerinde çalıştırılıp her bilinmeyen için insan onaylı kanıt eklenmedi.
+- [ ] Transitif lisans/SBOM, imzalı artefakt, ağsız tekrarlanabilir build ve çalışma zamanı ağ çıkışı ölçümü tamamlanmadı.
+- [ ] Gerçek Türkçe korpus/checkpoint, bağımsız kalite, fiziksel hızlandırıcı, Kubernetes kalıcı durum, canlı mTLS/iptal ve çok düğümlü güvenlik kapıları hâlâ açık.
+
+**Önemli:** Statik tarama dosya hash'lerini ve şüpheli referansları envanterler; yazar menşeini, lisans iznini, fiziksel donanımın ülke menşeini veya ağ çıkışının imkânsızlığını kanıtlamaz.
