@@ -1,5 +1,50 @@
 const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => document.querySelectorAll(sel);
+const $ = (sel) => document.querySelectorAll(sel);
+
+// Authenticated local session. Token is kept in sessionStorage, not in URLs.
+const nativeFetch = window.fetch.bind(window);
+let authToken = sessionStorage.getItem("seka.session") || "";
+let authPromptActive = false;
+async function requestLogin() {
+  if (authToken) return true;
+  if (authPromptActive) return false;
+  authPromptActive = true;
+  try {
+    const username = prompt("SEKA oturumu — kullanıcı adı", "owner");
+    if (!username) return false;
+    const password = prompt("SEKA oturumu — parola");
+    if (password === null || password === "") return false;
+    const response = await nativeFetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    if (!response.ok) {
+      alert("Giriş başarısız. Kullanıcı adı/parolayı ve OWNER_PASSWORD ayarını kontrol et.");
+      return false;
+    }
+    const data = await response.json();
+    authToken = data.token || "";
+    if (authToken) sessionStorage.setItem("seka.session", authToken);
+    return Boolean(authToken);
+  } finally {
+    authPromptActive = false;
+  }
+}
+window.fetch = async (input, init = {}) => {
+  const url = typeof input === "string" ? input : input.url;
+  if (!url || url.includes("/api/login") || !url.includes("/api/")) return nativeFetch(input, init);
+  const sourceHeaders = init.headers || (typeof input !== "string" ? input.headers : undefined);
+  const headers = new Headers(sourceHeaders);
+  if (authToken) headers.set("Authorization", "Bearer " + authToken);
+  let response = await nativeFetch(input, { ...init, headers });
+  if (response.status === 401 && await requestLogin()) {
+    const retryHeaders = new Headers(sourceHeaders);
+    retryHeaders.set("Authorization", "Bearer " + authToken);
+    response = await nativeFetch(input, { ...init, headers: retryHeaders });
+  }
+  return response;
+};
 
 function switchPanel(name) {
   $$(".nav-btn").forEach((b) => b.classList.remove("active"));
@@ -299,25 +344,38 @@ function renderJobs(jobs) {
   });
 }
 
-function connectSSE() {
+async function connectSSE() {
+  const cache = new Map();
   try {
-    const es = new EventSource("/api/jobs/stream");
-    const cache = new Map();
-    es.onmessage = (ev) => {
-      try {
-        const j = JSON.parse(ev.data);
-        cache.set(j.id, j);
-        const list = Array.from(cache.values()).sort((a, b) =>
-          (b.updated_at || "").localeCompare(a.updated_at || "")
-        );
-        renderJobs(list);
-      } catch (e) {}
-    };
-    es.onerror = () => {
-      es.close();
+    const response = await fetch("/api/jobs/stream", { headers: { Accept: "text/event-stream" } });
+    if (!response.ok || !response.body) {
       setTimeout(connectSSE, 5000);
-    };
+      return;
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+      for (const event of events) {
+        const line = event.split("\n").find((part) => part.startsWith("data: "));
+        if (!line) continue;
+        try {
+          const job = JSON.parse(line.slice(6));
+          cache.set(job.id, job);
+          const list = Array.from(cache.values()).sort((a, b) =>
+            (b.updated_at || "").localeCompare(a.updated_at || "")
+          );
+          renderJobs(list);
+        } catch (e) {}
+      }
+    }
   } catch (e) {}
+  setTimeout(connectSSE, 5000);
 }
 
 async function loadPulse() {
@@ -542,20 +600,20 @@ async function loadApprovals() {
     return;
   }
   box.innerHTML = "";
-  pending.forEach((item, idx) => {
+  pending.forEach((item) => {
     const card = document.createElement("div");
     card.className = "approval-card";
     card.innerHTML = `
       <div class="details"><div class="action-name">${item.action}</div><div>${item.details}</div></div>
       <div class="approval-actions">
-        <button class="approve" data-idx="${idx}">Onayla</button>
+        <button class="approve" data-id="${item.id}">Onayla</button>
         <button class="reject" data-idx="${idx}">Reddet</button>
       </div>`;
     box.appendChild(card);
   });
   box.querySelectorAll(".approve").forEach((btn) =>
     btn.addEventListener("click", async () => {
-      await fetch(`/api/approvals/${btn.dataset.idx}/approve`, { method: "POST" });
+      await fetch(`/api/approvals/${btn.dataset.id}/approve`, { method: "POST" });
       loadApprovals();
     })
   );
