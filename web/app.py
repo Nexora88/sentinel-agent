@@ -100,7 +100,7 @@ chat_history = _load_chat_history()
 MANIFESTO = {
     "name": "SEKA",
     "version": "6.1",
-    "tagline": "Yerel süper ajan — ücretli API yok, veri sende kalır",
+    "tagline": "Yerel Türkçe ajan — ağ özellikleri varsayılan olarak kapalı",
     "pillars": [
         "Ollama ile tamamen yerel zeka",
         "Bilgi evreni: sanitize + güven skoru ile büyür",
@@ -258,6 +258,13 @@ async def api_status(authorization: Optional[str] = Header(None)):
         "pending_approvals": len(p.permissions.list_pending()),
         "github_enabled": p.github.enabled,
         "chat_turns": sum(len(turns) for turns in chat_history.values()),
+        "privacy": {
+            "web_research": os.getenv("ALLOW_WEB_RESEARCH", "false").lower() == "true",
+            "external_finance_data": os.getenv("ALLOW_EXTERNAL_FINANCE_DATA", "false").lower() == "true",
+            "site_scanning": os.getenv("ALLOW_SITE_SCANNING", "false").lower() == "true",
+            "external_notifications": os.getenv("ALLOW_EXTERNAL_NOTIFICATIONS", "false").lower() == "true",
+            "github_network_access": p.github.enabled,
+        },
     }
 
 
@@ -470,7 +477,8 @@ async def api_ingest(file: UploadFile = File(...), authorization: Optional[str] 
 @app.get("/api/approvals")
 async def api_approvals(authorization: Optional[str] = Header(None)):
     get_user(authorization)
-    return {"pending": get_pipeline().permissions.list_actionable()}
+    permissions = get_pipeline().permissions
+    return {"pending": permissions.list_actionable(), "history": permissions.list_history(30)}
 
 
 @app.post("/api/approvals/{request_id}/approve")
