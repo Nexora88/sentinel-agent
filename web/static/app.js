@@ -944,13 +944,20 @@ async function loadStatus() {
     $("#status-text").textContent = JSON.stringify(data, null, 2);
     const u = data.universe || {};
     const f = data.finance || {};
+    const ollama = data.ollama || {};
+    const rag = data.rag || {};
+    const ollamaLabel = ollama.status === "online" ? "hazır" : ollama.status === "model_missing" ? "model eksik" : "bağlantı yok";
+    const diskMb = Number(rag.disk_bytes || 0) / (1024 * 1024);
     $("#quick-status").innerHTML = `
       <strong>SEKA ${data.version || ""}</strong><br>
+      Ollama: ${ollamaLabel}<br>
       Bilgi: ${u.total_pages || 0}<br>
+      RAG: ${rag.documents ?? 0}/${rag.max_documents ?? "—"} parça · ${diskMb.toFixed(1)} MB<br>
       Paper: ${f.equity ?? "—"}<br>
       Onay: ${data.pending_approvals || 0}<br>
       Ağ: ${data.privacy?.web_research ? "web açık" : "web kapalı"} · ${data.privacy?.external_finance_data ? "finans açık" : "finans kapalı"} · ${data.privacy?.site_scanning ? "tarama açık" : "tarama kapalı"}<br>
       Bildirim: ${data.privacy?.external_notifications ? "açık" : "kapalı"}`;
+    $("#quick-status").classList.toggle("is-degraded", ollama.status !== "online" || data.status === "degraded");
     renderJobs(data.jobs || []);
   } catch (e) {}
 }
