@@ -762,6 +762,11 @@ $("#finance-btn").addEventListener("click", async () => {
 let lastMediaFilename = "";
 function renderMediaResult(data) {
   const box = $("#image-result");
+  if (data.status === "queued" && data.id) {
+    box.textContent = "Donanım eşiği nedeniyle görev kuyruğa alındı (" + data.id + "). Egemenlik Kontrol Odası'ndan kaynaklar uygun olduğunda çalıştırabilirsin.";
+    loadControlRoom();
+    return;
+  }
   if (!data.success || !/^[A-Za-z0-9._-]+$/.test(String(data.filename || ""))) {
     box.textContent = data.detail || data.error || "İşlem tamamlanamadı.";
     return;
@@ -1081,6 +1086,9 @@ async function loadControlRoom() {
       const name=document.createElement("div"); name.className="action-name"; name.textContent=job.operation+" · "+job.id;
       const desc=document.createElement("div"); desc.textContent=job.status+" — "+(job.reason||"");
       detail.append(name,desc); card.appendChild(detail);
+      if (job.status === "done" && /^[A-Za-z0-9_-]{1,80}\\.(png|jpg|jpeg|webp|mp4)$/i.test(String(job.result?.filename || ""))) {
+        const link=document.createElement("a"); link.href="/api/images/"+encodeURIComponent(job.result.filename); link.target="_blank"; link.rel="noopener noreferrer"; link.textContent="Üretilen dosyayı aç"; link.className="media-download"; card.appendChild(link);
+      }
       if (job.status==="queued") {
         const run=document.createElement("button"); run.textContent="Kaynak uygunsa çalıştır";
         run.addEventListener("click", async()=>{ const res=await fetch("/api/media/jobs/"+encodeURIComponent(job.id)+"/run",{method:"POST"}); const d=await res.json(); desc.textContent=d.status+" — "+(d.reason||d.result?.error||""); loadControlRoom(); });
