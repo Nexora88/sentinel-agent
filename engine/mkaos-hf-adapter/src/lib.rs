@@ -2,6 +2,7 @@
 //! The core tensor crate stays dependency-free; this adapter uses the upstream tokenizers
 //! implementation so BPE/ByteLevel behavior comes from the pinned tokenizer artifact.
 pub mod model_loader;
+pub mod policy;
 use std::path::Path;
 use tokenizers::{Encoding, Tokenizer};
 type TokenizerError = Box<dyn std::error::Error + Send + Sync>;
