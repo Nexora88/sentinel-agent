@@ -1,44 +1,28 @@
 # MKAOS bağımsız çıkarım çekirdeği
 
-Bu crate, MKAOS'un kendi CPU çıkarım motoru için harici crate kullanmayan ve `unsafe` kodu yasaklayan Rust başlangıç katmanıdır. Şu anki bileşenler bir üretim sohbet modelinin tamamı değil; denetlenebilir matematik ve güvenli model-verisi temelleridir.
+Bu crate, MKAOS'un denetlenebilir CPU çıkarım motoru için harici Rust crate gerektirmeyen ve unsafe kodu yasaklayan başlangıç katmanıdır. Henüz eğitilmiş bir modeli uçtan uca çalıştıran üretim runtime'ı değildir.
 
-## Uygulanan bileşenler
+## Mevcut altyapı
 
-- Boyut, taşma, NaN/sonsuz değer denetimli 2B F32 tensör; matris çarpımı/transpoz, softmax ve RMSNorm
-- Token embedding lookup; çok başlıklı RoPE, causal attention, residual ve SwiGLU içeren tek decoder bloğu
-- Bağımsız SHA-256 uygulaması ve bilinen test vektörleri
-- Sürüm/magic imzalı `MKAOSW1\0` tensör konteyneri için sınırlandırılmış dosya okuyucu
-- Yükleme sırasında beklenen SHA-256 doğrulaması; dosya boyutu, tensor sayısı, isim uzunluğu, boyut çarpımı, eleman sayısı, sonlu F32 ve dosya sonu kontrolleri
-- UTF-8 byte tokenizer (yalnızca byte-level modeller ve altyapı testleri için)
-- Greedy ve top-k token örnekleme yardımcıları
+- F32 tensör matematiği, matris çarpımı, softmax ve RMSNorm.
+- Tek sentetik Transformer decoder bloğu: embedding, RoPE, causal multi-head attention, residual ve SwiGLU.
+- SHA-256 ve sınırlandırılmış MKAOSW1 checkpoint okuyucusu; beklenen hash, dosya sınırı, tensor şekli ve sonlu ağırlık denetimleri.
+- UTF-8 byte tokenizer (yaygın BPE/SentencePiece modelleriyle uyumlu değildir).
+- Greedy, top-k ve top-p örnekleme.
+- EOS ve token dizisiyle durdurma destekli referans üretim döngüsü.
 
-## Güvenli checkpoint biçimi
+## Gerçek model adayı
 
-`checkpoint::load_checkpoint(path, expected_sha256, max_bytes, max_elements_per_tensor)` dosyayı sınırlandırılmış biçimde okur ve ayrıştırmadan önce bütün dosyanın SHA-256 değerini karşılaştırır. Biçim little-endian olarak 8 bayt magic (`MKAOSW1\0`), u32 tensor sayısı ve her tensor için u16 ad uzunluğu + UTF-8 ad + u32 satır + u32 sütun + F32LE veri içerir. Her tensor ve dosya tamamen doğrulanır; tekrarlanan adlar, eksik/trailing baytlar ve NaN/sonsuz ağırlıklar reddedilir.
+models/smollm2-135m-instruct/model-lock.json dosyası, Apache-2.0 olarak listelenen SmolLM2-135M-Instruct modelinin değişmez kaynak revision'ını ve tokenizer/ağırlık URL'lerini kaydeder. Revision sabitlenmiştir; dosyaların SHA-256 değerleri bu ortamda gerçek dosyalar indirilip ölçülmediğinden henüz null'dır. Hash uydurulmamıştır. Ağ erişimi olan ortamda tools/fetch_model.py çalıştırılarak dosya hash'leri üretilebilir.
 
-Hash kontrolü **dosyanın bütünlüğünü** doğrular; modelin kaynağının veya lisansının doğru olduğunu tek başına kanıtlamaz. Beklenen hash güvenilir, bağımsız bir kaynaktan alınmalıdır. Mimariye özgü tensor adları ve şekilleri, checkpoint manifestindeki beklenen şekillerle ayrıca eşleştirilmelidir.
+Bu aday LlamaForCausalLM, grouped-query attention ve BPE tokenizer kullanır. Mevcut Rust decoder bu mimariyle uyumlu değildir. Bu nedenle model henüz Rust motorunda çalıştırılabilir kabul edilmez. tools/convert_safetensors_to_mkaosw1.py yalnızca format dönüşümü yapar; mimari parametre eşlemesi sağlamaz.
 
-## Önemli sınırlar
+## Üretim döngüsü sınırları
 
-- ByteTokenizer, SentencePiece/BPE veya yaygın önceden eğitilmiş LLM tokenizer'larıyla uyumlu değildir.
-- Repo içinde lisansı ve kökeni doğrulanmış eğitilmiş bir küçük model ağırlığı henüz yoktur.
-- Birden çok decoder katmanı, KV cache, final norm + LM head ile uçtan uca metin üretim döngüsü ve mimariye özgü checkpoint-to-model eşlemesi henüz tamamlanmamıştır.
-- Gerçek model metni, bellek kullanımı, token/s ve gecikme karşılaştırması henüz yapılmamıştır. Sentetik ağırlıklarla test, dil kalitesi kanıtı değildir.
-
-Bu nedenle Ollama entegrasyonu kaldırılmamalıdır. Bağımsız runtime gerçek ağırlıklarla doğrulanıp aynı değerlendirme kümesinde kalite, gecikme, RAM ve kararlılık eşiklerini geçene kadar Ollama geri dönüş seçeneği olarak kalır.
+Generation sürücüsü EOS ve durdurma dizilerini destekler; ancak her token için tüm prefix'i yeniden hesaplar. Bu gerçek KV cache değildir. Çok katmanlı decoder, GQA, model uyumlu tokenizer, final norm/LM head'in gerçek checkpoint ile bağlanması ve artımlı KV-cache decode hâlâ yapılmalıdır.
 
 ## Test
 
-```bash
 cargo test --manifest-path engine/mkaos-inference/Cargo.toml
-```
 
-Rust toolchain olmayan makinelerde test çalıştırılamaz. CI sonucu doğrulanmadan testlerin geçtiği varsayılmamalıdır.
-
-## Geliştirme ilkeleri
-
-1. Her kernel için matematiksel tanım, sınır koşulu ve deterministik test.
-2. Harici model dosyası için lisans/menşe kaydı, dosya boyutu limiti, SHA-256 ve mimariye uygun şekil doğrulaması.
-3. Tokenizer, model ağırlıkları ve model mimarisi aynı model sürümüne ait olmalı.
-4. Önce F32 doğruluğu; optimizasyon ancak tekrarlanabilir benchmark sonrası.
-5. Mevcut backend, bağımsız motor ölçümlerle yeterli kalite ve kararlılığı kanıtlayana kadar korunmalı.
+Rust testleri CI çalışması doğrulanmadan başarılı sayılmaz. Sentetik testler model kalitesi kanıtı değildir. Ollama, gerçek model ve aynı prompt kümesindeki kalite/kararlılık/RAM/gecikme ölçümleri yeterli olana kadar korunur.
