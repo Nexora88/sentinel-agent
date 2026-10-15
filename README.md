@@ -17,6 +17,14 @@ MKAOS, *Mustafa Kemal Atatürk Operating System* anlamıyla yerel egemenlik, bil
 - **Savunmacı tarama:** web tarayıcısı yerel/özel IP'leri ve doğrulanmayan yönlendirmeleri engeller. Yalnızca sahibi olduğun veya tarama iznin olan hedeflerde kullan.
 - **Güvenlik dürüstlüğü:** uygulama tek başına “veri asla dışarı çıkamaz” garantisi veremez. Bu; uygulama ayarlarına, işletim sistemi/firewall'a, model endpoint'ine, yedeklemeye ve etkinleştirilen entegrasyonlara bağlıdır.
 
+## Egemenlik, imzalı onay ve yerel hafıza
+
+- `GET /api/sovereignty` ağ bağlantısı denemesi yapmadan bulut işaretlerini ve opsiyonel host attestasyon dosyasını okur. Sonuç tek başına firewall denetimi değildir; uygulama `fully_sovereign=false` döndürür.
+- `POST /api/approval/verify` Ed25519 imzasını doğrular, payload hash'ini yerel audit dosyasına yazar ve tekrar kullanılan `request_id` değerini reddeder. Bu sürüm doğrulama sonrasında otomatik push/merge yürütmez.
+- Tarayıcıdaki anahtar üretimi özel anahtarı indirir; özel anahtar MKAOS sunucusuna gönderilmez. Açık anahtar `MKAOS_APPROVAL_ED25519_PUBLIC_KEY` ortam değişkenine eklenmelidir.
+- `GET /api/audit/clean-room` SPDX/lisans bildirim ipuçlarını tarar. Semantik benzerlik taraması yapmaz ve telif temizliği garantisi değildir.
+- `POST /api/privacy/forget` yalnızca açık `DELETE_MATCHING_MEMORY` onayıyla çalışır; zaman damgalı kişisel vektör kayıtları ve zaman damgalı sohbet eşleşmelerini siler. Zaman damgası olmayan eski sohbetler/profil gerçekleri, yedekler ve sistem günlükleri korunur.
+
 ## Yerel medya stüdyosu
 
 - Görsel üretimi ve düzenleme yalnızca `SD_API_URL` ile açıkça yapılandırılmış, kendi yönettiğin Stable Diffusion WebUI API sunucusuna gider. Kamuya açık görsel API yedeği kaldırılmıştır; sunucu tanımlı değilse işlem başarısız olur ve görsel istemi dışarı gönderilmez.
