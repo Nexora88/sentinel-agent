@@ -89,11 +89,11 @@ def ollama_once(base_url: str, model: str, prompt: str) -> dict:
     }
 
 
-def mkaos_once(model_dir: str, prompt: str) -> dict:
+def mkaos_once(model_dir: str, prompt: str, max_new_tokens: int) -> dict:
     command = [
         "/usr/bin/time", "-v", "cargo", "run", "--release", "--quiet",
         "--manifest-path", "engine/mkaos-hf-adapter/Cargo.toml",
-        "--bin", "mkaos_generate", "--", model_dir, prompt, "96",
+        "--bin", "mkaos_generate", "--", model_dir, prompt, str(max_new_tokens),
     ]
     child_env = dict(__import__("os").environ)
     child_env["MKAOS_SYSTEM_PROMPT"] = SYSTEM_PROMPT
@@ -116,13 +116,16 @@ def main() -> int:
     parser.add_argument("--ollama-model", required=True)
     parser.add_argument("--ollama-url", default="http://127.0.0.1:11434")
     parser.add_argument("--runs", type=int, default=1)
+    parser.add_argument("--max-new-tokens", type=int, default=32)
     args = parser.parse_args()
     if args.runs < 1 or args.runs > 10:
         raise SystemExit("--runs must be between 1 and 10")
+    if args.max_new_tokens < 1 or args.max_new_tokens > 512:
+        raise SystemExit("--max-new-tokens must be between 1 and 512")
     results = []
     for run in range(args.runs):
         for prompt in PROMPTS:
-            mkaos = mkaos_once(args.model_dir, prompt)
+            mkaos = mkaos_once(args.model_dir, prompt, args.max_new_tokens)
             ollama = ollama_once(args.ollama_url, args.ollama_model, prompt)
             row = {
                 "run": run + 1, "prompt": prompt,
@@ -136,6 +139,7 @@ def main() -> int:
         "model_dir": args.model_dir,
         "ollama_model": args.ollama_model,
         "runs": args.runs,
+        "max_new_tokens": args.max_new_tokens,
         "prompt_count_per_run": len(PROMPTS),
         "system_prompt": SYSTEM_PROMPT,
         "results": results,
