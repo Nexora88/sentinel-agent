@@ -66,6 +66,8 @@
               <option value="male">Erkek · tok ve bilge</option>
               <option value="female">Kadın · enerjik ve net</option>
             </select>
+            <label for="voice-pace">Konuşma hızı <output id="voice-pace-value">1,00×</output></label>
+            <input id="voice-pace" type="range" min="0.85" max="1.15" step="0.05" value="1" aria-label="Konuşma hızı" />
             <label class="cat-toggle"><input type="checkbox" id="cat-dub-toggle" /> 🐈 Kedi dublajı</label>
             <button id="voice-test-btn" type="button">Sesi dene</button>
             <button id="voice-stop-btn" type="button" class="voice-stop">Durdur</button>
