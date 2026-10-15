@@ -87,6 +87,8 @@ jobs:
           token="$(curl --fail --silent -X POST http://127.0.0.1:18000/api/login -H 'Content-Type: application/json' -d "{\"username\":\"owner\",\"password\":\"$bootstrap_secret\"}" | python -c 'import json,sys; print(json.load(sys.stdin)["token"])')"
           status="$(curl --fail --silent -H "Authorization: Bearer $token" http://127.0.0.1:18000/api/status)"
           printf '%s' "$status" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["status"] == "ok", d; assert d["ollama"]["status"] == "unavailable", d.get("ollama"); assert "rag" in d, d; print("Pipeline initializes; panel stays healthy and reports Ollama outage gracefully.")'
+      - name: Test fail-closed native Rust chat adapter
+        run: python -m unittest discover -s tests -p test_mkaos_native_chat.py -v
       - name: Run security regression tests
         run: python -m unittest discover -s tests -v
       - name: Benchmark native Turkish retrieval smoke set
