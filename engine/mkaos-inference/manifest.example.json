@@ -1,0 +1,40 @@
+{
+  "manifest_version": "1.0",
+  "model_id": "mkaos-tr-small-experimental",
+  "architecture": {
+    "family": "mkaos-transformer-decoder",
+    "layers": 2,
+    "hidden_size": 64,
+    "attention_heads": 4,
+    "vocab_size": 512,
+    "context_length": 256,
+    "normalization": "rms_norm",
+    "position_encoding": "rope"
+  },
+  "weights": [
+    {
+      "path": "weights/model.mkt",
+      "format": "mkaos-tensor-v1",
+      "dtype": "f32",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "size_bytes": 1
+    }
+  ],
+  "tokenizer": {
+    "type": "mkaos-bpe-v1",
+    "path": "tokenizer/tokenizer.json",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "vocab_size": 512
+  },
+  "provenance": {
+    "license": "CC0-1.0",
+    "base_model": null,
+    "training_data_manifest_sha256": null,
+    "model_card_uri": null
+  },
+  "runtime_requirements": {
+    "minimum_ram_bytes": 67108864,
+    "minimum_vram_bytes": null,
+    "supported_backends": ["mkaos-cpu"]
+  }
+}
