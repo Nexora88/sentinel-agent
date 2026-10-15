@@ -25,7 +25,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from core.ollama_client import OllamaClient
 
 logger = logging.getLogger("seka.rag")
-_TOKEN_RE = re.compile(r"[^\\W_]+", re.UNICODE)
+_TOKEN_RE = re.compile(r"[^\W_]+", re.UNICODE)
 _CACHE_TTL_SECONDS = 30.0
 _CACHE_MAX_ENTRIES = 128
 
@@ -192,7 +192,6 @@ class MemoryStore:
         if len(documents) < 2 or not query_terms:
             return documents[:limit]
         ranked = []
-        count = len(documents)
         for index, document in enumerate(documents):
             doc_terms = cls._lexical_terms(document.page_content)
             overlap = len(query_terms & doc_terms) / len(query_terms)
