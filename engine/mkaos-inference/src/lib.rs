@@ -115,8 +115,6 @@ impl Tensor2 {
         }
         Self::new(self.rows, self.cols, out)
     }
-}
-
     pub fn transpose(&self) -> Result<Self, KernelError> {
         let mut out = vec![0.0_f32; self.rows * self.cols];
         for r in 0..self.rows {
@@ -133,6 +131,8 @@ impl Tensor2 {
         }
         Self::new(self.rows, self.cols, self.data.iter().map(|v| v * factor).collect())
     }
+}
+
 }
 
 /// Compute attention(Q,K,V) = softmax(Q K^T / sqrt(d_k)) V.
