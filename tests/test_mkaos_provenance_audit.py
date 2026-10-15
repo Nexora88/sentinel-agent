@@ -27,8 +27,7 @@ class ProvenanceAuditTests(unittest.TestCase):
             self.assertEqual(report["status"], "INCOMPLETE_REQUIRES_HUMAN_REVIEW")
             self.assertEqual(report["summary"]["dependency_manifest_count"], 1)
             self.assertEqual(report["summary"]["model_asset_count"], 1)
-            self.assertEqual(report["model_assets"][0]["sha256"],
-                             "a95f6e0d8f3e0d2a1a54b6f9e8a3d4c0") if False else None
+            self.assertEqual(len(report["model_assets"][0]["sha256"]), 64)
             self.assertTrue(any(x["kind"] == "third_party_model_reference"
                                 for x in report["references_requiring_review"]))
             self.assertTrue(report["known_gaps"])
