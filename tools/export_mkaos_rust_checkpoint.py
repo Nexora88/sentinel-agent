@@ -63,7 +63,7 @@ def main():
         matrix("lm_head.weight","lm_head.weight",(v,d))
     except (ValueError,RuntimeError) as e:
         p.exit(2,f"Checkpoint rejected: {e}\n")
-    if len(tensors) != 2 + 9*n: p.exit(2,"Internal tensor-set count mismatch.\n")
+    if len(tensors) != 3 + 9*n: p.exit(2,"Internal tensor-set count mismatch.\n")
     out=bytearray(MAGIC); out.extend(struct.pack("<I",len(tensors)))
     for name in sorted(tensors):
         shape,values=tensors[name]; encoded=name.encode("utf-8")
