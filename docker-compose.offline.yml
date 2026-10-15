@@ -8,6 +8,8 @@ services:
       GITHUB_TOKEN: ""
       GH_TOKEN: ""
       ALLOW_WEB_RESEARCH: "false"
+      ALLOW_EXTERNAL_FINANCE_DATA: "false"
+      ALLOW_SITE_SCANNING: "false"
       ALLOW_EXTERNAL_NOTIFICATIONS: "false"
       WHATSAPP_PHONE: ""
       WHATSAPP_APIKEY: ""
