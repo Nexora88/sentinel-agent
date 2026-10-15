@@ -36,3 +36,14 @@ jobs:
         run: docker build --tag seka-agent-ci .
       - name: Run security regression tests
         run: python -m unittest discover -s tests -v
+      - name: Scan repository for likely hardcoded secrets
+        run: |
+          python - <<'PY'
+          from tools.secret_scanner import SecretScanner
+          findings = SecretScanner().scan_directory(".", max_files=2000)
+          if findings:
+              for finding in findings:
+                  print(f"{finding['type']} at {finding['source']}:{finding['line']}")
+              raise SystemExit("Potential hardcoded credentials found.")
+          print("No likely hardcoded credentials found.")
+          PY
