@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "dataset_id": "mkaos-quality-tr-001",
+  "language": "tr",
+  "purpose": "Sabit, küçük regresyon kümesi: Türkçe, matematik, kodlama ve talimat izleme. Bu küme uzman değerlendirmesinin yerine geçmez.",
+  "cases": [
+    {"id":"tr-fact-001","category":"turkish","prompt":"Türkiye'nin başkenti neresidir? Tek kelimeyle yanıtla.","expected_contains":["Ankara"]},
+    {"id":"tr-explain-001","category":"turkish","prompt":"Fotosentezi Türkçe, tek cümlede açıkla.","expected_contains":["ışık"],"any_expected_contains":["bitki","klorofil","güneş"]},
+    {"id":"math-add-001","category":"math","prompt":"Bir kutuda 3 kırmızı ve 2 mavi kalem var. Toplam kaç kalem vardır? Yalnızca sayıyı yaz.","expected_contains":["5"]},
+    {"id":"math-multiply-001","category":"math","prompt":"12 × 8 işleminin sonucunu yalnızca sayı olarak yaz.","expected_contains":["96"]},
+    {"id":"math-reason-001","category":"math","prompt":"Bir defter 15 TL. 4 defter kaç TL eder? Kısa işlem ve sonucu yaz.","expected_contains":["60"]},
+    {"id":"code-python-001","category":"coding","prompt":"Python'da iki sayıyı toplayan add(a, b) fonksiyonunu yaz. Yalnızca kod ver.","expected_contains":["def","return"]},
+    {"id":"code-loop-001","category":"coding","prompt":"Python'da 1'den 3'e kadar sayıları yazdıran kısa bir for döngüsü yaz. Yalnızca kod ver.","expected_contains":["for","range","print"]},
+    {"id":"instruction-list-001","category":"instruction_following","prompt":"Tam olarak üç numaralı madde yaz: veri topla; veriyi doğrula; sonucu raporla. Başka metin ekleme.","expected_contains":["1.","2.","3."],"any_expected_contains":["doğrula","raporla"]},
+    {"id":"instruction-short-001","category":"instruction_following","prompt":"'Merhaba dünya' ifadesini aynen yaz ve başka hiçbir şey ekleme.","expected_contains":["Merhaba dünya"]},
+    {"id":"instruction-format-001","category":"instruction_following","prompt":"Şu iki satırı aynen üret: DURUM: HAZIR ve SONUÇ: 7. Başka metin ekleme.","expected_contains":["DURUM: HAZIR","SONUÇ: 7"]},
+    {"id":"repeat-001","category":"repetition","prompt":"Türkiye'nin başkentini bir kez, kısa biçimde söyle. Aynı ifadeyi tekrarlama.","expected_contains":["Ankara"]},
+    {"id":"repeat-002","category":"repetition","prompt":"Bir cümleyle suyun donma sıcaklığını Celsius cinsinden söyle. Yanıtı tekrarlama.","expected_contains":["0"]}
+  ]
+}

@@ -6,6 +6,24 @@ use std::{env, fs, process, time::Instant};
 fn token_text(value: &Value) -> Option<&str> {
     value.as_str().or_else(|| value.get("content").and_then(Value::as_str))
 }
+
+fn repetition_penalty_from_env() -> f32 {
+    match env::var("MKAOS_REPETITION_PENALTY") {
+        Ok(value) => match value.parse::<f32>() {
+            Ok(value) if value.is_finite() && (1.0..=2.0).contains(&value) => value,
+            _ => {
+                eprintln!("MKAOS_REPETITION_PENALTY must be a finite number between 1.0 and 2.0");
+                process::exit(2);
+            }
+        },
+        Err(env::VarError::NotPresent) => 1.10,
+        Err(_) => {
+            eprintln!("MKAOS_REPETITION_PENALTY is not valid UTF-8");
+            process::exit(2);
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() != 3 {
@@ -16,6 +34,8 @@ fn main() {
     let prompt = &args[1];
     let max_new: usize = args[2].parse().unwrap_or(0);
     if max_new == 0 { eprintln!("max-new-tokens must be positive"); process::exit(2); }
+    let repetition_penalty = repetition_penalty_from_env();
+
     let model_load_start = Instant::now();
     let model = match load_smollm2(
         format!("{model_dir}/config.json"), format!("{model_dir}/model.safetensors")
@@ -39,8 +59,7 @@ fn main() {
         Err(error) => { eprintln!("EOS tokenization failed: {error}"); process::exit(1); }
     };
     let model_load_ms = model_load_start.elapsed().as_secs_f64() * 1000.0;
-    // Benchmark harnesses may set an explicit prompt to compare engines fairly.
-    // Normal application runs retain the Turkish-first policy prompt by default.
+    // Keep normal application prompts short. Benchmarks may override this for parity.
     let system_prompt = env::var("MKAOS_SYSTEM_PROMPT")
         .ok()
         .filter(|value| !value.trim().is_empty())
@@ -65,7 +84,15 @@ fn main() {
     let mut generated = Vec::<u32>::new();
     let mut first_token_ms = 0.0;
     for index in 0..max_new {
-        let token = match sampling::greedy_sample(&logits) {
+        let mut adjusted_logits = logits.clone();
+        let previous: Vec<usize> = generated.iter().map(|&token| token as usize).collect();
+        if let Err(error) = sampling::apply_repetition_penalty(
+            &mut adjusted_logits, &previous, repetition_penalty
+        ) {
+            eprintln!("repetition penalty failed: {error}");
+            process::exit(1);
+        }
+        let token = match sampling::greedy_sample(&adjusted_logits) {
             Ok(token) => token as u32,
             Err(error) => { eprintln!("sampling failed: {error}"); process::exit(1); }
         };
@@ -90,7 +117,8 @@ fn main() {
         "prompt_token_count": prompt_ids.len(), "generated_token_count": generated.len(),
         "model_load_ms": model_load_ms, "prefill_ms": prefill_ms,
         "first_token_ms": first_token_ms, "inference_total_ms": inference_ms,
-        "tokens_per_second": tps, "sampling": "greedy",
-        "note": "Only report as model-compatible after validate_tokenizer.py and validate_model_logits.py pass."
+        "tokens_per_second": tps, "sampling": "greedy_with_repetition_penalty",
+        "repetition_penalty": repetition_penalty,
+        "note": "Repetition penalty is a heuristic, not a quality guarantee. Validate on the fixed Turkish task set."
     }));
 }
