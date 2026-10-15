@@ -130,4 +130,15 @@ mod tests {
         let err = load_checkpoint("does-not-need-to-exist", "bad", 1024, 1024).unwrap_err();
         assert!(matches!(err, CheckpointError::InvalidExpectedHash));
     }
+
+    #[test] fn validates_manifest_shapes_and_tensor_set() {
+        let mut tensors = BTreeMap::new();
+        tensors.insert("embed".to_owned(), Tensor2::new(2, 3, vec![0.; 6]).unwrap());
+        let cp = Checkpoint { tensors, sha256: "test".to_owned() };
+        let mut expected = BTreeMap::new();
+        expected.insert("embed".to_owned(), (2, 3));
+        assert!(validate_tensor_shapes(&cp, &expected).is_ok());
+        expected.insert("lm_head".to_owned(), (3, 2));
+        assert!(validate_tensor_shapes(&cp, &expected).is_err());
+    }
 }
