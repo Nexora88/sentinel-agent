@@ -208,3 +208,45 @@ class PersonalMemory:
         if any(w in lower for w in ["adım", "ismim", "benim adım", "bana "]):
             # Let the LLM decide later; for now just store raw
             pass
+
+    def forget_matching(self, phrase: str, last_hours: int = 24) -> dict:
+        """Delete exact-topic matches from personal vector memory and profile facts."""
+        import time
+        phrase = str(phrase or "").strip().casefold()
+        if len(phrase) < 3:
+            raise ValueError("Silme konusu en az 3 karakter olmalı.")
+        hours = max(1, min(int(last_hours), 8760))
+        cutoff = time.time() - hours * 3600
+        collection = getattr(self.vectorstore, "_collection", None)
+        deleted_vectors = 0
+        if collection is not None:
+            snapshot = collection.get(include=["documents", "metadatas"])
+            ids = snapshot.get("ids", [])
+            docs = snapshot.get("documents") or ["" for _ in ids]
+            metas = snapshot.get("metadatas") or [{} for _ in ids]
+            remove = []
+            for item_id, body, metadata in zip(ids, docs, metas):
+                metadata = metadata or {}
+                stamp = metadata.get("timestamp") or metadata.get("created_at")
+                try:
+                    from datetime import datetime, timezone
+                    parsed = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+                    if parsed.tzinfo is None:
+                        parsed = parsed.replace(tzinfo=timezone.utc)
+                    recent = parsed.timestamp() >= cutoff
+                except (TypeError, ValueError, OverflowError):
+                    recent = False
+                if recent and phrase in str(body or "").casefold():
+                    remove.append(item_id)
+            if remove:
+                collection.delete(ids=remove)
+                deleted_vectors = len(remove)
+        before = len(self._profile.get("facts", []))
+        self._profile["facts"] = [fact for fact in self._profile.get("facts", []) if phrase not in str(fact).casefold()]
+        deleted_facts = before - len(self._profile["facts"])
+        if deleted_facts:
+            self._save_profile()
+        return {"deleted_vector_records": deleted_vectors, "deleted_profile_facts": deleted_facts,
+                "scope": "personal vector memory and profile facts; exact phrase match; requested time window",
+                "limitations": ["Bu işlem yedekleri, dışa aktarımları, sistem günlüklerini veya model ağırlıklarını temizlemez.",
+                                "Bu bir adli veri imha/SSD secure erase garantisi değildir."]}
