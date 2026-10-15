@@ -6,6 +6,7 @@ Canlı işler · plan motoru · bilgi paketleri · Ollama
 from __future__ import annotations
 
 import asyncio
+import difflib
 import json
 import logging
 import os
@@ -781,6 +782,12 @@ class ImprovementProposalRequest(BaseModel):
     test_plan: list[str]
 
 
+class ImprovementGenerateRequest(BaseModel):
+    file_path: str
+    issue: str
+    test_plan: list[str]
+
+
 class ImprovementApprovalRequest(BaseModel):
     confirmation: str
 
@@ -879,6 +886,46 @@ async def api_media_jobs(authorization: Optional[str] = Header(None)):
 def _improvement_store(username: str) -> ImprovementProposalStore:
     root = tenant_root("./memory/tenants", tenant_storage_id(username)) / "improvement_proposals"
     return ImprovementProposalStore(root)
+
+
+@app.post("/api/improvements/generate")
+async def api_generate_improvement_proposal(req: ImprovementGenerateRequest, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    file_path = str(req.file_path or "").strip().replace("\\", "/")
+    try:
+        # Validate the requested path before reading any repository file.
+        from core.improvement_gate import validate_candidate
+        validate_candidate(title="Code improvement", rationale=req.issue, files=[file_path],
+                           patch="candidate", test_plan=req.test_plan)
+        source = (ROOT / file_path).resolve()
+        if ROOT not in source.parents or not source.is_file() or source.stat().st_size > 40000:
+            raise ImprovementProposalError("Yalnızca izin verilen, 40 KB altındaki mevcut kaynak dosyalar seçilebilir.")
+        issue = str(req.issue or "").strip()
+        if not issue or len(issue) > 2000:
+            raise ImprovementProposalError("Sorun açıklaması 1-2000 karakter olmalı.")
+        current = source.read_text(encoding="utf-8")
+        pipeline = get_pipeline(user["username"])
+        candidate = await asyncio.to_thread(pipeline.code_writer.propose_fix, file_path, current, issue)
+        if not isinstance(candidate, str) or not candidate.strip() or len(candidate.encode("utf-8")) > 40000:
+            raise ImprovementProposalError("Yerel model boş veya çok büyük bir kod önerisi döndürdü.")
+        diff = "\\n".join(difflib.unified_diff(
+            current.splitlines(), candidate.strip().splitlines(),
+            fromfile="a/" + file_path, tofile="b/" + file_path, lineterm=""
+        ))
+        if not diff.strip():
+            raise ImprovementProposalError("Model değişiklik önermedi; dosya aynı kaldı.")
+        return _improvement_store(user["username"]).create(
+            title="Kod iyileştirmesi: " + file_path,
+            rationale=issue,
+            files=[file_path],
+            patch=diff,
+            test_plan=req.test_plan,
+        )
+    except ImprovementProposalError as exc:
+        raise HTTPException(400, str(exc))
+    except Exception as exc:
+        logger.warning("Local code proposal generation failed: %s", type(exc).__name__)
+        raise HTTPException(503, "Yerel kod önerisi üretilemedi; Ollama/model durumunu denetle.")
 
 
 @app.post("/api/improvements/proposals")
