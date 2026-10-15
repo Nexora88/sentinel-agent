@@ -46,7 +46,7 @@ class ApprovedGitHubExecutionTests(unittest.TestCase):
         self.assertTrue(self.manager.begin_execution(first_id))
         first = self.manager.get_request(first_id)
         result = self.client.execute_approved_request(first)
-        self.assertIn("PUSH_TO_REMOTE", result)
+        self.assertIn(Action.PUSH_TO_REMOTE.value, result)
         self.assertTrue(self.manager.finish_execution(first_id, True, result, final_status="staged"))
         self.client._put = Mock(return_value={"commit": {"html_url": "https://github.com/example/project/commit/abc"}})
         second = next(item for item in self.manager.list_actionable() if item["action"] == Action.PUSH_TO_REMOTE.value)
