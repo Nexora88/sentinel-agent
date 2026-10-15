@@ -36,7 +36,7 @@ jobs:
         run: |
           docker run --rm --network none \
             -v "$PWD/artifacts/smollm2-135m-instruct:/model:ro" \
-            -v "$PWD/target/release/mkaos_generate:/usr/local/bin/mkaos_generate:ro" \
+            -v "$PWD/engine/mkaos-hf-adapter/target/release/mkaos_generate:/usr/local/bin/mkaos_generate:ro" \
             ubuntu:24.04 \
             /usr/local/bin/mkaos_generate /model "Merhaba. Bir cümleyle Türkiye'nin başkentini söyle." 24
       - name: Start pinned Ollama comparison runtime
