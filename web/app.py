@@ -38,7 +38,7 @@ from core.local_voice import LocalVoiceError, voice_status, synthesize as synthe
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("seka.web")
 
-app = FastAPI(title="SEKA", version="6.0", description="Sentinel Egemen Kişisel Ajan")
+app = FastAPI(title="SEKA", version="6.1", description="Sentinel Egemen Kişisel Ajan")
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -99,7 +99,7 @@ chat_history = _load_chat_history()
 
 MANIFESTO = {
     "name": "SEKA",
-    "version": "6.0",
+    "version": "6.1",
     "tagline": "Yerel süper ajan — ücretli API yok, veri sende kalır",
     "pillars": [
         "Ollama ile tamamen yerel zeka",
@@ -174,7 +174,7 @@ class VoiceRequest(BaseModel):
 
 @app.on_event("startup")
 async def startup():
-    logger.info("SEKA Web v6.0")
+    logger.info("SEKA Web v6.1")
     get_pipeline()
 
 
@@ -240,7 +240,7 @@ async def api_status(authorization: Optional[str] = Header(None)):
     cur = p.curiosity.get_status()
     return {
         "brand": "SEKA",
-        "version": "5.0",
+        "version": "6.1",
         "user": user,
         "assistant": p.status(),
         "universe": uni,
