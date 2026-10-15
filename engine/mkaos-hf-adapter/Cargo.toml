@@ -1,0 +1,10 @@
+[package]
+name = "mkaos-hf-adapter"
+version = "0.1.0"
+edition = "2021"
+description = "Hugging Face tokenizer.json and SmolLM2-style chat template adapter for MKAOS"
+license = "MIT"
+
+[dependencies]
+mkaos-inference = { path = "../mkaos-inference" }
+tokenizers = { version = "0.21", default-features = false, features = ["onig"] }
