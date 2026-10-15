@@ -4,24 +4,24 @@
 
 Amaç, Ollama gibi harici runtime'lara bağımlılığı ölçümle ve güvenli biçimde azaltmaktır; tek bir commit ile tam bağımsızlık iddiası yapılmaz.
 
-Şu an Rust çekirdeğinde F32 tensör matematiği, embedding lookup, RoPE, causal attention, tek sentetik decoder bloğu, SHA-256, sınırlandırılmış MKAOSW1 checkpoint okuyucusu, byte tokenizer, greedy/top-k/top-p örnekleme ve EOS/stop-sequence destekli full-prefix üretim sürücüsü bulunur. Full-prefix sürücü her adımda tüm prefix'i yeniden hesaplar; gerçek KV cache değildir.
+Rust çekirdeğinde F32 tensör matematiği, embedding lookup, RoPE, causal attention, tek bloklu eski referans decoder, SHA-256, sınırlandırılmış MKAOSW1 checkpoint okuyucusu, byte tokenizer, greedy/top-k/top-p örnekleme ve EOS/stop-sequence destekli full-prefix üretim sürücüsü bulunur. Yeni `stacked_decoder` modülü ayrıca çok katmanlı GQA, final RMSNorm, LM head/logits ve her katmana ayrı artımlı KV cache için sentetik ağırlıklarla çalışan referans yol sunar. Bu modül henüz SmolLM2'nin gerçek dosyalarından ağırlık yüklemez.
 
 ## Aşamalar
 
-1. **Denetlenebilir CPU çekirdeği — kısmi:** matematik yardımcıları, sınır denetimleri ve birim testleri mevcut; CI sonucu ayrıca doğrulanmalıdır.
+1. **Denetlenebilir CPU çekirdeği — kısmi:** matematik yardımcıları, sınır denetimleri, sentetik decoder ve testler mevcut; CI sonucu ayrıca doğrulanmalıdır.
 2. **Checkpoint güvenliği — kısmi:** dosya boyutu sınırı, SHA-256, sürümlü container ve tensor şekil denetimi mevcut. Hash tek başına kaynak/lisans kanıtı değildir.
-3. **Model kaynağı — kısmi:** SmolLM2-135M-Instruct için Apache-2.0 olarak listelenen model kartı ve değişmez repository revision'ı kaydedildi. Gerçek ağırlık/tokenizer SHA-256 değerleri indirilip ölçülmediği için null; henüz doğrulanmış dosya hash'i iddiası yok. İndirme aracı hash manifesti üretir.
+3. **Model kaynağı — kısmi:** SmolLM2-135M-Instruct için Apache-2.0 olarak listelenen model kartı ve değişmez repository revision'ı kaydedildi. Gerçek ağırlık/tokenizer SHA-256 değerleri indirilip ölçülmediği için null; henüz doğrulanmış dosya hash'i iddiası yok. İndirme aracı artık boyut sınırları içinde akışla indirip ölçülen hash'leri kilit dosyasına yazabilir; gerçek indirme henüz burada çalıştırılmadı.
 4. **Safetensors dönüşümü — kısmi:** MKAOSW1 biçimine F32 taşıma dönüşümü var; mimariye özgü parametre eşleme, transpoz ve runtime uyumluluğu sağlamaz.
-5. **Tam decoder — bekliyor:** çok katmanlı decoder, GQA, final RMSNorm, LM head/logits'in gerçek checkpoint'e bağlanması ve gerçek artımlı KV cache tamamlanmadı.
-6. **Model tokenizer'ı — bekliyor:** mevcut ByteTokenizer yaygın BPE tokenizer ile uyumlu değil; SmolLM2 tokenizer ve chat template davranışı birebir doğrulanmalı.
-7. **Benchmark — protokol hazır, ölçüm yok:** sabit Türkçe/İngilizce prompt kümesi ve ölçüm protokolü eklendi. Gerçek model yüklenmeden doğruluk, ilk-token gecikmesi, toplam gecikme, token/s ve tepe RSS ölçülemez.
+5. **Decoder matematiği — yeni referans eklendi, model uyumluluğu bekliyor:** `stacked_decoder` birden fazla katmanı, GQA head eşlemesini, RoPE, katman başına KV cache'i, final RMSNorm ve LM head logits'ini uygular. Sentetik küçük ağırlıklarla tasarlandı. Gerçek checkpoint isim/şekil eşlemesi, BF16 dönüşüm doğrulaması ve Hugging Face referans logits karşılaştırması henüz yok.
+6. **Model tokenizer'ı — bekliyor:** mevcut ByteTokenizer yaygın BPE tokenizer ile uyumlu değil; SmolLM2 tokenizer.json, byte-level BPE, özel token ID'leri ve chat template davranışı birebir doğrulanmalı. BPE uyumlu değilken bu modelle doğru üretim iddia edilmez.
+7. **Gerçek üretim ve benchmark — bekliyor:** mevcut full-prefix üretim sürücüsü her adımda tüm prefix'i yeniden hesaplar; yeni KV-cache decoder ise tek token adımı sunar fakat henüz generation trait/stop koşullarıyla gerçek model adapter'ına bağlanmadı. Sabit Türkçe/İngilizce prompt seti ve ölçüm protokolü hazır; gerçek model yüklenmeden doğruluk, ilk-token gecikmesi, toplam gecikme, token/s ve tepe RSS ölçülemez.
 8. **Kademeli geçiş:** MKAOS önce deneysel opt-in yol olur. Ollama ancak aynı donanım/test kümesinde kalite, kararlılık, bellek ve gecikme eşiklerini tekrarlı biçimde geçtikten sonra devreden çıkarılabilir.
 9. **Ölçümlü optimizasyon:** önce F32 referans doğruluğu; ardından quantization/SIMD/GPU, her biri karşılaştırmalı testle.
 10. **Sürekli gelişim:** kullanıcı konuşmaları varsayılan eğitim verisi yapılmaz. Açık izin, lisans, kişisel veri temizliği ve sabit holdout testleri gerekir.
 
 ## Model uyumluluğu uyarısı
 
-SmolLM2-135M-Instruct, Llama tarzı decoder, grouped-query attention ve BPE tokenizer kullanır. Mevcut Rust çekirdeği bunları henüz desteklemediğinden checkpoint'in MKAOSW1'e dönüştürülmesi modeli çalışır kılmaz. Eğitim ağırlığı veya tokenizer uyumluluğu kanıtlanmadan metin kalitesi iddiası yapılmaz.
+SmolLM2-135M-Instruct, Llama tarzı decoder, grouped-query attention ve BPE tokenizer kullanır. Sentetik ağırlıkla çalışan decoder eklenmesi checkpoint'in doğrudan yüklenebildiği anlamına gelmez. Gerçek safetensors tensor eşlemesi, tokenizer, chat template ve referans logits doğrulaması yapılmadan model desteği ilan edilmez.
 
 ## Benchmark ölçütleri
 
