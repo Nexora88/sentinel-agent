@@ -195,31 +195,44 @@ async function createPlan(goal) {
 function renderPlan(plan) {
   const box = $("#plan-view");
   if (!box) return;
-  box.innerHTML = "";
+  box.replaceChildren();
   const head = document.createElement("div");
   head.className = "approval-card";
-  head.innerHTML = `
-    <div class="details">
-      <div class="action-name">${plan.goal || plan.id}</div>
-      <div>Durum: ${plan.status} · id ${plan.id}</div>
-    </div>
-    <button class="primary" id="run-plan-btn" data-id="${plan.id}">Güvenli Adımları Çalıştır</button>`;
+  const details = document.createElement("div");
+  details.className = "details";
+  const title = document.createElement("div");
+  title.className = "action-name";
+  title.textContent = String(plan.goal || plan.id || "Plan");
+  const status = document.createElement("div");
+  status.textContent = "Durum: " + String(plan.status || "—") + " · id " + String(plan.id || "—");
+  details.append(title, status);
+  const run = document.createElement("button");
+  run.className = "primary";
+  run.textContent = "Güvenli Adımları Çalıştır";
+  run.addEventListener("click", async () => {
+    const response = await fetch("/api/plan/" + encodeURIComponent(String(plan.id)) + "/run", { method: "POST" });
+    if (response.ok) addMessage("assistant", "Plan güvenli adımları arka planda çalışıyor.");
+    else addMessage("assistant", "Plan başlatılamadı; durum panelini kontrol et.");
+  });
+  head.append(details, run);
   box.appendChild(head);
-  (plan.steps || []).forEach((s, i) => {
+  (plan.steps || []).forEach((step, index) => {
     const div = document.createElement("div");
     div.className = "approval-card";
-    const badge = s.needs_approval ? "🔒 onay" : "⚡ güvenli";
-    div.innerHTML = `
-      <div class="details">
-        <div class="action-name">${i + 1}. ${s.title}</div>
-        <div>${s.type} · ${badge} · ${s.status || "pending"}</div>
-        <div style="color:var(--text-muted);font-size:0.85rem">${s.detail || ""}</div>
-      </div>`;
+    const stepDetails = document.createElement("div");
+    stepDetails.className = "details";
+    const stepTitle = document.createElement("div");
+    stepTitle.className = "action-name";
+    stepTitle.textContent = String(index + 1) + ". " + String(step.title || "Adım");
+    const meta = document.createElement("div");
+    meta.textContent = String(step.type || "işlem") + " · " +
+      (step.needs_approval ? "🔒 onay" : "⚡ güvenli") + " · " + String(step.status || "pending");
+    const description = document.createElement("div");
+    description.className = "plan-step-description";
+    description.textContent = String(step.detail || "");
+    stepDetails.append(stepTitle, meta, description);
+    div.appendChild(stepDetails);
     box.appendChild(div);
-  });
-  $("#run-plan-btn")?.addEventListener("click", async () => {
-    await fetch(`/api/plan/${plan.id}/run`, { method: "POST" });
-    addMessage("assistant", "Plan güvenli adımları arka planda çalışıyor (canlı işler)." );
   });
 }
 
@@ -228,22 +241,27 @@ async function loadPlans() {
     const res = await fetch("/api/plans");
     const data = await res.json();
     const box = $("#plans-list");
-    box.innerHTML = "";
-    (data.plans || []).forEach((p) => {
+    if (!box) return;
+    box.replaceChildren();
+    (data.plans || []).forEach((plan) => {
       const div = document.createElement("div");
       div.className = "approval-card";
-      div.innerHTML = `
-        <div class="details">
-          <div class="action-name">${p.goal}</div>
-          <div>${p.status} · ${(p.steps || []).length} adım</div>
-        </div>
-        <button data-pid="${p.id}">Aç</button>`;
-      div.querySelector("button").addEventListener("click", () => renderPlan(p));
+      const details = document.createElement("div");
+      details.className = "details";
+      const title = document.createElement("div");
+      title.className = "action-name";
+      title.textContent = String(plan.goal || "Adsız plan");
+      const meta = document.createElement("div");
+      meta.textContent = String(plan.status || "—") + " · " + (plan.steps || []).length + " adım";
+      const open = document.createElement("button");
+      open.textContent = "Aç";
+      open.addEventListener("click", () => renderPlan(plan));
+      details.append(title, meta);
+      div.append(details, open);
       box.appendChild(div);
     });
-  } catch (e) {}
+  } catch (_) {}
 }
-
 $("#plan-create-btn")?.addEventListener("click", async () => {
   const goal = $("#plan-goal").value.trim();
   if (!goal) return;
@@ -480,28 +498,31 @@ function renderJobs(jobs) {
   const live = $("#job-live");
   if (!jobs || !jobs.length) {
     if (live) live.textContent = "İş yok";
-    if (box) box.innerHTML = '<p class="empty">Canlı iş yok</p>';
+    if (box) box.textContent = "Canlı iş yok";
     return;
   }
   const top = jobs[0];
-  if (live) {
-    live.textContent = `${top.status} · ${top.title} · ${Math.round((top.progress || 0) * 100)}%`;
-  }
+  if (live) live.textContent = String(top.status || "—") + " · " + String(top.title || "İş") + " · " + Math.round((top.progress || 0) * 100) + "%";
   if (!box) return;
-  box.innerHTML = "";
-  jobs.slice(0, 12).forEach((j) => {
+  box.replaceChildren();
+  jobs.slice(0, 12).forEach((job) => {
     const div = document.createElement("div");
     div.className = "approval-card";
-    div.innerHTML = `
-      <div class="details">
-        <div class="action-name">${j.title}</div>
-        <div>${j.kind} · ${j.status} · ${Math.round((j.progress || 0) * 100)}%</div>
-        <div style="color:var(--text-muted);font-size:0.82rem">${j.message || ""}</div>
-      </div>`;
+    const details = document.createElement("div");
+    details.className = "details";
+    const title = document.createElement("div");
+    title.className = "action-name";
+    title.textContent = String(job.title || "İş");
+    const meta = document.createElement("div");
+    meta.textContent = String(job.kind || "iş") + " · " + String(job.status || "—") + " · " + Math.round((job.progress || 0) * 100) + "%";
+    const message = document.createElement("div");
+    message.className = "plan-step-description";
+    message.textContent = String(job.message || "");
+    details.append(title, meta, message);
+    div.appendChild(details);
     box.appendChild(div);
   });
 }
-
 async function connectSSE() {
   const cache = new Map();
   try {
@@ -729,22 +750,48 @@ $("#image-btn").addEventListener("click", async () => {
 
 async function loadGithub() {
   const box = $("#gh-repos");
-  box.innerHTML = "...";
-  const res = await fetch("/api/github/repos");
-  const data = await res.json();
-  if (data.error) {
-    box.innerHTML = `<p class="empty">${data.error}</p>`;
-    return;
+  if (!box) return;
+  box.textContent = "Yükleniyor…";
+  try {
+    const res = await fetch("/api/github/repos");
+    const data = await res.json();
+    box.replaceChildren();
+    if (data.error) {
+      const message = document.createElement("p");
+      message.className = "empty";
+      message.textContent = String(data.error);
+      box.appendChild(message);
+      return;
+    }
+    (data.repos || []).forEach((repo) => {
+      const div = document.createElement("div");
+      div.className = "approval-card";
+      const details = document.createElement("div");
+      details.className = "details";
+      const title = document.createElement("div");
+      title.className = "action-name";
+      title.textContent = String(repo.full_name || repo.name || "Depo");
+      const description = document.createElement("div");
+      description.textContent = String(repo.description || "");
+      details.append(title, description);
+      div.appendChild(details);
+      try {
+        const url = new URL(repo.url);
+        if (url.protocol === "https:" && url.hostname === "github.com") {
+          const link = document.createElement("a");
+          link.href = url.href;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = "Aç";
+          link.style.color = "var(--accent-2)";
+          div.appendChild(link);
+        }
+      } catch (_) {}
+      box.appendChild(div);
+    });
+  } catch (_) {
+    box.textContent = "GitHub depoları alınamadı.";
   }
-  box.innerHTML = "";
-  (data.repos || []).forEach((r) => {
-    const div = document.createElement("div");
-    div.className = "approval-card";
-    div.innerHTML = `<div class="details"><div class="action-name">${r.full_name}</div>
-      <div>${r.description || ""}</div></div>
-      <a href="${r.url}" target="_blank" style="color:var(--accent-2)">Aç</a>`;
-    box.appendChild(div);
-  });
 }
 $("#gh-refresh").addEventListener("click", loadGithub);
 
