@@ -6,12 +6,11 @@ services:
       - "127.0.0.1:${WEB_PORT:-8000}:8000"
     environment:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b}
-      - MKAOS_ENABLED=${MKAOS_ENABLED:-false}
       - MKAOS_BASE_URL=${MKAOS_BASE_URL:-http://mkaos:11435}
       - MKAOS_MODEL_NAME=${MKAOS_MODEL_NAME:-mkaos-local}
-      - OLLAMA_MODEL_FAST=${OLLAMA_MODEL_FAST:-qwen2.5:7b}
-      - OLLAMA_MODEL_DEEP=${OLLAMA_MODEL_DEEP:-qwen2.5-coder:7b}
+      - MKAOS_REPETITION_PENALTY=${MKAOS_REPETITION_PENALTY:-1.10}
+      - MKAOS_TEMPERATURE=${MKAOS_TEMPERATURE:-0.15}
+      - MKAOS_TOP_P=${MKAOS_TOP_P:-0.9}
       - OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - WHATSAPP_PHONE=${WHATSAPP_PHONE:-}
@@ -48,7 +47,6 @@ services:
       - SD_API_URL=${SD_API_URL:-}
       - U2NET_HOME=${U2NET_HOME:-/app/models/u2net}
     volumes:
-      # Persistent local knowledge and memory. Keep this volume backed up.
       - sentinel_memory:/app/memory
       - ./models:/app/models:ro
       - ./config:/app/config:ro
@@ -57,17 +55,14 @@ services:
     restart: unless-stopped
     command: ["python", "-m", "scripts.run", "web", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen(\u0022http://127.0.0.1:8000/health\u0022, timeout=3).read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8000/health\", timeout=3).read()"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 30s
 
-
-  # Opt-in resident Rust inference service. Its port is intentionally not published
-  # to the host; only containers on the internal network can reach it.
+  # MKAOS is required for chat generation; there is no Ollama chat rollback flag.
   mkaos:
-    profiles: ["mkaos"]
     build:
       context: .
       dockerfile: Dockerfile.mkaos
@@ -91,8 +86,9 @@ services:
       retries: 3
       start_period: 120s
 
+  # Temporary embedding-only dependency; chat generation never uses this service.
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.12.6
     container_name: seka-ollama
     volumes:
       - ollama_models:/root/.ollama
