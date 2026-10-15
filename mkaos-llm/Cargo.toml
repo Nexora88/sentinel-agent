@@ -1,0 +1,15 @@
+[package]
+name = "mkaos-llm-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Dependency-free, safe Rust foundation for the MKAOS native inference runtime"
+
+[lib]
+name = "mkaos_llm_core"
+path = "src/lib.rs"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
