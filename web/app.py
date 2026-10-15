@@ -11,6 +11,7 @@ import logging
 import os
 import queue
 import shutil
+import tempfile
 import uuid
 from pathlib import Path
 from typing import List, Optional
@@ -49,7 +50,51 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 pipeline: Optional[SentinelPipeline] = None
 auth = AuthManager()
-chat_history: List[dict] = []
+CHAT_HISTORY_FILE = Path("./memory/chat_history.json")
+
+
+def _load_chat_history() -> dict:
+    if not CHAT_HISTORY_FILE.exists():
+        return {}
+    try:
+        data = json.loads(CHAT_HISTORY_FILE.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or any(not isinstance(v, list) for v in data.values()):
+            raise ValueError("chat history must be a user-to-list mapping")
+        return data
+    except Exception as exc:
+        # Preserve user data and stop rather than silently resetting corrupted history.
+        raise RuntimeError(
+            f"Chat history is unreadable; preserve and recover {CHAT_HISTORY_FILE} before restarting."
+        ) from exc
+
+
+def _save_chat_history() -> None:
+    CHAT_HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temp_name = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=str(CHAT_HISTORY_FILE.parent),
+            prefix=".chat-history-", suffix=".tmp", delete=False
+        ) as temp:
+            json.dump(chat_history, temp, ensure_ascii=False, indent=2)
+            temp.flush()
+            os.fsync(temp.fileno())
+            temp_name = temp.name
+        try:
+            os.chmod(temp_name, 0o600)
+        except OSError:
+            pass
+        os.replace(temp_name, CHAT_HISTORY_FILE)
+        try:
+            os.chmod(CHAT_HISTORY_FILE, 0o600)
+        except OSError:
+            pass
+    finally:
+        if temp_name and os.path.exists(temp_name):
+            os.unlink(temp_name)
+
+
+chat_history = _load_chat_history()
 
 MANIFESTO = {
     "name": "SEKA",
@@ -171,7 +216,7 @@ async def api_status(authorization: Optional[str] = Header(None)):
         },
         "pending_approvals": len(p.permissions.list_pending()),
         "github_enabled": p.github.enabled,
-        "chat_turns": len(chat_history),
+        "chat_turns": sum(len(turns) for turns in chat_history.values()),
     }
 
 
@@ -208,7 +253,7 @@ async def api_jobs_stream(authorization: Optional[str] = Header(None)):
 
 @app.post("/api/chat")
 async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
     p = get_pipeline()
     message = req.message.strip()
     if not message:
@@ -217,17 +262,21 @@ async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)
         reply = p.status()
     else:
         reply = p.chat(message)
-    chat_history.append({"role": "user", "content": message})
-    chat_history.append({"role": "assistant", "content": reply})
-    if len(chat_history) > 300:
-        chat_history[:] = chat_history[-300:]
+    history = chat_history.setdefault(user["username"], [])
+    history.extend([
+        {"role": "user", "content": message},
+        {"role": "assistant", "content": reply},
+    ])
+    if len(history) > 300:
+        del history[:-300]
+    _save_chat_history()
     return {"reply": reply}
 
 
 @app.get("/api/history")
 async def api_history(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
-    return {"history": chat_history[-50:]}
+    user = get_user(authorization)
+    return {"history": chat_history.get(user["username"], [])[-50:]}
 
 
 @app.post("/api/expand")
