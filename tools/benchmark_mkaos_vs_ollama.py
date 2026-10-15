@@ -41,15 +41,16 @@ def sample_memory(stop_event: threading.Event, peak: list, *, process_name: str 
                   container_name: str | None = None) -> None:
     while not stop_event.is_set():
         try:
+            value = None
             if container_name:
                 result = subprocess.run(
                     ["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", container_name],
                     capture_output=True, text=True, check=False, timeout=2,
                 )
                 value = parse_memory_mb(result.stdout.strip().split("/")[0]) if result.returncode == 0 else None
-            else:
+            if value is None and process_name:
                 result = subprocess.run(
-                    ["ps", "-C", process_name or "mkaos_server", "-o", "rss="],
+                    ["ps", "-C", process_name, "-o", "rss="],
                     capture_output=True, text=True, check=False, timeout=2,
                 )
                 values = [int(x) for x in result.stdout.split() if x.isdigit()]
@@ -113,7 +114,7 @@ def mkaos_once(base_url: str, prompt: str, max_new_tokens: int) -> dict:
     peak = [0.0]
     stop = threading.Event()
     sampler = threading.Thread(
-        target=sample_memory, args=(stop, peak), kwargs={"process_name": "mkaos_server"}, daemon=True
+        target=sample_memory, args=(stop, peak), kwargs={"process_name": "mkaos_server", "container_name": "sentinel-mkaos"}, daemon=True
     )
     sampler.start()
     try:
