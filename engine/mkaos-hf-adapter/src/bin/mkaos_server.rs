@@ -91,7 +91,7 @@ fn read_request(stream: &TcpStream) -> Result<(String, String, Vec<u8>), String>
     Ok((method, path, body))
 }
 
-fn parse_messages(path: &str, body: &Value, default_system: &str) -> Result<(Vec<ChatMessage>, usize, f32), String> {
+fn parse_messages(path: &str, body: &Value, default_system: &str, penalty_default: f32) -> Result<(Vec<ChatMessage>, usize, f32, f32, f32), String> {
     let options = body.get("options").unwrap_or(&Value::Null);
     let requested = options.get("num_predict").and_then(Value::as_u64)
         .map(|n| n as usize).unwrap_or(DEFAULT_MAX_NEW_TOKENS);
@@ -128,7 +128,7 @@ fn parse_messages(path: &str, body: &Value, default_system: &str) -> Result<(Vec
         messages.push(ChatMessage::new("system", system));
         messages.push(ChatMessage::new("user", prompt));
     }
-    Ok((messages, requested, penalty))
+    Ok((messages, requested, penalty, temperature, top_p))
 }
 
 fn generate(
@@ -152,7 +152,7 @@ fn generate(
         let mut adjusted_logits = logits.clone();
         let previous: Vec<usize> = generated.iter().map(|&token| token as usize).collect();
         sampling::apply_repetition_penalty(&mut adjusted_logits, &previous, penalty).map_err(|e| e.to_string())?;
-        let token = sampling::greedy_sample(&adjusted_logits).map_err(|e| e.to_string())? as u32;
+        let token = if temperature <= 0.0 {\n            sampling::greedy_sample(&adjusted_logits)\n        } else {\n            sampling::sample_top_p(&adjusted_logits, temperature, top_p, next_random_unit(&mut random_state))\n        }.map_err(|e| e.to_string())? as u32;
         if eos_ids.contains(&token) { break; }
         generated.push(token);
         if index + 1 < max_new {
@@ -201,7 +201,7 @@ fn handle(
             return;
         }
     };
-    let (messages, max_new, penalty) = match parse_messages(&path, &body, default_system) {
+    let (messages, max_new, penalty, temperature, top_p) = match parse_messages(&path, &body, default_system, penalty_default) {
         Ok(value) => value,
         Err(error) => {
             let _ = send_json(&mut stream, "400 Bad Request", json!({"error":error}), false);
@@ -210,7 +210,7 @@ fn handle(
     };
     let penalty = if body.pointer("/options/repeat_penalty").is_none() { penalty_default } else { penalty };
     let started = Instant::now();
-    match generate(model, tokenizer, eos_ids, &messages, max_new, penalty) {
+    match generate(model, tokenizer, eos_ids, &messages, max_new, penalty, temperature, top_p) {
         Ok((answer, prompt_count, generated_count, prefill_ns, decode_ns, total_ns)) => {
             let total_ns = total_ns.max(started.elapsed().as_nanos());
             let payload = if path == "/api/chat" {
