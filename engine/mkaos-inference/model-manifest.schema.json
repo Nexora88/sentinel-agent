@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mkaos.local/schemas/model-manifest-1.0.json",
+  "title": "MKAOS Model Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "model_id",
+    "architecture",
+    "weights",
+    "tokenizer",
+    "provenance",
+    "runtime_requirements"
+  ],
+  "properties": {
+    "manifest_version": { "const": "1.0" },
+    "model_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "architecture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "layers", "hidden_size", "attention_heads", "vocab_size"],
+      "properties": {
+        "family": { "type": "string", "enum": ["mkaos-transformer-decoder"] },
+        "layers": { "type": "integer", "minimum": 1, "maximum": 512 },
+        "hidden_size": { "type": "integer", "minimum": 1, "maximum": 65536 },
+        "attention_heads": { "type": "integer", "minimum": 1, "maximum": 1024 },
+        "vocab_size": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "context_length": { "type": "integer", "minimum": 1, "maximum": 1048576 },
+        "normalization": { "type": "string", "enum": ["rms_norm"] },
+        "position_encoding": { "type": "string", "enum": ["rope"] }
+      }
+    },
+    "weights": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "format", "dtype", "sha256", "size_bytes"],
+        "properties": {
+          "path": { "type": "string", "pattern": "^[A-Za-z0-9._/-]+$" },
+          "format": { "type": "string", "enum": ["mkaos-tensor-v1"] },
+          "dtype": { "type": "string", "enum": ["f32", "f16", "bf16", "i8", "i4"] },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "size_bytes": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "tokenizer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "path", "sha256", "vocab_size"],
+      "properties": {
+        "type": { "type": "string", "enum": ["mkaos-bpe-v1", "mkaos-unigram-v1"] },
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "vocab_size": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["license", "base_model", "training_data_manifest_sha256"],
+      "properties": {
+        "license": { "type": "string", "minLength": 1 },
+        "base_model": { "type": ["string", "null"] },
+        "training_data_manifest_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "model_card_uri": { "type": ["string", "null"] }
+      }
+    },
+    "runtime_requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum_ram_bytes", "supported_backends"],
+      "properties": {
+        "minimum_ram_bytes": { "type": "integer", "minimum": 1 },
+        "minimum_vram_bytes": { "type": ["integer", "null"], "minimum": 1 },
+        "supported_backends": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["mkaos-cpu", "mkaos-cuda", "mkaos-rocm", "mkaos-metal"] },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}
