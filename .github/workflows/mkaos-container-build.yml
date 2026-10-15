@@ -5,6 +5,7 @@ on:
     paths:
       - "Dockerfile.mkaos"
       - "docker-compose.yml"
+      - "docker-compose.offline.yml"
       - "core/ollama_client.py"
       - "engine/mkaos-hf-adapter/src/bin/mkaos_server.rs"
       - ".github/workflows/mkaos-container-build.yml"
