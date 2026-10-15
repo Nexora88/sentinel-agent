@@ -3,20 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sentinel Agent</title>
+  <title>SEKA — Egemen Kişisel Ajan</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
   <div class="app">
     <aside class="sidebar">
       <div class="logo">
-        <span class="logo-icon">◉</span>
-        <span>Sentinel</span>
+        <span class="logo-icon">◈</span>
+        <div class="logo-text">
+          <span class="brand">SEKA</span>
+          <span class="tag">v4 · yerel · apisiz</span>
+        </div>
       </div>
       <nav>
-        <button class="nav-btn active" data-panel="chat">Sohbet</button>
+        <button class="nav-btn active" data-panel="bridge">Köprü</button>
         <button class="nav-btn" data-panel="universe">Bilgi Evreni</button>
+        <button class="nav-btn" data-panel="curiosity">Merak</button>
+        <button class="nav-btn" data-panel="night">Gece + Podcast</button>
+        <button class="nav-btn" data-panel="docs">Belgeler</button>
         <button class="nav-btn" data-panel="finance">Finans</button>
+        <button class="nav-btn" data-panel="discover">Keşif</button>
+        <button class="nav-btn" data-panel="legacy">Yedek</button>
         <button class="nav-btn" data-panel="image">Görsel</button>
         <button class="nav-btn" data-panel="github">GitHub</button>
         <button class="nav-btn" data-panel="approvals">Onaylar</button>
@@ -28,15 +36,24 @@
     </aside>
 
     <main class="main">
-      <section id="panel-chat" class="panel active">
+      <!-- KÖPRÜ: komut merkezi, sadece sohbet değil -->
+      <section id="panel-bridge" class="panel active">
         <header class="panel-header">
-          <h1>Kişisel Ajan</h1>
-          <p>Emir ver, sesli konuş, her şeyi öğrensin.</p>
+          <h1>Komut Köprüsü</h1>
+          <p>SEKA senin yerel süper ajanın. Ücretli API yok — Ollama + senin makinen.</p>
         </header>
+        <div class="quick-grid">
+          <button class="qcard" data-cmd="expand">🌌 Bilgi genişlet</button>
+          <button class="qcard" data-cmd="curiosity">🔭 Merak turu</button>
+          <button class="qcard" data-cmd="night">🌙 Gece araştırması</button>
+          <button class="qcard" data-cmd="finance">💰 Paper döngü</button>
+          <button class="qcard" data-cmd="discover">🔌 Yerel keşif</button>
+          <button class="qcard" data-cmd="podcast">🎙 Podcast taslağı</button>
+        </div>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="chat-input-area">
           <button id="voice-btn" title="Sesli komut" class="icon-btn">🎤</button>
-          <textarea id="chat-input" placeholder="Mesaj veya komut yaz..." rows="2"></textarea>
+          <textarea id="chat-input" placeholder="Emir ver: incele, öğren, tara, öner..." rows="2"></textarea>
           <button id="send-btn">Gönder</button>
         </div>
       </section>
@@ -44,7 +61,7 @@
       <section id="panel-universe" class="panel">
         <header class="panel-header">
           <h1>Bilgi Evreni</h1>
-          <p>Kara delik gibi büyüyor — haber, araştırma, kripto, kitap özetleri.</p>
+          <p>Kara delik gibi büyür — sanitize + güven skoru ile.</p>
         </header>
         <div class="universe-stats">
           <div class="stat-card"><span class="stat-value" id="u-pages">—</span><span class="stat-label">Toplam Bilgi</span></div>
@@ -53,8 +70,8 @@
           <div class="stat-card"><span class="stat-value" id="u-visited">—</span><span class="stat-label">Ziyaret</span></div>
         </div>
         <div class="universe-actions">
-          <input type="text" id="new-topic" placeholder="Yeni konu" />
-          <button id="add-seed-btn">Tohum Ekle</button>
+          <input type="text" id="new-topic" placeholder="Yeni konu (Türkçe / İngilizce)" />
+          <button id="add-seed-btn">Tohum</button>
           <button id="expand-btn" class="primary">Şimdi Genişlet</button>
         </div>
         <div class="recent-topics">
@@ -63,37 +80,99 @@
         </div>
       </section>
 
+      <section id="panel-curiosity" class="panel">
+        <header class="panel-header">
+          <h1>Merak Motoru</h1>
+          <p>Boşta iken bilim, felsefe, kriptografi, medya okuryazarlığı keşfeder.</p>
+        </header>
+        <div class="universe-stats">
+          <div class="stat-card"><span class="stat-value" id="c-count">—</span><span class="stat-label">Keşif</span></div>
+          <div class="stat-card"><span class="stat-value" id="c-last">—</span><span class="stat-label">Son Tur</span></div>
+        </div>
+        <div class="universe-actions">
+          <button id="curiosity-btn" class="primary">Bir Merak Turu Başlat</button>
+        </div>
+        <pre id="curiosity-out" class="status-box">Henüz tur yok.</pre>
+      </section>
+
+      <section id="panel-night" class="panel">
+        <header class="panel-header">
+          <h1>Gece Araştırması + Podcast Taslağı</h1>
+          <p>Öneri üretir. Para harcamaz. Otomatik yayın yok.</p>
+        </header>
+        <div class="universe-actions">
+          <button id="night-btn" class="primary">Gece Döngüsü</button>
+          <button id="podcast-btn">Podcast Metni Üret</button>
+        </div>
+        <pre id="night-out" class="status-box">Rapor burada görünecek.</pre>
+      </section>
+
+      <section id="panel-docs" class="panel">
+        <header class="panel-header">
+          <h1>Belge Merkezi</h1>
+          <p>PDF / MD / TXT yükle → bilgi evreni + tarih/tutar önerisi. Otomatik ödeme yok.</p>
+        </header>
+        <div class="universe-actions">
+          <input type="file" id="doc-file" accept=".pdf,.md,.txt,.csv" />
+          <button id="doc-upload-btn" class="primary">Yükle ve Analiz Et</button>
+        </div>
+        <pre id="doc-out" class="status-box">Dosya seç...</pre>
+      </section>
+
       <section id="panel-finance" class="panel">
         <header class="panel-header">
-          <h1>Finans (Paper Trading)</h1>
-          <p>Sanal para ile otonom işlem. Gerçek para yok. Risk kuralları kilitli.</p>
+          <h1>Finans (Paper)</h1>
+          <p>Sanal portföy. Gerçek cüzdan kapalı.</p>
         </header>
         <div class="universe-stats" id="fin-stats">
           <div class="stat-card"><span class="stat-value" id="f-equity">—</span><span class="stat-label">Portföy $</span></div>
-          <div class="stat-card"><span class="stat-value" id="f-pnl">—</span><span class="stat-label">Toplam PnL %</span></div>
+          <div class="stat-card"><span class="stat-value" id="f-pnl">—</span><span class="stat-label">PnL %</span></div>
           <div class="stat-card"><span class="stat-value" id="f-cash">—</span><span class="stat-label">Nakit $</span></div>
-          <div class="stat-card"><span class="stat-value" id="f-open">—</span><span class="stat-label">Açık Pozisyon</span></div>
+          <div class="stat-card"><span class="stat-value" id="f-open">—</span><span class="stat-label">Açık</span></div>
         </div>
         <div class="universe-actions">
-          <button id="fin-cycle-btn" class="primary">Bir Döngü Çalıştır</button>
+          <button id="fin-cycle-btn" class="primary">Döngü</button>
           <button id="fin-refresh-btn">Yenile</button>
           <span id="fin-mode" class="stat-label" style="align-self:center"></span>
         </div>
-        <h3 style="margin:16px 0 8px;color:var(--text-muted)">Açık Pozisyonlar</h3>
+        <h3 class="section-h">Açık Pozisyonlar</h3>
         <div id="fin-positions" class="approvals-list"></div>
-        <h3 style="margin:20px 0 8px;color:var(--text-muted)">Ajan Düşünce Günlüğü</h3>
-        <pre id="fin-thoughts" class="status-box" style="max-height:240px">—</pre>
+        <h3 class="section-h">Düşünce Günlüğü</h3>
+        <pre id="fin-thoughts" class="status-box" style="max-height:220px">—</pre>
         <div class="finance-box" style="margin-top:16px">
-          <input type="text" id="finance-query" placeholder="Analiz sorusu: Bitcoin, piyasa özeti..." />
+          <input type="text" id="finance-query" placeholder="Analiz: Bitcoin, piyasa..." />
           <button id="finance-btn">Analiz</button>
         </div>
         <pre id="finance-result" class="status-box">—</pre>
       </section>
 
+      <section id="panel-discover" class="panel">
+        <header class="panel-header">
+          <h1>Yerel Keşif</h1>
+          <p>Sadece localhost portları. Cihaz kontrolü yok.</p>
+        </header>
+        <div class="universe-actions">
+          <button id="discover-btn" class="primary">Tara</button>
+        </div>
+        <pre id="discover-out" class="status-box">—</pre>
+      </section>
+
+      <section id="panel-legacy" class="panel">
+        <header class="panel-header">
+          <h1>Legacy Yedek</h1>
+          <p>Şifreli yerel yedek. Blockchain değil — dosya sende kalır.</p>
+        </header>
+        <div class="universe-actions">
+          <input type="password" id="legacy-pass" placeholder="En az 8 karakter parola" />
+          <button id="legacy-btn" class="primary">Yedekle</button>
+        </div>
+        <pre id="legacy-out" class="status-box">—</pre>
+      </section>
+
       <section id="panel-image" class="panel">
         <header class="panel-header">
-          <h1>Görsel Üretimi</h1>
-          <p>Local SD veya ücretsiz Pollinations.</p>
+          <h1>Görsel</h1>
+          <p>Yerel SD veya ücretsiz Pollinations.</p>
         </header>
         <div class="universe-actions">
           <input type="text" id="image-prompt" placeholder="Görsel tarifi..." />
@@ -105,7 +184,7 @@
       <section id="panel-github" class="panel">
         <header class="panel-header">
           <h1>GitHub</h1>
-          <p>Repolar — yazma/push onaylı.</p>
+          <p>Yazma / push her zaman onaylı.</p>
         </header>
         <button id="gh-refresh" class="primary">Repoları Yenile</button>
         <div id="gh-repos" class="gh-repos"></div>
@@ -122,7 +201,7 @@
 
       <section id="panel-status" class="panel">
         <header class="panel-header">
-          <h1>Sistem Durumu</h1>
+          <h1>Sistem Nabzı</h1>
         </header>
         <pre id="status-text" class="status-box">Yükleniyor...</pre>
       </section>
