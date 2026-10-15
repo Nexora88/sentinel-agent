@@ -152,7 +152,7 @@ class ImageGenerator:
         return Image.open(io.BytesIO(raw)).convert("RGBA")
 
     def create_video(self, filename: str, duration: float = 4.0) -> dict:
-        if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}\\.png", str(filename or "")):
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}\.png", str(filename or "")):
             raise MediaToolError("Video için güvenli PNG dosya adı gerekli.")
         source = (self.output_dir / filename).resolve()
         if self.output_dir not in source.parents or not source.is_file():
