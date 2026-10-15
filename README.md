@@ -2,14 +2,14 @@
 
 **Yerel Türkçe ajan işletim sistemi altyapısı.** Uzun vadeli hedef; kendi model biçimi, tokenizer'ı ve çıkarım motoruyla harici çalışma zamanı bağımlılığını kaldırmaktır. Bu geçiş aşamalıdır: `engine/mkaos-inference/` altında bağımsız Rust CPU çekirdeği başlatılmıştır; mevcut uygulama henüz Ollama üzerinden model çalıştırır ve bu entegrasyon geçici uyumluluk katmanıdır. Yerine geçecek motor uçtan uca model çalıştırıp testleri geçmeden Ollama'yı silmek mevcut yerel sohbet işlevini kırar, bağımsızlık sağlamaz. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
-MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. Sohbet varsayılan olarak mevcut yerel Ollama yolunda kalır; `MKAOS_ENABLED=true` ile ayrı, bellekte yaşayan Rust MKAOS servisine kontrollü olarak yönlendirilir. MKAOS yanıt vermezse otomatik olarak başka bir modele geçilmez; hata görünür kalır ve geri alma için bayrak kapatılır. “Kendi kararlarını vermek”, hedefler için plan önermek ve güvenli yerel işleri yürütmek anlamına gelir. Dosya değiştirme, commit, push, bildirim veya harici sisteme veri gönderme gibi etkiler açık onay gerektirir.
+MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. Sohbet ve tüm üretim görevleri yalnızca Rust MKAOS servisine gider; `MKAOS_ENABLED` sağlayıcı değiştirmez. MKAOS erişilemiyorsa hata görünür kalır. Ollama şu an yalnızca RAG embedding'leri için geçici olarak tutulur; bu nedenle tam Ollama bağımsızlığı henüz tamamlanmış değildir.
 
 ## Bağımsız çıkarım motoru — aşamalı geçiş
 
 - Çekirdek: [`engine/mkaos-inference/`](engine/mkaos-inference/) — Rust CPU tensör işlemleri, Transformer decoder ve KV cache.
 - HF uyumluluk katmanı: [`engine/mkaos-hf-adapter/`](engine/mkaos-hf-adapter/).
 - Yerleşik servis: `mkaos_server` model ağırlıklarını/tokenizer'ı başlangıçta bir kez yükler ve yerel HTTP API'si sağlar. Aynı sistem istemi için sınırlı KV önek önbelleği kullanır.
-- Uygulama bağlantısı isteğe bağlıdır: `MKAOS_ENABLED=false` varsayılandır; `true` yalnızca deneysel MKAOS sohbet yönlendirmesini açar. `false` ile sohbet önceki yerel Ollama yoluna döner. Embedding'ler şimdilik Ollama'da kalır.
+- Sohbet üretimi yalnızca MKAOS'a yönlendirilir; `MKAOS_ENABLED=false` Ollama sohbet yolunu açmaz. Embedding'ler geçici olarak Ollama'da kalır.
 - Sunucu varsayılan olarak loopback'e bağlanır. Docker Compose dağıtımı, portu host'a yayınlamadan yalnızca dahili ağa bağlar; container arayüzüne bağlanmak için açık bir ayar gerekir.
 - Şimdiki aday ağırlıklar üçüncü taraf SmolLM2-135M-Instruct'tır. Motorun bağımsız kodu geliştirilse de model ağırlıkları henüz MKAOS tarafından eğitilmiş değildir. Türkçe anlamsal kalite ve hedef cihaz performansı geçiş kapılarıdır.
 
@@ -19,7 +19,7 @@ MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik t
 
    `python tools/fetch_model.py --output-dir models/smollm2-135m-instruct`
 
-2. `.env.example` dosyasını `.env` olarak kopyalayın; `MKAOS_ENABLED=true` yapın. Ollama embedding modelinin mevcut olduğundan emin olun; embedding yolu şu an hâlâ Ollama kullanır.
+2. `.env.example` dosyasını `.env` olarak kopyalayın. Sohbet için MKAOS zorunludur; embedding modeli geçici olarak Ollama'dan sağlanır.
 3. Servisi dahili Docker ağı üzerinde başlatın:
 
    `docker compose --profile mkaos up --build`
@@ -28,7 +28,7 @@ MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik t
 
    `docker compose exec sentinel python -c "import urllib.request; print(urllib.request.urlopen('http://mkaos:11435/health').read().decode())"`
 
-Geri alma için `.env` içinde `MKAOS_ENABLED=false` yapıp `docker compose up -d sentinel` çalıştırın. İlk model yüklemesi birkaç saniye veya daha uzun sürebilir; sonraki isteklerde süreç yeniden başlatılmadıkça ağırlıklar bellekte kalır. API şu an token-token streaming sağlamaz ve istekleri sıralı işler.
+Ollama sohbetine geri dönüş yolu kaldırılmıştır. MKAOS hizmeti kapalıysa sohbet isteği açık hata verir; önce MKAOS servisini düzeltin. İlk model yüklemesi birkaç saniye veya daha uzun sürebilir; sonraki isteklerde süreç yeniden başlatılmadıkça ağırlıklar bellekte kalır. API şu an token-token streaming sağlamaz ve istekleri sıralı işler.
 
 **Hedef cihazda kalite ve sürekli-istek ölçümü (TTFT testi bu aşamada çalıştırılmaz):**
 
@@ -238,7 +238,7 @@ cargo run --release --manifest-path engine/mkaos-hf-adapter/Cargo.toml --bin mka
 
 Varsayılan adres `http://127.0.0.1:11435` şeklindedir. `/health`, `/api/chat`, `/api/generate` ve `/api/tags` uç noktaları desteklenir. Sohbet yanıtı uyumluluk amacıyla tek NDJSON yanıtı olarak gönderilir; token token canlı akış henüz uygulanmamıştır.
 
-Uygulamayı MKAOS'a yönlendirmek için `.env` içinde `MKAOS_ENABLED=true` ve `MKAOS_BASE_URL=http://127.0.0.1:11435` ayarlanır. **Geri alma:** `MKAOS_ENABLED=false` yapıp uygulamayı yeniden başlatmak, sohbet üretimini önceki yerel Ollama sağlayıcısına döndürür. Embedding işlemleri Ollama'da kalır. MKAOS sunucusu çalışmıyorsa uygulama otomatik olarak Ollama'ya geçmez; sessiz sağlayıcı değişimi yerine açık hata davranışı korunur.
+Uygulamayı MKAOS'a yönlendirmek için `.env` içinde `MKAOS_BASE_URL=http://127.0.0.1:11435` ayarlanır; `MKAOS_ENABLED` sohbet için artık geçersizdir. **Geri alma yok:** sohbet üretimi yalnızca MKAOS'a gider. MKAOS kapalıysa hata görünür; Ollama sohbet sağlayıcısı olarak kullanılmaz. Embedding işlemleri Ollama'da kalır. MKAOS sunucusu çalışmıyorsa uygulama otomatik olarak Ollama'ya geçmez; sessiz sağlayıcı değişimi yerine açık hata davranışı korunur.
 
 Bu özellik deneysel durumdadır. Mevcut aday ağırlıklar üçüncü taraf SmolLM2'dir; bu sunucu kendi ağırlıklarımızı eğitmez. Türkçe kalite, semantik doğruluk ve hedef cihaz performansı sabit değerlendirme kümesiyle ölçülmeden varsayılan yapılmamalıdır. Kalite raporu:
 

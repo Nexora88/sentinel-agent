@@ -10,18 +10,15 @@ from tools.website_scanner import UnsafeTarget, WebsiteScanner, validate_public_
 
 class LocalModelEndpointTests(unittest.TestCase):
     def test_only_loopback_and_local_docker_endpoint_are_allowed(self):
-        self.assertEqual(
-            validate_local_ollama_url("http://localhost:11434"),
+        for endpoint in (
             "http://localhost:11434",
-        )
-        self.assertEqual(
-            validate_local_ollama_url("http://host.docker.internal:11434"),
             "http://host.docker.internal:11434",
-        )
-        self.assertEqual(
-            validate_local_ollama_url("http://ollama:11434"),
             "http://ollama:11434",
-        )
+            "http://localhost:11435",
+            "http://mkaos:11435",
+        ):
+            with self.subTest(endpoint=endpoint):
+                self.assertEqual(validate_local_ollama_url(endpoint), endpoint)
         for endpoint in (
             "https://api.example.com",
             "http://192.168.1.20:11434",
@@ -31,19 +28,26 @@ class LocalModelEndpointTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_local_ollama_url(endpoint)
 
-
-
-    def test_crewai_adapter_uses_only_local_ollama_provider(self):
-        from unittest.mock import patch
+    def test_crewai_adapter_uses_only_local_mkaos_engine(self):
         from core.ollama_client import OllamaClient
 
-        client = OllamaClient(model="qwen2.5:7b", base_url="http://ollama:11434")
-        with patch("crewai.LLM") as local_llm:
-            client.get_crew_llm()
+        env = {
+            "MKAOS_BASE_URL": "http://mkaos:11435",
+            "MKAOS_MODEL_NAME": "mkaos-local",
+            "MKAOS_TEMPERATURE": "0.15",
+            "MKAOS_TOP_P": "0.9",
+            "MKAOS_REPETITION_PENALTY": "1.10",
+        }
+        with patch.dict("os.environ", env):
+            client = OllamaClient()
+            with patch("crewai.LLM") as local_llm:
+                client.get_crew_llm()
         local_llm.assert_called_once_with(
-            model="ollama/qwen2.5:7b",
-            base_url="http://ollama:11434",
-            temperature=0.2,
+            model="ollama/mkaos-local",
+            base_url="http://mkaos:11435",
+            temperature=0.15,
+            top_p=0.9,
+            repeat_penalty=1.1,
         )
 
 

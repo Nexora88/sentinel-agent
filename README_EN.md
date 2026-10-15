@@ -22,10 +22,10 @@ A local-first assistant and agent runtime built around local Ollama inference, e
 The Rust runtime in `engine/mkaos-hf-adapter/` exposes an Ollama-compatible local chat API. It loads the pinned model and tokenizer once at startup, keeps weights resident, and maintains a bounded cache for repeated exact system-prompt prefixes. Requests are currently processed sequentially; token-by-token streaming is not implemented.
 
 The application integration is deliberately opt-in:
-- `MKAOS_ENABLED=false` is the default and preserves the existing local Ollama chat route.
-- `MKAOS_ENABLED=true` routes chat to `MKAOS_BASE_URL`; embeddings remain on Ollama until MKAOS has a validated embedder.
-- Set `MKAOS_ENABLED=false` to roll chat back to Ollama. There is no silent fallback that could hide a failed MKAOS request.
-- The currently pinned weights are third-party SmolLM2-135M-Instruct, not self-trained MKAOS weights. Semantic quality and target-device latency must pass before considering it a default.
+- All chat, coding, planning and agent generation is routed exclusively to `MKAOS_BASE_URL`; `MKAOS_ENABLED` no longer changes the provider.
+- A failed MKAOS request is surfaced and never retried against another chat runtime.
+- Ollama remains temporarily only for RAG embeddings. Full Ollama removal is blocked on a native MKAOS embedder plus retrieval-parity and offline integration tests.
+- The currently pinned weights are third-party SmolLM2-135M-Instruct, not self-trained MKAOS weights. Engine independence and model-weight ownership are separate milestones.
 
 ### Optional Docker Compose deployment
 
@@ -33,8 +33,8 @@ The application integration is deliberately opt-in:
 
    `python tools/fetch_model.py --output-dir models/smollm2-135m-instruct`
 
-2. Copy `.env.example` to `.env` and set `MKAOS_ENABLED=true`. The embedding model is still served by Ollama.
-3. Start the app and the opt-in resident runtime on the internal Docker network:
+2. Copy `.env.example` to `.env` and set `MKAOS_BASE_URL` to the resident MKAOS service. `MKAOS_ENABLED` no longer switches the chat provider. Ollama remains temporarily for embeddings only.
+3. Start the app and the required resident MKAOS runtime on the internal Docker network:
 
    `docker compose --profile mkaos up --build`
 
@@ -42,7 +42,7 @@ The MKAOS port is not published on the host. Container-interface binding is expl
 
 `docker compose exec sentinel python -c "import urllib.request; print(urllib.request.urlopen('http://mkaos:11435/health').read().decode())"`
 
-To roll back, set `MKAOS_ENABLED=false` and run `docker compose up -d sentinel`. First startup includes model loading; subsequent requests reuse the resident process unless the service restarts.
+There is no Ollama chat rollback. If MKAOS is down, chat requests fail visibly; restore the MKAOS service rather than changing providers. First startup includes model loading; subsequent requests reuse the resident process unless the service restarts.
 
 **Target-device quality and steady-request benchmark (the dedicated TTFT test is deliberately not run yet):**
 
@@ -170,7 +170,7 @@ cargo run --release --manifest-path engine/mkaos-hf-adapter/Cargo.toml --bin mka
 
 The default address is `http://127.0.0.1:11435`. It supports `/health`, `/api/chat`, `/api/generate`, and `/api/tags`. Chat responses currently use a single NDJSON record; token-by-token streaming is not implemented yet.
 
-To route app chat through MKAOS, set `MKAOS_ENABLED=true` and `MKAOS_BASE_URL=http://127.0.0.1:11435` in `.env`. **Rollback:** set `MKAOS_ENABLED=false` and restart to return chat generation to the existing local Ollama provider. Embeddings remain on Ollama. If the MKAOS server is unavailable, the app does not silently switch providers; it fails explicitly.
+Chat generation always uses MKAOS. Set `MKAOS_BASE_URL=http://127.0.0.1:11435` for a native local run. There is no Ollama chat rollback. Embeddings remain temporarily on Ollama; if MKAOS is unavailable, the request fails visibly.
 
 This is experimental. The current candidate weights are third-party SmolLM2; this server does not train owned weights. Do not make it the default until Turkish quality, semantic correctness, and target-device performance have passed the fixed evaluation set.
 
