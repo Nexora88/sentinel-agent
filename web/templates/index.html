@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SEKA v6.2 — Yerel Türkçe Ajan</title>
+  <title>SEKA v6.3 — Yerel Türkçe Ajan</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -13,7 +13,7 @@
         <span class="logo-icon">◈</span>
         <div class="logo-text">
           <span class="brand">SEKA</span>
-          <span class="tag">v6.2 · yerel · güvenli</span>
+          <span class="tag">v6.3 · yerel · güvenli</span>
         </div>
       </div>
       <nav>
@@ -42,7 +42,7 @@
       <section id="panel-bridge" class="panel active">
         <header class="panel-header">
           <h1>Komut Köprüsü</h1>
-          <p>SEKA v6.2 — yerel Türkçe ajan. Ağ özellikleri varsayılan olarak kapalıdır.</p>
+          <p>SEKA v6.3 — yerel Türkçe ajan. Ağ özellikleri varsayılan olarak kapalıdır.</p>
         </header>
         <div class="quick-grid">
           <button class="qcard" data-cmd="expand">🌌 Bilgi genişlet</button>
@@ -146,8 +146,12 @@
       <section id="panel-night" class="panel">
         <header class="panel-header">
           <h1>Gece + Podcast</h1>
-          <p>Öneri + metin taslağı. Otomatik yayın yok.</p>
+          <p>Yerel gece denetimi, güvenlik raporu ve podcast taslağı. Kod değişikliği ve push için onay gerekir.</p>
         </header>
+        <div class="stat-card night-schedule-card">
+          <span class="stat-label">OTOMATİK GECE DENETİMİ</span>
+          <pre id="night-scheduler-status" class="status-box">Zamanlama durumu yükleniyor…</pre>
+        </div>
         <div class="universe-actions">
           <button id="night-btn" class="primary">Gece Döngüsü</button>
           <button id="podcast-btn">Podcast Metni</button>
