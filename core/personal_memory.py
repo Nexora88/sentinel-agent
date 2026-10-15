@@ -36,7 +36,7 @@ class PersonalMemory:
         self.tenant_id = str(tenant_id).strip().lower() if tenant_id else None
         self.persist_directory = Path(persist_directory)
         self.persist_directory.mkdir(parents=True, exist_ok=True)
-        self.encrypt_profile = os.getenv("MKAOS_ENCRYPT_PERSONAL_PROFILE", "").strip().lower() in {"1", "true", "yes", "on"}
+        self.encrypt_profile = any(os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"} for name in ("MKAOS_ENCRYPT_PERSONAL_PROFILE", "MKAOS_ENCRYPT_MEMORY_FILES"))
         self.profile_path = self.persist_directory / ("profile.enc" if self.encrypt_profile else "profile.json")
         self.legacy_profile_path = self.persist_directory / "profile.json"
 
