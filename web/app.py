@@ -767,6 +767,11 @@ class VideoRequest(BaseModel):
     duration: float = 4.0
 
 
+class VideoStoryRequest(BaseModel):
+    prompts: list[str]
+    duration: float = 8.0
+
+
 @app.post("/api/media/video")
 async def api_media_video(req: VideoRequest, authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
@@ -781,6 +786,28 @@ async def api_media_video(req: VideoRequest, authorization: Optional[str] = Head
             raise HTTPException(503, str(exc))
         logger.exception("MKAOS local video rendering failed")
         raise HTTPException(500, "Video oluşturma başarısız oldu.")
+
+
+@app.post("/api/media/story-video")
+async def api_media_story_video(req: VideoStoryRequest, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    if not isinstance(req.prompts, list) or not 2 <= len(req.prompts) <= 6:
+        raise HTTPException(400, "Storyboard için 2-6 sahne açıklaması gerekli.")
+    if any(not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 1000 for prompt in req.prompts):
+        raise HTTPException(400, "Her sahne açıklaması 1-1000 karakter olmalı.")
+    duration = max(4.0, min(24.0, float(req.duration)))
+    try:
+        p = get_pipeline(user["username"])
+        payload = {"prompts": [prompt.strip() for prompt in req.prompts], "duration": duration}
+        if p.media_engine.should_defer_heavy():
+            return p.media_engine.submit("story_video", payload)
+        return await asyncio.to_thread(p.media_bridge.execute, "story_video", payload)
+    except Exception as exc:
+        from tools.image_gen import MediaToolError
+        if isinstance(exc, MediaToolError):
+            raise HTTPException(503, str(exc))
+        logger.exception("MKAOS local storyboard video failed")
+        raise HTTPException(500, "Storyboard videosu oluşturulamadı.")
 
 
 @app.get("/api/images/{filename}")
@@ -806,7 +833,7 @@ async def api_media_capabilities(authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
     p = get_pipeline(user["username"])
     return {"bridge": p.media_bridge.capabilities(), "engine": p.media_engine.capabilities(),
-            "jobs": p.media_engine.list_jobs(20), "video_mode": "local ffmpeg motion effect, not text-to-video"}
+            "jobs": p.media_engine.list_jobs(20), "video_mode": "local ffmpeg motion effect plus 2-6-scene self-hosted Stable Diffusion storyboard; not neural text-to-video"}
 
 
 @app.post("/api/media/queue")
