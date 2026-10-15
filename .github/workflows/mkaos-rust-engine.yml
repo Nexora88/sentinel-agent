@@ -8,6 +8,10 @@ on:
       - ".github/workflows/mkaos-rust-engine.yml"
       - "tools/fetch_model.py"
       - "tools/convert_safetensors_to_mkaosw1.py"
+      - "tools/validate_tokenizer.py"
+      - "tools/validate_model_logits.py"
+      - "tools/benchmark_mkaos_vs_ollama.py"
+      - ".github/workflows/mkaos-real-model-validation.yml"
       - "models/smollm2-135m-instruct/**"
   pull_request:
     paths:
@@ -16,6 +20,10 @@ on:
       - ".github/workflows/mkaos-rust-engine.yml"
       - "tools/fetch_model.py"
       - "tools/convert_safetensors_to_mkaosw1.py"
+      - "tools/validate_tokenizer.py"
+      - "tools/validate_model_logits.py"
+      - "tools/benchmark_mkaos_vs_ollama.py"
+      - ".github/workflows/mkaos-real-model-validation.yml"
       - "models/smollm2-135m-instruct/**"
       - "benchmarks/**"
   workflow_dispatch:
