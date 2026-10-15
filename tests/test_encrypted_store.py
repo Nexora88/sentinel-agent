@@ -46,9 +46,16 @@ class EncryptedFileStoreTests(unittest.TestCase):
                 os.environ["MKAOS_MEMORY_KEY"] = old
 
     def test_environment_key_requires_256_bits(self):
-        key = base64.urlsafe_b64encode(b"x" * 32).decode("ascii")
-        store = EncryptedFileStore.from_environment_with_key_for_test(key)
-        self.assertEqual(len(store._key), 32)
+        old = os.environ.get("MKAOS_MEMORY_KEY")
+        os.environ["MKAOS_MEMORY_KEY"] = base64.urlsafe_b64encode(b"x" * 32).decode("ascii")
+        try:
+            store = EncryptedFileStore.from_environment("unused.enc")
+            self.assertEqual(len(store._key), 32)
+        finally:
+            if old is None:
+                os.environ.pop("MKAOS_MEMORY_KEY", None)
+            else:
+                os.environ["MKAOS_MEMORY_KEY"] = old
 
 
 if __name__ == "__main__":
