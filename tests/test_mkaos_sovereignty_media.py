@@ -39,6 +39,20 @@ class ForgetMemoryTests(unittest.TestCase):
             instance.forget_matching("ab", 24)
 
 class SignedApprovalTests(unittest.TestCase):
+    def test_valid_signature_is_audited_and_replay_is_rejected(self):
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from cryptography.hazmat.primitives import serialization
+        key=Ed25519PrivateKey.generate()
+        public=key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        public_b64=base64.b64encode(public).decode()
+        payload={"request_id":"request-once","action":"review"}
+        signature=base64.b64encode(key.sign(SignedApprovalProtocol.canonical_payload(payload))).decode()
+        with tempfile.TemporaryDirectory() as d:
+            protocol=SignedApprovalProtocol(str(Path(d)/"audit.jsonl"), public_key_b64=public_b64)
+            self.assertTrue(protocol.verify(payload, signature)["valid"])
+            with self.assertRaisesRegex(ApprovalProtocolError, "replay engellendi"):
+                protocol.verify(payload, signature)
+
     def test_missing_public_key_fails_closed(self):
         with tempfile.TemporaryDirectory() as d:
             protocol=SignedApprovalProtocol(str(Path(d)/"audit.jsonl"), public_key_b64="")
