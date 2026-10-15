@@ -1,5 +1,5 @@
 """
-SEKA v5 — Sentinel Egemen Kişisel Ajan
+SEKA v6 — Sentinel Egemen Kişisel Ajan
 Canlı işler · plan motoru · bilgi paketleri · Ollama
 """
 
@@ -37,7 +37,7 @@ from core.job_bus import job_bus
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("seka.web")
 
-app = FastAPI(title="SEKA", version="5.0", description="Sentinel Egemen Kişisel Ajan")
+app = FastAPI(title="SEKA", version="6.0", description="Sentinel Egemen Kişisel Ajan")
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -98,7 +98,7 @@ chat_history = _load_chat_history()
 
 MANIFESTO = {
     "name": "SEKA",
-    "version": "5.0",
+    "version": "6.0",
     "tagline": "Yerel süper ajan — ücretli API yok, veri sende kalır",
     "pillars": [
         "Ollama ile tamamen yerel zeka",
@@ -168,7 +168,7 @@ class PackRequest(BaseModel):
 
 @app.on_event("startup")
 async def startup():
-    logger.info("SEKA Web v5.0")
+    logger.info("SEKA Web v6.0")
     get_pipeline()
 
 
