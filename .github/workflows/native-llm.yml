@@ -1,0 +1,34 @@
+name: MKAOS Native LLM Core
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mkaos-llm/**"
+      - ".github/workflows/native-llm.yml"
+  pull_request:
+    paths:
+      - "mkaos-llm/**"
+      - ".github/workflows/native-llm.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust-core:
+    name: Rust core tests (stable)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test native runtime foundation
+        working-directory: mkaos-llm
+        run: cargo test
+      - name: Check formatting
+        working-directory: mkaos-llm
+        run: cargo fmt --all -- --check
+      - name: Lint
+        working-directory: mkaos-llm
+        run: cargo clippy --all-targets -- -D warnings
