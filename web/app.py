@@ -311,10 +311,10 @@ async def api_status(authorization: Optional[str] = Header(None)):
     try:
         p = get_pipeline()
     except Exception as exc:
-        logger.warning("SEKA bileşenleri başlatılamadı (%s).", type(exc).__name__)
+        logger.warning("MKAOS bileşenleri başlatılamadı (%s).", type(exc).__name__)
         return {
             "brand": "MKAOS", "version": "6.4", "status": "degraded", "user": user,
-            "assistant": {"status": "degraded", "message": "SEKA paneli açık; yerel bellek veya model bileşeni başlatılamadı. Veriler otomatik silinmedi."},
+            "assistant": {"status": "degraded", "message": "MKAOS paneli açık; yerel bellek veya model bileşeni başlatılamadı. Veriler otomatik silinmedi."},
             "ollama": {"status": "unavailable", "message": "Ollama bağlantısı hazır değil. Ollama hizmetini, model kurulumunu ve yerel bellek dizinini kontrol et."},
             "privacy": {"web_research": False, "external_finance_data": False, "site_scanning": False, "external_notifications": False, "github_network_access": False},
             "night_scheduler": night_scheduler.status() if night_scheduler else {"enabled": False, "running": False},
@@ -402,7 +402,7 @@ async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)
     except Exception as exc:
         # Keep FastAPI alive and never return raw exception/traceback to the browser.
         logger.warning("Yerel yanıt üretilemedi (%s).", type(exc).__name__)
-        reply = ("SEKA paneli çalışıyor ancak yerel Ollama/model bağlantısı hazır değil. "
+        reply = ("MKAOS paneli çalışıyor ancak yerel Ollama/model bağlantısı hazır değil. "
                  "Ollama hizmetinin açık olduğunu, OLLAMA_BASE_URL değerini ve OLLAMA_MODEL "
                  "modelinin yerel olarak yüklü olduğunu kontrol et. Yerel verilerin silinmedi.")
     history = chat_history.setdefault(user["username"], [])
