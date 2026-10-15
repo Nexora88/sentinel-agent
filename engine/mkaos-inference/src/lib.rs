@@ -1,13 +1,14 @@
 //! MKAOS: dependency-free, auditable CPU inference primitives.
 //! Reference implementation for small models, not a fast production runtime.
-//! Includes a single synthetic decoder block, bounded checkpoint reader, byte tokenizer,
-//! sampling helpers, and a full-prefix generation driver. No real model adapter or KV cache yet.
+//! Includes a synthetic single-block reference plus a multi-layer GQA reference decoder with
+//! incremental per-layer KV cache. The pretrained-model adapter and compatible BPE tokenizer are not yet complete.
 #![forbid(unsafe_code)]
 
 pub mod checkpoint;
 pub mod generation;
 pub mod sampling;
 pub mod sha256;
+pub mod stacked_decoder;
 pub mod tokenizer;
 use std::fmt;
 
