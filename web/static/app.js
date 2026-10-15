@@ -698,14 +698,22 @@ async function loadPortfolio() {
     $("#fin-mode").textContent = d.mode || "paper";
     const box = $("#fin-positions");
     const positions = d.open_positions || [];
-    if (!positions.length) box.innerHTML = '<p class="empty">Yok</p>';
-    else {
-      box.innerHTML = "";
-      positions.forEach((p) => {
+    if (!positions.length) {
+      box.textContent = "Açık pozisyon yok";
+    } else {
+      box.replaceChildren();
+      positions.forEach((position) => {
         const div = document.createElement("div");
         div.className = "approval-card";
-        div.innerHTML = `<div class="details"><div class="action-name">${p.symbol}</div>
-          <div>PnL $${p.pnl?.toFixed(2)}</div></div>`;
+        const details = document.createElement("div");
+        details.className = "details";
+        const symbol = document.createElement("div");
+        symbol.className = "action-name";
+        symbol.textContent = String(position.symbol || "Varlık");
+        const pnl = document.createElement("div");
+        pnl.textContent = "PnL $" + (Number.isFinite(position.pnl) ? position.pnl.toFixed(2) : "—");
+        details.append(symbol, pnl);
+        div.appendChild(details);
         box.appendChild(div);
       });
     }
@@ -736,18 +744,23 @@ $("#finance-btn").addEventListener("click", async () => {
 $("#image-btn").addEventListener("click", async () => {
   const prompt = $("#image-prompt").value.trim();
   if (!prompt) return;
-  $("#image-result").innerHTML = "Üretiliyor...";
+  $("#image-result").textContent = "Üretiliyor...";
   const res = await fetch("/api/image", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt }),
   });
   const data = await res.json();
-  if (data.success) {
-    $("#image-result").innerHTML = `<img src="/api/images/${data.filename}" style="max-width:100%;border-radius:12px" />`;
-  } else $("#image-result").textContent = data.error || "Hata";
+  if (data.success && /^[A-Za-z0-9._-]+$/.test(String(data.filename || ""))) {
+    const image = document.createElement("img");
+    image.src = "/api/images/" + encodeURIComponent(data.filename);
+    image.alt = "SEKA tarafından üretilen görsel";
+    image.loading = "lazy";
+    image.style.maxWidth = "100%";
+    image.style.borderRadius = "12px";
+    $("#image-result").replaceChildren(image);
+  } else $("#image-result").textContent = data.error || "Görsel üretilemedi.";
 });
-
 async function loadGithub() {
   const box = $("#gh-repos");
   if (!box) return;
