@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from core.rag import MemoryStore
+from core.rag import MemoryStore, _limit
 
 
 class BoundedRagTests(unittest.TestCase):
@@ -21,6 +21,9 @@ class BoundedRagTests(unittest.TestCase):
         store.vectorstore._collection.count.return_value = 0
         store.vectorstore._collection.get.return_value = {"ids": [], "metadatas": []}
         return store
+
+    def test_document_limit_has_a_hard_memory_safety_ceiling(self):
+        self.assertEqual(_limit(1_000_000, "SEKA_RAG_MAX_DOCUMENTS", 10_000, 100_000), 100_000)
 
     def test_rejects_oversized_ingest_before_any_write(self):
         store = self.make_store(max_chars=5)
