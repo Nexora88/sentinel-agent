@@ -28,7 +28,7 @@ MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik t
 
    `docker compose exec sentinel python -c "import urllib.request; print(urllib.request.urlopen('http://mkaos:11435/health').read().decode())"`
 
-Geri alma için `.env` içinde `MKAOS_ENABLED=false` yapıp `docker compose up -d sentinel` çalıştırın. İlk model yüklemesi birkaç saniye veya daha uzun sürebilir; sonraki isteklerde süreç yeniden başlatılmadıkça ağırlıklar bellekte kalır. API şu an token-token streaming sağlamaz ve istekleri sıralı işler.
+Ollama sohbetine geri dönüş yolu kaldırılmıştır. MKAOS hizmeti kapalıysa sohbet isteği açık hata verir; önce MKAOS servisini düzeltin. İlk model yüklemesi birkaç saniye veya daha uzun sürebilir; sonraki isteklerde süreç yeniden başlatılmadıkça ağırlıklar bellekte kalır. API şu an token-token streaming sağlamaz ve istekleri sıralı işler.
 
 **Hedef cihazda kalite ve sürekli-istek ölçümü (TTFT testi bu aşamada çalıştırılmaz):**
 
@@ -238,7 +238,7 @@ cargo run --release --manifest-path engine/mkaos-hf-adapter/Cargo.toml --bin mka
 
 Varsayılan adres `http://127.0.0.1:11435` şeklindedir. `/health`, `/api/chat`, `/api/generate` ve `/api/tags` uç noktaları desteklenir. Sohbet yanıtı uyumluluk amacıyla tek NDJSON yanıtı olarak gönderilir; token token canlı akış henüz uygulanmamıştır.
 
-Uygulamayı MKAOS'a yönlendirmek için `.env` içinde `MKAOS_ENABLED=true` ve `MKAOS_BASE_URL=http://127.0.0.1:11435` ayarlanır. **Geri alma:** `MKAOS_ENABLED=false` yapıp uygulamayı yeniden başlatmak, sohbet üretimini önceki yerel Ollama sağlayıcısına döndürür. Embedding işlemleri Ollama'da kalır. MKAOS sunucusu çalışmıyorsa uygulama otomatik olarak Ollama'ya geçmez; sessiz sağlayıcı değişimi yerine açık hata davranışı korunur.
+Uygulamayı MKAOS'a yönlendirmek için `.env` içinde `MKAOS_BASE_URL=http://127.0.0.1:11435` ayarlanır; `MKAOS_ENABLED` sohbet için artık geçersizdir. **Geri alma yok:** sohbet üretimi yalnızca MKAOS'a gider. MKAOS kapalıysa hata görünür; Ollama sohbet sağlayıcısı olarak kullanılmaz. Embedding işlemleri Ollama'da kalır. MKAOS sunucusu çalışmıyorsa uygulama otomatik olarak Ollama'ya geçmez; sessiz sağlayıcı değişimi yerine açık hata davranışı korunur.
 
 Bu özellik deneysel durumdadır. Mevcut aday ağırlıklar üçüncü taraf SmolLM2'dir; bu sunucu kendi ağırlıklarımızı eğitmez. Türkçe kalite, semantik doğruluk ve hedef cihaz performansı sabit değerlendirme kümesiyle ölçülmeden varsayılan yapılmamalıdır. Kalite raporu:
 
