@@ -10,4 +10,4 @@ mkaos-inference = { path = "../mkaos-inference" }
 safetensors = "0.4"
 half = "2"
 serde_json = "1"
-tokenizers = { version = "0.21", default-features = false, features = ["onig"] }
+tokenizers = { version = "0.23", default-features = false, features = ["onig"] }
