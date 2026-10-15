@@ -8,6 +8,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import tempfile
 import random
 import os
 import time
@@ -17,6 +19,7 @@ from urllib.parse import urljoin
 from typing import Any, Dict, List, Optional, Set
 
 import requests
+from requests.exceptions import RequestException
 from bs4 import BeautifulSoup
 
 from core.ollama_client import OllamaClient
@@ -25,6 +28,33 @@ from core.safety import sanitize_web_content, contains_injection, source_credibi
 from tools.website_scanner import UnsafeTarget, validate_public_url
 
 logger = logging.getLogger("sentinel.knowledge_expander")
+
+
+def _atomic_write_json(path: Path, data: Any) -> None:
+    """Durably replace a local JSON state file without leaving partial writes."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_name = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=str(path.parent),
+            prefix=f".{path.name}-", suffix=".tmp", delete=False
+        ) as temp:
+            json.dump(data, temp, ensure_ascii=False, indent=2)
+            temp.flush()
+            os.fsync(temp.fileno())
+            temp_name = temp.name
+        try:
+            os.chmod(temp_name, 0o600)
+        except OSError:
+            pass
+        os.replace(temp_name, path)
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+    finally:
+        if temp_name and os.path.exists(temp_name):
+            os.unlink(temp_name)
 
 DEFAULT_SEEDS = [
     "artificial intelligence latest research 2025 2026",
@@ -96,39 +126,52 @@ class KnowledgeExpander:
         self.session.trust_env = False
 
     def _load_visited(self) -> Set[str]:
-        if self.visited_path.exists():
-            try:
-                return set(json.loads(self.visited_path.read_text(encoding="utf-8")))
-            except Exception:
-                pass
-        return set()
+        if not self.visited_path.exists():
+            return set()
+        try:
+            data = json.loads(self.visited_path.read_text(encoding="utf-8"))
+            if not isinstance(data, list) or any(not isinstance(item, str) for item in data):
+                raise ValueError("visited state must be a list of URLs")
+            return set(data)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Visited URL state is unreadable; preserve and recover {self.visited_path}."
+            ) from exc
 
     def _save_visited(self) -> None:
-        self.visited_path.write_text(
-            json.dumps(list(self.visited)[-8000:], ensure_ascii=False), encoding="utf-8"
-        )
+        _atomic_write_json(self.visited_path, list(self.visited)[-8000:])
 
     def _load_seeds(self) -> List[str]:
-        if self.seeds_path.exists():
-            try:
-                return json.loads(self.seeds_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        return DEFAULT_SEEDS.copy()
+        if not self.seeds_path.exists():
+            return DEFAULT_SEEDS.copy()
+        try:
+            data = json.loads(self.seeds_path.read_text(encoding="utf-8"))
+            if not isinstance(data, list) or any(not isinstance(item, str) for item in data):
+                raise ValueError("seed state must be a list of strings")
+            return data
+        except Exception as exc:
+            raise RuntimeError(
+                f"Research seed state is unreadable; preserve and recover {self.seeds_path}."
+            ) from exc
 
     def _save_seeds(self) -> None:
-        self.seeds_path.write_text(json.dumps(self.seeds, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write_json(self.seeds_path, self.seeds)
 
     def _load_stats(self) -> Dict[str, Any]:
-        if self.stats_path.exists():
-            try:
-                return json.loads(self.stats_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        return {"total_pages_ingested": 0, "total_runs": 0, "last_run": None, "topics_explored": []}
+        if not self.stats_path.exists():
+            return {"total_pages_ingested": 0, "total_runs": 0, "last_run": None, "topics_explored": []}
+        try:
+            data = json.loads(self.stats_path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("research stats must be a JSON object")
+            return data
+        except Exception as exc:
+            raise RuntimeError(
+                f"Research statistics are unreadable; preserve and recover {self.stats_path}."
+            ) from exc
 
     def _save_stats(self) -> None:
-        self.stats_path.write_text(json.dumps(self.stats, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write_json(self.stats_path, self.stats)
 
     def add_seed_topic(self, topic: str) -> None:
         topic = topic.strip()
