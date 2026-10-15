@@ -473,6 +473,27 @@ mod tests {
         }
     }
 
+
+    #[test]
+    fn streaming_http_response_is_flushable_ndjson_with_valid_framing() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let mut client = TcpStream::connect(address).unwrap();
+        let (mut server, _) = listener.accept().unwrap();
+        send_stream_headers(&mut server).unwrap();
+        send_stream_line(&mut server, json!({"done":false,"response":"Mer"})).unwrap();
+        drop(server);
+        let mut response = String::new();
+        client.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 200 OK\\r\\n"));
+        assert!(response.contains("Content-Type: application/x-ndjson\\r\\n"));
+        let body = response.split_once("\\r\\n\\r\\n").unwrap().1;
+        let line = body.lines().next().unwrap();
+        let parsed: Value = serde_json::from_str(line).unwrap();
+        assert_eq!(parsed["response"], "Mer");
+        assert_eq!(parsed["done"], false);
+    }
+
     #[test]
     fn stream_flag_is_opt_in_and_respected() {
         let base = json!({"messages":[{"role":"user","content":"Merhaba"}]});
