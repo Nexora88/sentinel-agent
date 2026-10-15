@@ -125,6 +125,14 @@ class PermissionManager:
         with self._lock:
             return [dict(r) for r in self.pending_approvals if r["status"] == "pending"]
 
+    def list_history(self, limit: int = 30) -> List[Dict]:
+        with self._lock:
+            completed = [
+                dict(r) for r in self.pending_approvals
+                if r.get("status") in {"rejected", "executed", "execution_failed", "executing"}
+            ]
+            return completed[-max(1, min(limit, 100)):]
+
     def get_request(self, request_id: str) -> Optional[Dict]:
         with self._lock:
             for request in self.pending_approvals:
