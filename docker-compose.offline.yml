@@ -29,4 +29,4 @@ networks:
     internal: true
 volumes:
   ollama_models:
-    driver: local
+    name: seka_ollama_models
