@@ -250,3 +250,17 @@ python tools/evaluate_mkaos_quality.py --model-dir models/smollm2-135m-instruct\
 ## Türkçe eğitim verisi ve bağımsız kalite kapısı
 
 Eğitim verisi menşei ve izin politikası için [Türkçe veri yönetişimi](docs/MKAOS_TURKISH_DATA_GOVERNANCE.md), bağımsız değerlendirme süreci için [Türkçe değerlendirme protokolü](docs/MKAOS_TURKISH_EVALUATION_PROTOCOL.md) belgelerine bak. Mevcut kalite kümesi yalnızca küçük bir regresyon testidir; MKAOS tarafından eğitilmiş ağırlık veya Türkçe yeterlilik sertifikası değildir. Gerçek eğitim, izinleri gözden geçirilmiş veri kümesi, ayrılmış test bölümü, hesaplama kaynağı ve bağımsız değerlendirme gerektirir.
+
+
+## MKAOS ağırlıklarını sıfırdan eğitme (deneysel)
+
+`tools/train_mkaos_from_scratch.py`, başka bir modelin ağırlıklarını indirmeden rastgele başlatılmış MKAOS GQA/SwiGLU decoder'ını eğitir ve Rust motorunun `MKAOSW1` checkpoint biçimine aktarır. Bu yol, önceden eğitilmiş bir LLM'yi yeniden adlandırmaz veya onun ağırlıklarını kullanmaz. Eğitim için ayrıca yerel, insan/hukuk incelemesinden geçmiş Türkçe veri gerekir; repoda hazır/onaylı bir eğitim korpusu bulunması anlamına gelmez.
+
+- JSONL satırları: `{"sample_id":"...","text":"..."}`; her metnin SHA-256 değeri manifestteki örnekle eşleşmelidir.
+- Manifest kapısı: `tools/validate_mkaos_training_manifest.py` içindeki tüm kaynak/lisans/izin/PII/split kontrolleri geçmelidir.
+- Eğitim komutu: `python tools/train_mkaos_from_scratch.py --corpus ./approved-tr.jsonl --manifest ./approved-manifest.json --output-dir ./artifacts/mkaos-tr`
+- Eğitim gereksinimi: yerel kurulumda PyTorch; hiçbir model deposuna veya indirme API'sine başvurulmaz.
+- Çıktılar: `mkaos-owned.mkaosw`, `tokenizer.json` ve hash/seed/cihaz/kayıp bilgilerini içeren `training-report.json`.
+- Test bölümü optimizasyon ve model seçimi için kullanılmaz. Çalıştırma raporu Türkçe yetenek sertifikası değildir; bağımsız held-out değerlendirme ve Rust motorunda checkpoint yükleme/yanıt testi hâlâ gerekir.
+
+Bu küçük byte-tokenizer modeli başlangıç araştırma hattıdır; üretim kalitesinde Türkçe asistan, GPU hızlandırması, dağıtık durum veya canlı mesh tamamlanmış sayılmaz.
