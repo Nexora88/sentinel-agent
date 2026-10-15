@@ -135,5 +135,5 @@ To route app chat through MKAOS, set `MKAOS_ENABLED=true` and `MKAOS_BASE_URL=ht
 This is experimental. The current candidate weights are third-party SmolLM2; this server does not train owned weights. Do not make it the default until Turkish quality, semantic correctness, and target-device performance have passed the fixed evaluation set.
 
 ```bash
-python tools/evaluate_mkaos_quality.py --model-dir models/smollm2-135m-instruct
+python tools/evaluate_mkaos_quality.py --model-dir models/smollm2-135m-instruct\n# While the server is running, measure requests without reloading model weights:\npython tools/evaluate_mkaos_quality.py --server-url http://127.0.0.1:11435 --output artifacts/mkaos-resident-quality.json
 ```
