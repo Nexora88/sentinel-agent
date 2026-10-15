@@ -721,8 +721,11 @@ async def api_media_video(req: VideoRequest, authorization: Optional[str] = Head
 
 @app.get("/api/images/{filename}")
 async def serve_image(filename: str):
-    path = Path("./memory/generated_images") / filename
-    if path.exists():
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}\\.(png|jpg|jpeg|webp|mp4)", filename, re.IGNORECASE):
+        raise HTTPException(404)
+    root = Path("./memory/generated_images").resolve()
+    path = (root / filename).resolve()
+    if root in path.parents and path.is_file():
         return FileResponse(path)
     raise HTTPException(404)
 
