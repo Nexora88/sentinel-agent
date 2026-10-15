@@ -1,4 +1,6 @@
 import unittest
+import tempfile
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from core.permission_manager import Action, PermissionManager
@@ -39,8 +41,15 @@ class PublicUrlValidationTests(unittest.TestCase):
 
 
 class ApprovalIdentityTests(unittest.TestCase):
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.store = str(Path(self.tempdir.name) / "approvals.json")
+
+    def tearDown(self):
+        self.tempdir.cleanup()
+
     def test_approval_requires_stable_request_id_and_is_one_time(self):
-        manager = PermissionManager()
+        manager = PermissionManager(store_path=self.store)
         message = manager.request_approval(Action.PUSH_TO_REMOTE, "push branch", {"branch": "feature"})
         request_id = message.split("Request ID: ", 1)[1].splitlines()[0]
         self.assertTrue(request_id)
@@ -48,9 +57,11 @@ class ApprovalIdentityTests(unittest.TestCase):
         self.assertTrue(manager.approve(request_id))
         self.assertFalse(manager.approve(request_id))
         self.assertEqual(manager.list_pending(), [])
+        reloaded = PermissionManager(store_path=self.store)
+        self.assertEqual(reloaded.pending_approvals[0]["status"], "approved")
 
     def test_rejects_unknown_approval_id(self):
-        manager = PermissionManager()
+        manager = PermissionManager(store_path=self.store)
         manager.request_approval(Action.MODIFY_FILES, "edit config")
         self.assertFalse(manager.reject("not-a-real-id"))
 
