@@ -758,25 +758,69 @@ $("#finance-btn").addEventListener("click", async () => {
   $("#finance-result").textContent = data.result || "";
 });
 
-$("#image-btn").addEventListener("click", async () => {
-  const prompt = $("#image-prompt").value.trim();
-  if (!prompt) return;
-  $("#image-result").textContent = "Üretiliyor...";
-  const res = await fetch("/api/image", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
-  });
-  const data = await res.json();
-  if (data.success && /^[A-Za-z0-9._-]+$/.test(String(data.filename || ""))) {
+let lastMediaFilename = "";
+function renderMediaResult(data) {
+  const box = $("#image-result");
+  if (!data.success || !/^[A-Za-z0-9._-]+$/.test(String(data.filename || ""))) {
+    box.textContent = data.detail || data.error || "İşlem tamamlanamadı.";
+    return;
+  }
+  lastMediaFilename = data.filename;
+  const url = "/api/images/" + encodeURIComponent(data.filename);
+  if (data.filename.endsWith(".mp4")) {
+    const video = document.createElement("video");
+    video.src = url; video.controls = true; video.preload = "metadata";
+    video.style.maxWidth = "100%"; video.style.borderRadius = "12px";
+    box.replaceChildren(video);
+  } else {
     const image = document.createElement("img");
-    image.src = "/api/images/" + encodeURIComponent(data.filename);
-    image.alt = "SEKA tarafından üretilen görsel";
-    image.loading = "lazy";
-    image.style.maxWidth = "100%";
-    image.style.borderRadius = "12px";
-    $("#image-result").replaceChildren(image);
-  } else $("#image-result").textContent = data.error || "Görsel üretilemedi.";
+    image.src = url; image.alt = "MKAOS tarafından yerel olarak işlenen görsel";
+    image.loading = "lazy"; image.style.maxWidth = "100%"; image.style.borderRadius = "12px";
+    const save = document.createElement("a");
+    save.href = url; save.download = data.filename; save.textContent = "Görseli indir";
+    save.className = "media-download";
+    box.replaceChildren(image, save);
+  }
+}
+$("#image-btn").addEventListener("click", async () => {
+  const mode = $("#media-mode").value;
+  const prompt = $("#image-prompt").value.trim();
+  const file = $("#media-file").files?.[0];
+  const box = $("#image-result");
+  box.textContent = "Yerel işlem hazırlanıyor…";
+  try {
+    let res;
+    if (mode === "generate") {
+      if (!prompt) { box.textContent = "Önce görsel tarifini yaz."; return; }
+      res = await fetch("/api/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
+    } else {
+      if (!file) { box.textContent = "Düzenlemek için bir görsel seç."; return; }
+      const form = new FormData(); form.append("file", file);
+      if (mode === "edit") {
+        if (!prompt) { box.textContent = "Düzenleme talimatını yaz."; return; }
+        form.append("prompt", prompt);
+        res = await fetch("/api/media/edit", { method: "POST", body: form });
+      } else {
+        form.append("color", $("#background-color").value);
+        res = await fetch("/api/media/background", { method: "POST", body: form });
+      }
+    }
+    const data = await res.json();
+    renderMediaResult(res.ok ? data : { error: data.detail || "Yerel medya işlemi başarısız." });
+  } catch (_) { box.textContent = "MKAOS medya servisine ulaşılamadı."; }
+});
+$("#video-btn")?.addEventListener("click", async () => {
+  const box = $("#image-result");
+  if (!lastMediaFilename || !lastMediaFilename.endsWith(".png")) {
+    box.textContent = "Önce bir PNG görsel üret veya düzenle.";
+    return;
+  }
+  box.textContent = "Yerel video hazırlanıyor…";
+  try {
+    const res = await fetch("/api/media/video", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filename: lastMediaFilename, duration: 4 }) });
+    const data = await res.json();
+    renderMediaResult(res.ok ? data : { error: data.detail || "Video oluşturulamadı." });
+  } catch (_) { box.textContent = "Yerel video servisine ulaşılamadı."; }
 });
 async function loadGithub() {
   const box = $("#gh-repos");
