@@ -160,6 +160,8 @@ def main() -> int:
         "mean_tokens_per_second": mean_or_none([row["tokens_per_second"] for row in rows if row["tokens_per_second"] is not None]),
         "mean_model_load_ms_per_request": mean_or_none([row["model_load_ms"] for row in rows if row["model_load_ms"] is not None]),
         "mean_wall_time_ms": mean_or_none([row["wall_time_ms_including_process_and_request"] for row in rows]),
+        "prefix_cache_hit_count": sum(row["prefix_cache_hit"] is True for row in rows),
+        "prefix_cache_hit_rate": sum(row["prefix_cache_hit"] is True for row in rows) / len(rows) if args.server_url else None,
         "by_category": by_category, "results": rows,
         "limitations": [
             "Substring checks are a smoke-test metric, not semantic correctness or expert grading.",
@@ -173,7 +175,7 @@ def main() -> int:
     output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({key: report[key] for key in (
         "dataset_id", "mode", "case_count", "required_terms_pass_rate", "mean_first_token_ms",
-        "mean_tokens_per_second", "mean_model_load_ms_per_request", "mean_wall_time_ms", "by_category"
+        "mean_tokens_per_second", "mean_model_load_ms_per_request", "mean_wall_time_ms", "prefix_cache_hit_count", "prefix_cache_hit_rate", "by_category"
     )}, ensure_ascii=False, indent=2))
     print(f"Full report: {output_path}")
     return 0
