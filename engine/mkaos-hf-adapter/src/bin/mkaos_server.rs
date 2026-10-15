@@ -12,6 +12,8 @@ use std::{
     io::{BufRead, BufReader, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
     process,
+    sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex},
+    thread,
     time::Instant,
 };
 
@@ -44,6 +46,23 @@ fn send_response(stream: &mut TcpStream, status: &str, content_type: &str, body:
     )?;
     stream.write_all(body)?;
     stream.flush()
+}
+
+fn send_stream_headers(stream: &mut TcpStream) -> std::io::Result<()> {
+    write!(stream, "HTTP/1.1 200 OK\\r\\nContent-Type: application/x-ndjson\\r\\nConnection: close\\r\\nCache-Control: no-cache, no-store\\r\\nX-Accel-Buffering: no\\r\\n\\r\\n")?;
+    stream.flush()
+}
+
+fn send_stream_line(stream: &mut TcpStream, value: Value) -> std::io::Result<()> {
+    serde_json::to_writer(&mut *stream, &value)?;
+    stream.write_all(b"\\n")?;
+    stream.flush()
+}
+
+fn try_acquire_request_slot(active: &AtomicUsize, maximum: usize) -> bool {
+    active.fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+        if count < maximum { Some(count + 1) } else { None }
+    }).is_ok()
 }
 
 fn send_json(stream: &mut TcpStream, status: &str, value: Value, ndjson: bool) -> std::io::Result<()> {
@@ -92,7 +111,8 @@ fn parse_messages(
     body: &Value,
     default_system: &str,
     penalty_default: f32,
-) -> Result<(Vec<ChatMessage>, usize, f32, f32, f32), String> {
+ ) -> Result<(Vec<ChatMessage>, usize, f32, f32, f32, bool), String> {
+    let streaming = body.get("stream").and_then(Value::as_bool).unwrap_or(false);
     let options = body.get("options").unwrap_or(&Value::Null);
     let requested = options.get("num_predict").and_then(Value::as_u64)
         .map(|n| n as usize).unwrap_or(DEFAULT_MAX_NEW_TOKENS);
@@ -140,7 +160,7 @@ fn parse_messages(
         messages.push(ChatMessage::new("system", system));
         messages.push(ChatMessage::new("user", prompt));
     }
-    Ok((messages, requested, penalty, temperature, top_p))
+    Ok((messages, requested, penalty, temperature, top_p, streaming))
 }
 
 fn next_random_unit(state: &mut u64) -> f32 {
@@ -160,7 +180,8 @@ fn generate(
     penalty: f32,
     temperature: f32,
     top_p: f32,
-    prefix_cache: &mut HashMap<String, KvCache>,
+    prefix_cache: &Mutex<HashMap<String, KvCache>>,
+    on_token: &mut dyn FnMut(&[u32]) -> Result<(), String>,
 ) -> Result<(String, usize, usize, u128, u128, u128, bool), String> {
     let prompt_ids_u32 = tokenizer.encode_chat(messages, true).map_err(|e| e.to_string())?;
     let prompt_ids: Vec<usize> = prompt_ids_u32.iter().map(|&x| x as usize).collect();
@@ -178,19 +199,17 @@ fn generate(
             .map_err(|e| e.to_string())?;
         let prefix_ids: Vec<usize> = prefix_ids_u32.iter().map(|&x| x as usize).collect();
         if !prefix_ids.is_empty() && prompt_ids.starts_with(&prefix_ids) && prefix_ids.len() < prompt_ids.len() {
-            if let Some(saved_cache) = prefix_cache.get(&key) {
-                cache = saved_cache.clone();
+            let cached = prefix_cache.lock().map_err(|_| "prefix cache lock poisoned".to_string())?.get(&key).cloned();
+            if let Some(saved_cache) = cached {
+                cache = saved_cache;
                 prefix_cache_hit = true;
             } else {
                 let prefix_start = Instant::now();
                 model.prefill(&prefix_ids, &mut cache).map_err(|e| e.to_string())?;
                 prefill_ns += prefix_start.elapsed().as_nanos();
-                if prefix_cache.len() >= 8 {
-                    if let Some(oldest_key) = prefix_cache.keys().next().cloned() {
-                        prefix_cache.remove(&oldest_key);
-                    }
-                }
-                prefix_cache.insert(key, cache.clone());
+                let mut shared = prefix_cache.lock().map_err(|_| "prefix cache lock poisoned".to_string())?;
+                if shared.len() >= 8 { if let Some(oldest_key) = shared.keys().next().cloned() { shared.remove(&oldest_key); } }
+                shared.insert(key, cache.clone());
             }
             prefix_len = prefix_ids.len();
         }
@@ -221,6 +240,7 @@ fn generate(
         if eos_ids.contains(&token) { break; }
         generated.push(token);
         repetition_context.push(token as usize);
+        on_token(&generated)?;
         if index + 1 < max_new {
             logits = model.step(token as usize, &mut cache).map_err(|e| e.to_string())?;
         }
@@ -238,7 +258,7 @@ fn handle(
     eos_ids: &[u32],
     default_system: &str,
     penalty_default: f32,
-    prefix_cache: &mut HashMap<String, KvCache>,
+    prefix_cache: &Mutex<HashMap<String, KvCache>>,
 ) {
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(30)));
     let _ = stream.set_write_timeout(Some(std::time::Duration::from_secs(900)));
@@ -268,7 +288,7 @@ fn handle(
             return;
         }
     };
-    let (messages, max_new, penalty, temperature, top_p) =
+    let (messages, max_new, penalty, temperature, top_p, streaming) =
         match parse_messages(&path, &body, default_system, penalty_default) {
             Ok(value) => value,
             Err(error) => {
@@ -276,8 +296,26 @@ fn handle(
                 return;
             }
         };
+    if streaming { if let Err(error) = send_stream_headers(&mut stream) { eprintln!("stream header write failed: {error}"); return; } }
     let started = Instant::now();
-    match generate(model, tokenizer, eos_ids, &messages, max_new, penalty, temperature, top_p, prefix_cache) {
+    let mut emitted_text = String::new();
+    let mut on_token = |tokens: &[u32]| -> Result<(), String> {
+        if !streaming { return Ok(()); }
+        let decoded = tokenizer.decode(tokens, true).map_err(|e| e.to_string())?;
+        if decoded.starts_with(&emitted_text) {
+            let delta = &decoded[emitted_text.len()..];
+            if !delta.is_empty() {
+                let chunk = if path == "/api/chat" { json!({"model":"mkaos-local","message":{"role":"assistant","content":delta},"done":false}) }
+                    else { json!({"model":"mkaos-local","response":delta,"done":false}) };
+                send_stream_line(&mut stream, chunk).map_err(|e| format!("stream write failed: {e}"))?;
+                emitted_text.push_str(delta);
+            }
+        }
+        Ok(())
+    };
+    let generated_result = generate(model, tokenizer, eos_ids, &messages, max_new, penalty, temperature, top_p, prefix_cache, &mut on_token);
+    drop(on_token);
+    match generated_result {
         Ok((answer, prompt_count, generated_count, prefill_ns, decode_ns, total_ns, prefix_cache_hit)) => {
             let total_ns = total_ns.max(started.elapsed().as_nanos());
             let payload = if path == "/api/chat" {
@@ -302,12 +340,25 @@ fn handle(
                     "mkaos_prefix_cache_hit":prefix_cache_hit
                 })
             };
-            let _ = send_json(&mut stream, "200 OK", payload, true);
+            if streaming {
+                if answer.starts_with(&emitted_text) && answer.len() > emitted_text.len() {
+                    let delta = &answer[emitted_text.len()..];
+                    let chunk = if path == "/api/chat" { json!({"model":"mkaos-local","message":{"role":"assistant","content":delta},"done":false}) } else { json!({"model":"mkaos-local","response":delta,"done":false}) };
+                    let _ = send_stream_line(&mut stream, chunk);
+                }
+                let final_payload = if path == "/api/chat" {
+                    json!({"model":"mkaos-local","message":{"role":"assistant","content":""},"done":true,"total_duration":total_ns,"load_duration":0,"prompt_eval_count":prompt_count,"prompt_eval_duration":prefill_ns,"eval_count":generated_count,"eval_duration":decode_ns,"mkaos_prefix_cache_hit":prefix_cache_hit})
+                } else {
+                    json!({"model":"mkaos-local","response":"","done":true,"total_duration":total_ns,"load_duration":0,"prompt_eval_count":prompt_count,"prompt_eval_duration":prefill_ns,"eval_count":generated_count,"eval_duration":decode_ns,"mkaos_prefix_cache_hit":prefix_cache_hit})
+                };
+                let _ = send_stream_line(&mut stream, final_payload);
+            } else { let _ = send_json(&mut stream, "200 OK", payload, true); }
             eprintln!("request path={path} prompt_tokens={prompt_count} generated_tokens={generated_count} prefix_cache_hit={prefix_cache_hit} temperature={temperature:.2} top_p={top_p:.2} prefill_ms={:.2} decode_ms={:.2} total_ms={:.2}",
                 prefill_ns as f64 / 1e6, decode_ns as f64 / 1e6, total_ns as f64 / 1e6);
         }
         Err(error) => {
-            let _ = send_json(&mut stream, "500 Internal Server Error", json!({"error":error}), false);
+            if streaming { let _ = send_stream_line(&mut stream, json!({"error":error,"done":true})); }
+            else { let _ = send_json(&mut stream, "500 Internal Server Error", json!({"error":error}), false); }
         }
     }
 }
@@ -354,10 +405,25 @@ fn main() {
     let penalty = repetition_penalty_from_env();
     let listener = TcpListener::bind(bind).unwrap_or_else(|error| { eprintln!("bind failed: {error}"); process::exit(1) });
     eprintln!("MKAOS resident server listening on http://{bind}; model loaded once in {:.2}s", load_start.elapsed().as_secs_f64());
-    let mut prefix_cache = HashMap::<String, KvCache>::new();
+    let model = Arc::new(model); let tokenizer = Arc::new(tokenizer); let eos_ids = Arc::new(eos_ids);
+    let default_system = Arc::new(default_system);
+    let prefix_cache = Arc::new(Mutex::new(HashMap::<String, KvCache>::new()));
+    let maximum = env::var("MKAOS_MAX_CONCURRENT_REQUESTS").ok().and_then(|v| v.parse::<usize>().ok()).unwrap_or(4);
+    if !(1..=64).contains(&maximum) { eprintln!("MKAOS_MAX_CONCURRENT_REQUESTS must be in 1..=64"); process::exit(2); }
+    let active = Arc::new(AtomicUsize::new(0));
     for connection in listener.incoming() {
         match connection {
-            Ok(stream) => handle(stream, &model, &tokenizer, &eos_ids, &default_system, penalty, &mut prefix_cache),
+            Ok(mut stream) => {
+                if !try_acquire_request_slot(&active, maximum) {
+                    let _ = send_json(&mut stream, "503 Service Unavailable", json!({"error":"MKAOS request capacity reached","retry_after_seconds":1}), false); continue;
+                }
+                let model = Arc::clone(&model); let tokenizer = Arc::clone(&tokenizer); let eos_ids = Arc::clone(&eos_ids);
+                let default_system = Arc::clone(&default_system); let prefix_cache = Arc::clone(&prefix_cache); let active_worker = Arc::clone(&active);
+                if let Err(error) = thread::Builder::new().name("mkaos-request".into()).spawn(move || {
+                    handle(stream, &model, &tokenizer, &eos_ids, &default_system, penalty, &prefix_cache);
+                    active_worker.fetch_sub(1, Ordering::AcqRel);
+                }) { active.fetch_sub(1, Ordering::AcqRel); eprintln!("request worker spawn failed: {error}"); }
+            }
             Err(error) => eprintln!("accept failed: {error}"),
         }
     }
