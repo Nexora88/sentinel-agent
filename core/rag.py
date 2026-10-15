@@ -150,7 +150,9 @@ class MemoryStore:
             # Stable IDs prevent the same source/chunk from inflating the collection.
             self.vectorstore.add_documents(docs, ids=ids)
             self._memory_generation = getattr(self, "_memory_generation", 0) + 1
-            self._search_cache.clear()  # newly learned facts must be visible immediately
+            cache = getattr(self, "_search_cache", None)
+            if cache is not None:
+                cache.clear()  # newly learned facts must be visible immediately
             self._prune_if_needed()
         return len(docs)
 
