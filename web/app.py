@@ -40,6 +40,7 @@ from core.local_voice import LocalVoiceError, voice_status, synthesize as synthe
 from core.night_scheduler import NightScheduler
 from core.safety.sovereignty import sovereignty_status
 from core.approval_protocol import SignedApprovalProtocol, ApprovalProtocolError
+from core.improvement_gate import ImprovementProposalStore, ImprovementProposalError
 from core.integrations.catalog import integration_status
 from tools.clean_room_audit import scan_code_cleanliness
 
@@ -772,6 +773,18 @@ class VideoStoryRequest(BaseModel):
     duration: float = 8.0
 
 
+class ImprovementProposalRequest(BaseModel):
+    title: str
+    rationale: str
+    files: list[str]
+    patch: str
+    test_plan: list[str]
+
+
+class ImprovementApprovalRequest(BaseModel):
+    confirmation: str
+
+
 @app.post("/api/media/video")
 async def api_media_video(req: VideoRequest, authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
@@ -861,6 +874,47 @@ async def api_media_run_job(job_id: str, authorization: Optional[str] = Header(N
 async def api_media_jobs(authorization: Optional[str] = Header(None)):
     user = get_user(authorization)
     return {"jobs": get_pipeline(user["username"]).media_engine.list_jobs(30)}
+
+
+def _improvement_store(username: str) -> ImprovementProposalStore:
+    root = tenant_root("./memory/tenants", tenant_storage_id(username)) / "improvement_proposals"
+    return ImprovementProposalStore(root)
+
+
+@app.post("/api/improvements/proposals")
+async def api_create_improvement_proposal(req: ImprovementProposalRequest, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    try:
+        return _improvement_store(user["username"]).create(
+            title=req.title, rationale=req.rationale, files=req.files, patch=req.patch, test_plan=req.test_plan
+        )
+    except ImprovementProposalError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.get("/api/improvements/proposals")
+async def api_list_improvement_proposals(authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    return {"proposals": _improvement_store(user["username"]).list()}
+
+
+@app.get("/api/improvements/proposals/{proposal_id}")
+async def api_get_improvement_proposal(proposal_id: str, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    try:
+        return _improvement_store(user["username"]).get(proposal_id)
+    except ImprovementProposalError as exc:
+        raise HTTPException(404, str(exc))
+
+
+@app.post("/api/improvements/proposals/{proposal_id}/approve")
+async def api_approve_improvement_proposal(proposal_id: str, req: ImprovementApprovalRequest,
+                                           authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    try:
+        return _improvement_store(user["username"]).approve_for_review(proposal_id, req.confirmation)
+    except ImprovementProposalError as exc:
+        raise HTTPException(400, str(exc))
 
 
 @app.post("/api/approval/verify")
