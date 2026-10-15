@@ -6,6 +6,7 @@ store them under the configured local model directory, and keep network egress b
 from __future__ import annotations
 
 import os
+import importlib.util
 import shutil
 import subprocess
 import tempfile
@@ -43,7 +44,7 @@ def voice_status() -> dict:
         "mode": "local-only",
         "piper_available": shutil.which(PIPER_BIN) is not None,
         "whisper_cpp_available": shutil.which(WHISPER_BIN) is not None and bool(WHISPER_MODEL and Path(WHISPER_MODEL).is_file()),
-        "faster_whisper_available": __import__("importlib.util").util.find_spec("faster_whisper") is not None and Path(FASTER_WHISPER_MODEL).is_dir(),
+        "faster_whisper_available": importlib.util.find_spec("faster_whisper") is not None and Path(FASTER_WHISPER_MODEL).is_dir(),
         "whisper_available": (shutil.which(WHISPER_BIN) is not None and bool(WHISPER_MODEL and Path(WHISPER_MODEL).is_file())) or (__import__("importlib.util").util.find_spec("faster_whisper") is not None and Path(FASTER_WHISPER_MODEL).is_dir()),
         "voices": {
             key: {"configured": (VOICE_DIR / filename).is_file(), "file": filename}
@@ -68,7 +69,7 @@ def synthesize(text: str, voice: str = "male", cat_mode: bool = False) -> bytes:
     with tempfile.TemporaryDirectory(prefix="seka-voice-", dir=str(output_dir)) as temp_dir:
         wav_path = Path(temp_dir) / "speech.wav"
         result = subprocess.run(
-            [executable, "--model", str(model), "--output_file", str(wav_path)],
+            [executable, "--model", str(model), "--length_scale", "0.90" if voice == "female" else "1.0", "--output_file", str(wav_path)],
             input=clean.encode("utf-8"),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
