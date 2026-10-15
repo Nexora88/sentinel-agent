@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import json
+import hashlib
 import os
 import secrets
 import threading
@@ -72,7 +73,10 @@ class WebAuthnManager:
 
     def _save(self) -> None:
         tmp = self.users_file.with_suffix(".tmp")
-        tmp.write_text(json.dumps(self._credentials, ensure_ascii=False, indent=2), encoding="utf-8")
+        with tmp.open("w", encoding="utf-8") as handle:
+            handle.write(json.dumps(self._credentials, ensure_ascii=False, indent=2))
+            handle.flush()
+            os.fsync(handle.fileno())
         try:
             os.chmod(tmp, 0o600)
         except OSError:
@@ -109,7 +113,7 @@ class WebAuthnManager:
             options = generate_registration_options(
                 rp_id=self.rp_id,
                 rp_name=self.rp_name,
-                user_id=username.encode("utf-8"),
+                user_id=hashlib.sha256(username.encode("utf-8")).digest(),
                 user_name=username,
                 user_display_name=(display_name or username)[:128],
                 exclude_credentials=[
