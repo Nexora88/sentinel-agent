@@ -379,7 +379,7 @@ mod tests {
                 "top_p": 0.9
             }
         });
-        let (messages, max_new, penalty, temperature, top_p) =
+        let (messages, max_new, penalty, temperature, top_p, streaming) =
             parse_messages("/api/chat", &body, "Kısa yanıt ver.", 1.1).unwrap();
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0].role, "system");
@@ -404,6 +404,26 @@ mod tests {
             });
             assert!(parse_messages("/api/chat", &body, "system", 1.1).is_err());
         }
+    }
+
+    #[test]
+    fn stream_flag_is_opt_in_and_respected() {
+        let base = json!({"messages":[{"role":"user","content":"Merhaba"}]});
+        let (_, _, _, _, _, off) = parse_messages("/api/chat", &base, "system", 1.1).unwrap();
+        let enabled = json!({"stream":true,"messages":[{"role":"user","content":"Merhaba"}]});
+        let (_, _, _, _, _, on) = parse_messages("/api/chat", &enabled, "system", 1.1).unwrap();
+        assert!(!off);
+        assert!(on);
+    }
+
+    #[test]
+    fn request_limiter_rejects_over_capacity_and_releases_slots() {
+        let active = AtomicUsize::new(0);
+        assert!(try_acquire_request_slot(&active, 2));
+        assert!(try_acquire_request_slot(&active, 2));
+        assert!(!try_acquire_request_slot(&active, 2));
+        active.fetch_sub(1, Ordering::AcqRel);
+        assert!(try_acquire_request_slot(&active, 2));
     }
 
     #[test]
