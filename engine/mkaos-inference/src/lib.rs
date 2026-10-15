@@ -125,24 +125,27 @@ pub fn causal_scaled_dot_product_attention(q: &Tensor2, k: &Tensor2, v: &Tensor2
     Tensor2::new(q.rows, v.cols, out)
 }
 
-/// Rotary position embeddings on adjacent channel pairs, independently per attention head.
+/// Llama-style rotary position embeddings using split-half rotate_half layout.
 pub fn apply_rope(x: &Tensor2, head_dim: usize, start_position: usize, theta: f32) -> Result<Tensor2, KernelError> {
     if head_dim == 0 || head_dim % 2 != 0 || x.cols % head_dim != 0 || !theta.is_finite() || theta <= 1.0 {
         return Err(KernelError::InvalidConfig);
     }
     let heads = x.cols / head_dim;
+    let half = head_dim / 2;
     let mut out = x.data.clone();
     for pos in 0..x.rows {
         let absolute_pos = start_position.checked_add(pos).ok_or(KernelError::InvalidDimension)?;
-        for h in 0..heads { for pair in 0..(head_dim / 2) {
-            let i0 = pos * x.cols + h * head_dim + pair * 2;
-            let i1 = i0 + 1;
-            let freq = 1.0 / theta.powf((2 * pair) as f32 / head_dim as f32);
-            let (sin, cos) = ((absolute_pos as f32 * freq).sin(), (absolute_pos as f32 * freq).cos());
-            let a = x.data[i0]; let b = x.data[i1];
-            out[i0] = a * cos - b * sin;
-            out[i1] = a * sin + b * cos;
-        }}
+        for h in 0..heads {
+            let base = pos * x.cols + h * head_dim;
+            for i in 0..half {
+                let freq = 1.0 / theta.powf((2 * i) as f32 / head_dim as f32);
+                let (sin, cos) = ((absolute_pos as f32 * freq).sin(), (absolute_pos as f32 * freq).cos());
+                let a = x.data[base + i];
+                let b = x.data[base + half + i];
+                out[base + i] = a * cos - b * sin;
+                out[base + half + i] = b * cos + a * sin;
+            }
+        }
     }
     Tensor2::new(x.rows, x.cols, out)
 }
