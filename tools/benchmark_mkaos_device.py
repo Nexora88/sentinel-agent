@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import math
 import json
 import os
 import platform
@@ -33,8 +34,11 @@ def percentile(values: list[float], p: float) -> float | None:
     if not values:
         return None
     ordered = sorted(values)
-    index = max(0, min(len(ordered) - 1, int(round((len(ordered) - 1) * p))))
-    return round(ordered[index], 3)
+    position = max(0.0, min(float(len(ordered) - 1), (len(ordered) - 1) * p))
+    lower = int(math.floor(position))
+    upper = int(math.ceil(position))
+    value = ordered[lower] if lower == upper else ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
+    return round(value, 3)
 
 
 def sha256_file(path: Path) -> str:
