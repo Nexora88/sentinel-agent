@@ -62,6 +62,7 @@ class HybridMemoryRetrievalTests(unittest.TestCase):
         store.add_texts(["Yeni bilgi"], [{"source": "manual"}])
 
         self.assertEqual(len(store._search_cache), 0)
+        self.assertEqual(store._memory_generation, 1)
         store.vectorstore.add_documents.assert_called_once()
 
 
