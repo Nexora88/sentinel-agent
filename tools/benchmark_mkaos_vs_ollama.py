@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Compare resident MKAOS and local Ollama steady-request latency without TTFT sampling."""
+"""Compare resident MKAOS and local Ollama steady-request latency without TTFT sampling.
+
+Run this on the target host after the quality gate; TTFT is a separate final test."""
 import argparse
 import json
 import subprocess
