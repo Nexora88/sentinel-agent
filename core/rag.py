@@ -44,7 +44,9 @@ class MemoryStore:
         max_documents: Optional[int] = None,
         max_chunks_per_ingest: Optional[int] = None,
         max_chars_per_ingest: Optional[int] = None,
+        tenant_id: Optional[str] = None,
     ):
+        self.tenant_id = str(tenant_id).strip().lower() if tenant_id else None
         self.persist_directory = Path(persist_directory)
         self.persist_directory.mkdir(parents=True, exist_ok=True)
         self.ollama = ollama or OllamaClient()
@@ -111,7 +113,10 @@ class MemoryStore:
         for text, metadata in zip(texts, metadata_rows):
             if not isinstance(metadata, dict):
                 raise ValueError("Bilgi metadata alanı geçersiz.")
-            for document in self.splitter.create_documents([text], metadatas=[self._safe_metadata(metadata)]):
+            scoped_metadata = dict(metadata)
+            if self.tenant_id:
+                scoped_metadata["tenant_id"] = self.tenant_id
+            for document in self.splitter.create_documents([text], metadatas=[self._safe_metadata(scoped_metadata)]):
                 docs.append(document)
                 if len(docs) > self.max_chunks_per_ingest:
                     raise ValueError(
@@ -160,7 +165,7 @@ class MemoryStore:
             return []
         safe_k = max(1, min(int(k), 20))
         try:
-            return self.vectorstore.similarity_search(query.strip()[:4000], k=safe_k)
+            return self.vectorstore.similarity_search(query.strip()[:4000], k=safe_k, **({"filter": {"tenant_id": self.tenant_id}} if self.tenant_id else {}))
         except Exception as exc:
             # Retrieval failure must not take down the chat panel.
             logger.warning("Yerel RAG araması kullanılamıyor (%s).", type(exc).__name__)
@@ -170,7 +175,7 @@ class MemoryStore:
         if not isinstance(query, str) or not query.strip():
             return []
         try:
-            return self.vectorstore.similarity_search_with_score(query.strip()[:4000], k=max(1, min(int(k), 20)))
+            return self.vectorstore.similarity_search_with_score(query.strip()[:4000], k=max(1, min(int(k), 20)), **({"filter": {"tenant_id": self.tenant_id}} if self.tenant_id else {}))
         except Exception as exc:
             logger.warning("Yerel RAG puanlı araması kullanılamıyor (%s).", type(exc).__name__)
             return []
