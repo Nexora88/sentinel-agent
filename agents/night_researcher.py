@@ -12,6 +12,8 @@ While you sleep it:
 from __future__ import annotations
 
 import logging
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -151,6 +153,27 @@ Her öneri tek satır, eylem odaklı olsun.
         lines.append("\n---\nBu rapor sadece öneridir. Hiçbir değişiklik otomatik uygulanmadı.")
 
         text = "\n".join(lines)
-        path.write_text(text, encoding="utf-8")
+        temp_name = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=str(self.report_dir),
+                prefix=".night-report-", suffix=".tmp", delete=False,
+            ) as temp:
+                temp.write(text)
+                temp.flush()
+                os.fsync(temp.fileno())
+                temp_name = temp.name
+            try:
+                os.chmod(temp_name, 0o600)
+            except OSError:
+                pass
+            os.replace(temp_name, path)
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
+        finally:
+            if temp_name and os.path.exists(temp_name):
+                os.unlink(temp_name)
         logger.info(f"Night report written: {path}")
         return text
