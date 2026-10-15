@@ -1,6 +1,9 @@
-# Optional host-side test overlay. Exposes MKAOS only on host loopback for local benchmarking.
-# Do not use this overlay on untrusted/shared hosts; production Compose keeps the port unpublished.
+# Optional host-side test overlay. Exposes local inference APIs only on host loopback for benchmarking.
+# Do not use this overlay on untrusted/shared hosts; production Compose keeps these ports unpublished.
 services:
   mkaos:
     ports:
       - "127.0.0.1:${MKAOS_HOST_PORT:-11435}:11435"
+  ollama:
+    ports:
+      - "127.0.0.1:${OLLAMA_HOST_PORT:-11434}:11434"
