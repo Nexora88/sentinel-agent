@@ -1,6 +1,6 @@
 # MKAOS v6.5 — Mustafa Kemal Atatürk Operating System
 
-**Yerel Türkçe ajan işletim sistemi altyapısı.** Uzun vadeli hedef; kendi model biçimi, tokenizer'ı ve çıkarım motoruyla harici çalışma zamanı bağımlılığını kaldırmaktır. Rust CPU çıkarım çekirdeği ve MKAOS uyumlu HTTP sunucusu geliştirilmektedir; ancak mevcut HTTP sunucusunun aday ağırlıkları hâlâ üçüncü taraf SmolLM2-135M-Instruct'tır. Sentetik CI eğitimi mimari/aktarım testidir; gerçek Türkçe yetenek kanıtı değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
+**Yerel Türkçe ajan işletim sistemi altyapısı.** HTTP sohbet yolu artık varsayılan olarak yerel Rust `mkaos-generate` CLI'ına gider ve onaylı yerel checkpoint yoksa açıkça `503` döndürür; üçüncü taraf SmolLM2'ye sessiz geri dönüş yapılmaz. Ancak henüz onaylı Türkçe korpus, eğitilmiş kullanılabilir MKAOS checkpoint'i veya bağımsız Türkçe kalite kanıtı yoktur. Sentetik CI eğitimi mimari/aktarım testidir; gerçek Türkçe yetenek kanıtı değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
 MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. Sohbet üretimi yalnızca MKAOS servisine gider; `MKAOS_ENABLED` sağlayıcı değiştirmez ve MKAOS erişilemiyorsa hata görünür kalır. RAG varsayılanı çevrimdışı `mkaos-native` sözcük/karakter n-gram taban çizgisidir. Bu eğitilmiş semantik embedding modeli değildir; eski Ollama embedding sağlayıcısı yalnızca açık opt-in ile kullanılabilir.
 
@@ -44,6 +44,14 @@ Bu test overlay'i yalnızca güvenilir, yerel geliştirme cihazında kullan; ür
 
 - Yol haritası: [`docs/MKAOS_INDEPENDENCE_MILESTONES.md`](docs/MKAOS_INDEPENDENCE_MILESTONES.md).
 - Türkçe/tarihî veri menşei ve eğitim politikası: [`docs/MKAOS_TURKISH_DATA_GOVERNANCE.md`](docs/MKAOS_TURKISH_DATA_GOVERNANCE.md).
+
+## Native Rust chat integration status
+
+- `POST /api/chat` defaults to `MKAOS_CHAT_BACKEND=native-rust` and invokes the locally packaged Rust CLI without a shell.
+- The checkpoint must be supplied locally at `models/mkaos/model.mkaosw` and its SHA-256 set through `MKAOS_NATIVE_SHA256`; the repository intentionally does not bundle model weights.
+- Until an approved corpus produces a real checkpoint, chat returns HTTP 503. It does not silently use third-party weights.
+- The third-party SmolLM2 compatibility service is gated behind the explicit `legacy-third-party-chat` Compose profile.
+- This wiring is not proof of useful Turkish quality, production performance, full supply-chain independence, or completed hardware/distributed validation.
 
 ## Marka ve tasarım ilkesi
 
