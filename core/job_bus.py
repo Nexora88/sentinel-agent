@@ -17,6 +17,7 @@ from typing import Any, Callable, Deque, Dict, List, Optional
 @dataclass
 class Job:
     id: str
+    owner_id: str
     kind: str
     title: str
     status: str = "queued"  # queued | running | done | error
@@ -54,9 +55,9 @@ class JobBus:
             except Exception:
                 pass
 
-    def create(self, kind: str, title: str) -> Job:
-        jid = uuid.uuid4().hex[:12]
-        job = Job(id=jid, kind=kind, title=title)
+    def create(self, kind: str, title: str, owner_id: str = "owner") -> Job:
+        jid = uuid.uuid4().hex
+        job = Job(id=jid, owner_id=str(owner_id).strip().lower(), kind=kind, title=title)
         with self._lock:
             self._jobs[jid] = job
             self._order.append(jid)
@@ -90,24 +91,26 @@ class JobBus:
         self._emit(job)
         return job
 
-    def get(self, job_id: str) -> Optional[dict]:
+    def get(self, job_id: str, owner_id: str = "owner") -> Optional[dict]:
         with self._lock:
             j = self._jobs.get(job_id)
-            return j.to_dict() if j else None
+            return j.to_dict() if j and j.owner_id == str(owner_id).strip().lower() else None
 
-    def list_recent(self, limit: int = 20) -> List[dict]:
+    def list_recent(self, limit: int = 20, owner_id: str = "owner") -> List[dict]:
+        owner = str(owner_id).strip().lower()
         with self._lock:
-            ids = list(self._order)[-limit:]
-            return [self._jobs[i].to_dict() for i in reversed(ids) if i in self._jobs]
+            owned = [self._jobs[i] for i in self._order if i in self._jobs and self._jobs[i].owner_id == owner]
+            return [job.to_dict() for job in reversed(owned[-max(1, min(int(limit), 200)):])]
 
     def run_in_thread(
         self,
         kind: str,
         title: str,
         fn: Callable[[Callable[..., None]], Any],
+        owner_id: str = "owner",
     ) -> str:
-        """fn receives an update(status=..., progress=..., message=...) callback."""
-        job = self.create(kind, title)
+        """fn receives an update callback; the job remains owned by its creator."""
+        job = self.create(kind, title, owner_id=owner_id)
 
         def worker():
             def upd(**kwargs):
