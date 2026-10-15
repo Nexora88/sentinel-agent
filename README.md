@@ -15,14 +15,18 @@ SEKA; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik ta
 
 ## Kesin çevrimdışı çalışma profili
 
-`docker-compose.offline.yml` ayrı bir çalışma zamanı profili sağlar: SEKA ve Ollama yalnızca birbirleriyle konuşan, internet çıkışı olmayan bir Docker ağına bağlanır. GitHub token'ı, web araştırması, dış bildirim ve harici görsel üretimi bu profilde kapalıdır. Bu nedenle canlı finans verisi, GitHub yazma ve web taraması çevrimdışı profilde çalışmaması beklenen özelliklerdir.
+`docker-compose.offline.yml` çalışma zamanında SEKA ve Ollama'yı yalnızca birbirleriyle konuşan, internet çıkışı olmayan bir Docker ağına bağlar. GitHub token'ı, web araştırması, dış bildirim ve harici görsel üretimi bu profilde kapalıdır. Bu nedenle canlı finans verisi, GitHub yazma ve web taraması çevrimdışı profilde çalışmaz; bu beklenen bir gizlilik sınırıdır.
 
-1. Docker imajlarını ve gerekli Ollama modellerini internet bağlantısı varken önceden hazırla.
-2. `models/voices/` içine Piper'ın Türkçe `tr_TR-fettah-medium.onnx` ve `tr_TR-dfki-medium.onnx` dosyalarını (ve eşlik eden `.onnx.json` dosyalarını) yerleştir.
-3. `models/whisper-small/` içine yerel faster-whisper uyumlu model dosyalarını yerleştir. Model bulunamazsa konuşma özelliği hata verir; otomatik bulut yedeği yoktur.
-4. İlk hazırlık ve model indirmeleri bittikten sonra `docker compose -f docker-compose.yml -f docker-compose.offline.yml up -d --build` komutuyla çalıştır. Model/imaj hazırlığını tamamladıktan sonra ağı internetten yalıtılmış halde tut.
+**Model/imaç hazırlığı çevrimiçi yapılır; ardından uygulama izole edilir:**
 
-`internal: true` ağı, uygulama konteynerlerinin normal internet çıkışını engeller; yine de bu, ana bilgisayarın veya başka uygulamaların ağ erişimini sınırlandırmaz. En yüksek güvence için ana bilgisayarın güvenlik duvarı kurallarını da denetle.
+1. Gerekli Docker imajını önceden indir ve SEKA imajını oluştur: `docker compose -f docker-compose.yml build sentinel`.
+2. Ollama modelleri için hazırlık servisini başlat: `docker compose -f docker-compose.bootstrap.yml up -d`.
+3. Modelleri indir: `docker compose -f docker-compose.bootstrap.yml exec ollama-bootstrap ollama pull qwen2.5-coder:7b` ve `docker compose -f docker-compose.bootstrap.yml exec ollama-bootstrap ollama pull nomic-embed-text`.
+4. Model indirme bittikten sonra hazırlık servisini durdur: `docker compose -f docker-compose.bootstrap.yml down`. **`-v` kullanma**; bu yerel model hacmini silebilir.
+5. Yerel Piper ve faster-whisper modellerini `models/voices/` ve `models/whisper-small/` içine yerleştir. Model dosyalarını kaynak depoya ekleme.
+6. Çevrimdışı çalışma ağını başlat: `docker compose -f docker-compose.yml -f docker-compose.offline.yml up -d --no-build`.
+
+`internal: true` ağı, uygulama konteynerlerinin normal internet çıkışını engeller; ana bilgisayarın veya başka uygulamaların ağ erişimini kendiliğinden sınırlandırmaz. En yüksek güvence için ana bilgisayarın güvenlik duvarı kurallarını da denetle. Çevrimdışı mod, internete bağlanma kabiliyetini azaltır; ama tek başına ana bilgisayardaki her sürecin veri göndermesini engellemez.
 
 ## Yerel Türkçe ses
 
