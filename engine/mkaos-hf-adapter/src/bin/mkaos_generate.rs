@@ -39,8 +39,14 @@ fn main() {
         Err(error) => { eprintln!("EOS tokenization failed: {error}"); process::exit(1); }
     };
     let model_load_ms = model_load_start.elapsed().as_secs_f64() * 1000.0;
+    // Benchmark harnesses may set an explicit prompt to compare engines fairly.
+    // Normal application runs retain the Turkish-first policy prompt by default.
+    let system_prompt = env::var("MKAOS_SYSTEM_PROMPT")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| TURKISH_FIRST_SYSTEM_PROMPT.to_string());
     let messages = [
-        ChatMessage::new("system", TURKISH_FIRST_SYSTEM_PROMPT),
+        ChatMessage::new("system", system_prompt.as_str()),
         ChatMessage::new("user", prompt.as_str()),
     ];
     let prompt_ids_u32 = match tokenizer.encode_chat(&messages, true) {
