@@ -8,10 +8,10 @@ from urllib.request import Request, urlopen
 
 REPO = "HuggingFaceTB/SmolLM2-135M-Instruct"
 REVISION = "12fd25f77366fa6b3b4b768ec3050bf629380bac"
-FILES = ["README.md", "LICENSE", "config.json", "model.safetensors",
+FILES = ["README.md", "config.json", "model.safetensors",
          "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json"]
 MAX_BYTES = {
-    "README.md": 2_000_000, "LICENSE": 200_000, "config.json": 200_000,
+    "README.md": 2_000_000, "config.json": 200_000,
     "model.safetensors": 600_000_000, "tokenizer.json": 10_000_000,
     "tokenizer_config.json": 200_000, "special_tokens_map.json": 200_000,
 }
