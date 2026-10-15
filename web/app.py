@@ -758,7 +758,10 @@ class VideoRequest(BaseModel):
 async def api_media_video(req: VideoRequest, authorization: Optional[str] = Header(None)):
     get_user(authorization)
     try:
-        return await asyncio.to_thread(get_pipeline().media_bridge.execute, "video", {"filename": req.filename, "duration": req.duration})
+        p = get_pipeline()
+        if p.media_engine.should_defer_heavy():
+            return p.media_engine.submit("video", {"filename": req.filename, "duration": req.duration})
+        return await asyncio.to_thread(p.media_bridge.execute, "video", {"filename": req.filename, "duration": req.duration})
     except Exception as exc:
         from tools.image_gen import MediaToolError
         if isinstance(exc, MediaToolError):
