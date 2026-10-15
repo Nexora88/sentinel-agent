@@ -41,6 +41,10 @@ class AgentMeshTests(unittest.TestCase):
         with self.assertRaisesRegex(MeshMessageError, "Executable"):
             self.envelope(payload={"command": "whoami"})
 
+    def test_nested_executable_payload_rejected(self):
+        with self.assertRaisesRegex(MeshMessageError, "Executable"):
+            self.envelope(payload={"metadata": {"script": "unsafe"}})
+
     def test_wrong_recipient_rejected(self):
         envelope = self.envelope(recipient_id="another-agent")
         with self.assertRaisesRegex(MeshMessageError, "recipient"):
