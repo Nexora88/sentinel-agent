@@ -35,6 +35,7 @@ load_dotenv()
 from core.pipeline import SentinelPipeline
 from core.tenant_storage import tenant_root, tenant_storage_id
 from core.auth import AuthManager
+from core.webauthn_auth import WebAuthnManager, WebAuthnError
 from core.energy_policy import policy_status
 from core.job_bus import job_bus
 from core.local_voice import LocalVoiceError, voice_status, synthesize as synthesize_local_voice, transcribe as transcribe_local_voice
@@ -49,6 +50,31 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("seka.web")
 
 app = FastAPI(title="MKAOS", version="6.5", description="Mustafa Kemal Atatürk Operating System — yerel ajan işletim sistemi")
+webauthn = WebAuthnManager()
+
+@app.middleware("http")
+async def security_headers_and_https(request: Request, call_next):
+    """Add browser hardening headers and optionally require HTTPS outside localhost."""
+    is_local = request.url.hostname in {"localhost", "127.0.0.1", "::1"}
+    scheme = request.url.scheme
+    if os.getenv("TRUST_PROXY_HEADERS", "").strip().lower() in {"1", "true", "yes", "on"}:
+        # Use only behind a trusted proxy that overwrites this header.
+        forwarded = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+        if forwarded in {"https", "http"}:
+            scheme = forwarded
+    require_https = os.getenv("REQUIRE_HTTPS", "").strip().lower() in {"1", "true", "yes", "on"}
+    if require_https and not is_local and scheme != "https":
+        return Response("HTTPS is required for this deployment.", status_code=426)
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    if scheme == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
+
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
@@ -165,6 +191,13 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+class PasskeyOptionsRequest(BaseModel):
+    username: str
+
+class PasskeyVerifyRequest(BaseModel):
+    challenge_id: str
+    credential: dict
+
 class ImageRequest(BaseModel):
     prompt: str
     width: int = 768
@@ -270,6 +303,48 @@ async def login(req: LoginRequest):
         raise HTTPException(401, "Hatalı kullanıcı veya şifre")
     return {"token": token, "user": auth.validate(token)}
 
+
+@app.get("/api/webauthn/capabilities")
+async def webauthn_capabilities():
+    return webauthn.capabilities()
+
+@app.post("/api/webauthn/register/options")
+async def webauthn_register_options(authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    try:
+        return webauthn.registration_options(user["username"], user.get("display_name") or user["username"])
+    except WebAuthnError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+@app.post("/api/webauthn/register/verify")
+async def webauthn_register_verify(req: PasskeyVerifyRequest, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    try:
+        return webauthn.verify_registration_for_user(req.challenge_id, req.credential, user["username"])
+    except WebAuthnError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+@app.post("/api/webauthn/login/options")
+async def webauthn_login_options(req: PasskeyOptionsRequest):
+    username = req.username.lower().strip()
+    account = auth._users.get(username)
+    if not account or not account.get("active"):
+        raise HTTPException(401, "Hesap veya kayıtlı passkey bulunamadı")
+    try:
+        return webauthn.authentication_options(username)
+    except WebAuthnError as exc:
+        raise HTTPException(401, "Hesap veya kayıtlı passkey bulunamadı") from exc
+
+@app.post("/api/webauthn/login/verify")
+async def webauthn_login_verify(req: PasskeyVerifyRequest):
+    try:
+        username = webauthn.verify_authentication(req.challenge_id, req.credential)
+        token = auth.create_session_for_verified_user(username)
+        if not token:
+            raise HTTPException(401, "Hesap etkin değil")
+        return {"token": token, "user": auth.validate(token)}
+    except WebAuthnError as exc:
+        raise HTTPException(401, "Passkey doğrulaması başarısız") from exc
 
 @app.get("/api/voice/status")
 async def api_voice_status(authorization: Optional[str] = Header(None)):
