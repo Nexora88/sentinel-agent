@@ -17,7 +17,6 @@ import json
 import logging
 import os
 import tempfile
-import os
 import time
 import uuid
 from datetime import datetime, timedelta
@@ -60,7 +59,13 @@ class AutonomousFinance:
     def _load_state(self) -> Dict[str, Any]:
         if self.state_path.exists():
             try:
-                return json.loads(self.state_path.read_text(encoding="utf-8"))
+                data = json.loads(self.state_path.read_text(encoding="utf-8"))
+                required = {"mode", "cash_usd", "equity_start", "positions", "closed_trades"}
+                if not isinstance(data, dict) or not required.issubset(data):
+                    raise ValueError("paper portfolio has an invalid structure")
+                if not isinstance(data.get("positions"), dict) or not isinstance(data.get("closed_trades"), list):
+                    raise ValueError("paper portfolio collections have invalid types")
+                return data
             except Exception as exc:
                 raise RuntimeError(
                     f"Paper portfolio is unreadable; preserve and recover {self.state_path} before restarting."
