@@ -183,6 +183,11 @@ class MediaQueueRequest(BaseModel):
     width: int = 768
     height: int = 768
 
+class ForgetRequest(BaseModel):
+    topic: str
+    last_hours: int = 24
+    confirmation: str
+
 class ApprovalVerifyRequest(BaseModel):
     payload: dict
     signature_b64: str
@@ -194,6 +199,17 @@ class VoiceRequest(BaseModel):
     pace: float = 1.0
 
 
+
+def _run_night_with_infographic() -> dict:
+    result = get_pipeline().run_night_research()
+    summary = result.get("summary") if isinstance(result, dict) else str(result)
+    visual = get_pipeline().media_engine.render_report_infographic(str(summary or result)[:4000])
+    if isinstance(result, dict):
+        result["infographic"] = visual
+        return result
+    return {"summary": str(result)[:800], "infographic": visual}
+
+
 @app.on_event("startup")
 async def startup():
     # Keep the web process available even if Ollama/models are temporarily offline.
@@ -203,7 +219,7 @@ async def startup():
     enabled = os.getenv("SEKA_NIGHT_AUTORUN", "true").strip().lower() in {"1", "true", "yes", "on"}
     try:
         night_scheduler = NightScheduler(
-            runner=lambda: get_pipeline().run_night_research(),
+            runner=lambda: _run_night_with_infographic(),
             enabled=enabled,
             hour=int(os.getenv("SEKA_NIGHT_HOUR", "3")),
             minute=int(os.getenv("SEKA_NIGHT_MINUTE", "0")),
@@ -795,6 +811,45 @@ async def api_approval_verify(req: ApprovalVerifyRequest, authorization: Optiona
         return {**result, "execution": "not_started", "message": "İmza doğrulandı; bu uç nokta push/merge yürütmez."}
     except ApprovalProtocolError as exc:
         raise HTTPException(400, str(exc))
+
+
+
+@app.post("/api/privacy/forget")
+async def api_privacy_forget(req: ForgetRequest, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    if req.confirmation != "DELETE_MATCHING_MEMORY":
+        raise HTTPException(400, "Açık onay gerekli: DELETE_MATCHING_MEMORY")
+    if len(req.topic.strip()) < 3:
+        raise HTTPException(400, "Silme konusu en az 3 karakter olmalı.")
+    p = get_pipeline()
+    try:
+        memory_result = p.personal_memory.forget_matching(req.topic, req.last_hours)
+    except Exception as exc:
+        logger.warning("Personal memory deletion failed: %s", type(exc).__name__)
+        raise HTTPException(500, "Kişisel vektör hafızası temizlenemedi; veri otomatik sıfırlanmadı.")
+    history = chat_history.get(user["username"], [])
+    phrase = req.topic.strip().casefold()
+    before = len(history)
+    chat_history[user["username"]] = [row for row in history if phrase not in str(row.get("content", "")).casefold()]
+    deleted_chat_turns = before - len(chat_history[user["username"]])
+    if deleted_chat_turns:
+        _save_chat_history()
+    audit = Path("./memory/privacy_deletion_audit.jsonl")
+    audit.parent.mkdir(parents=True, exist_ok=True)
+    from datetime import datetime
+    import hashlib
+    record = {"timestamp": datetime.now().astimezone().isoformat(),
+              "username": str(user.get("username", "owner")),
+              "topic_sha256": hashlib.sha256(req.topic.strip().encode()).hexdigest(),
+              "last_hours": max(1, min(req.last_hours, 8760)),
+              "deleted_chat_turns": deleted_chat_turns, "result": "local_match_delete_attempted"}
+    fd = os.open(str(audit), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    return {"success": True, **memory_result, "deleted_chat_turns": deleted_chat_turns,
+            "audit_recorded": True, "limitations": memory_result["limitations"]}
 
 
 @app.get("/api/audit/clean-room")
