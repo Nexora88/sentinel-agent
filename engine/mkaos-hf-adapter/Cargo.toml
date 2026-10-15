@@ -6,4 +6,8 @@ description = "Hugging Face tokenizer.json and SmolLM2-style chat template adapt
 license = "MIT"
 
 [dependencies]
+mkaos-inference = { path = "../mkaos-inference" }
+safetensors = "0.4"
+half = "2"
+serde_json = "1"
 tokenizers = { version = "0.21", default-features = false, features = ["onig"] }
