@@ -5,7 +5,7 @@ const $$ = (sel) => document.querySelectorAll(sel);
 const nativeFetch = window.fetch.bind(window);
 let authToken = sessionStorage.getItem("seka.session") || "";
 let authPromptActive = false;
-document.addEventListener("DOMContentLoaded", () => { const button = document.querySelector("#passkey-register"); if (button) button.hidden = !authToken; });
+
 const b64urlToBytes = (value) => {
   const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - value.length % 4) % 4);
   return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
@@ -161,6 +161,22 @@ window.fetch = async (input, init = {}) => {
   }
   return response;
 };
+
+const passkeyEnrollmentButton = document.querySelector("#passkey-register");
+if (passkeyEnrollmentButton) {
+  passkeyEnrollmentButton.hidden = !authToken;
+  passkeyEnrollmentButton.addEventListener("click", async () => {
+    passkeyEnrollmentButton.disabled = true;
+    try {
+      const result = await registerPasskey();
+      alert("Passkey bu hesaba kaydedildi. Kayıtlı kimlik bilgisi sayısı: " + result.credential_count);
+    } catch (error) {
+      alert(error?.message || "Passkey kaydı tamamlanamadı.");
+    } finally {
+      passkeyEnrollmentButton.disabled = false;
+    }
+  });
+}
 
 function switchPanel(name) {
   $$(".nav-btn").forEach((b) => b.classList.remove("active"));
