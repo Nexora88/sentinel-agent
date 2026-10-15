@@ -87,6 +87,10 @@ jobs:
           printf '%s' "$status" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["status"] == "ok", d; assert d["ollama"]["status"] == "unavailable", d.get("ollama"); assert "rag" in d, d; print("Pipeline initializes; panel stays healthy and reports Ollama outage gracefully.")'
       - name: Run security regression tests
         run: python -m unittest discover -s tests -v
+      - name: Benchmark native Turkish retrieval smoke set
+        env:
+          SEKA_EMBEDDINGS_PROVIDER: mkaos-native
+        run: python -m scripts.benchmark_mkaos_retrieval
       - name: Scan repository for likely hardcoded secrets
         run: |
           python - <<'PY'
