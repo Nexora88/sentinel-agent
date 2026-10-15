@@ -85,3 +85,8 @@ python tools/audit_mkaos_provenance.py --root . --output artifacts/mkaos-provena
 Aşağıdaki başlıklar çözülmeden “%100 yerli” veya “tam egemen” ifadesi kullanılmamalıdır: gerçek onaylı eğitim korpusu, yeterli sıfırdan eğitim koşusu, insan puanlamalı Türkçe kalite raporu, kendi checkpoint'imizin HTTP servisinde uçtan uca kullanımı, tam transitif bağımlılık/lisans envanteri, ağsız tekrarlanabilir derleme, gerçek donanım ölçümleri, ortak kalıcı dağıtık durum ve üretim seviyesinde mTLS/iptal/çok düğümlü testleri.
 
 Her kapının tamamlanması, kanıt artefaktı ve bağımsız incelemeyle işaretlenir. Plan maddesini eklemek veya CI'ın geçmesi tek başına kapıyı kapatmaz.
+
+## 2026-10-16 — SBOM üretimi ve provenance attestation
+- [x] tools/generate_mkaos_sbom.py kurulu Python çalışma ortamı için CycloneDX 1.5 SBOM üretir; eksik lisans metaverisini tahmin etmez ve raporu INCOMPLETE_REQUIRES_HUMAN_REVIEW olarak işaretler.
+- [x] Güvenilir main/workflow_dispatch CI çalıştırmalarında SBOM artefaktı üretmek ve GitHub provenance attestation yayımlamak için ayrı iş eklendi; PR kodundan attestation üretilmez.
+- [ ] Bu, bağımlılıkların lisanslarının hukuken temizlendiği anlamına gelmez. Tam transitif lisans incelemesi, kaynak hash/provenance doğrulaması, ağsız tekrarlanabilir build ve dağıtılan container imajı için ayrıca imzalı provenance doğrulaması hâlâ gereklidir.
