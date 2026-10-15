@@ -1,8 +1,8 @@
 # MKAOS v6.5 — Mustafa Kemal Atatürk Operating System
 
-**Yerel Türkçe ajan işletim sistemi altyapısı.** Uzun vadeli hedef; kendi model biçimi, tokenizer'ı ve çıkarım motoruyla harici çalışma zamanı bağımlılığını kaldırmaktır. Bu geçiş aşamalıdır: `engine/mkaos-inference/` altında bağımsız Rust CPU çekirdeği başlatılmıştır; mevcut uygulama henüz Ollama üzerinden model çalıştırır ve bu entegrasyon geçici uyumluluk katmanıdır. Yerine geçecek motor uçtan uca model çalıştırıp testleri geçmeden Ollama'yı silmek mevcut yerel sohbet işlevini kırar, bağımsızlık sağlamaz. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
+**Yerel Türkçe ajan işletim sistemi altyapısı.** Uzun vadeli hedef; kendi model biçimi, tokenizer'ı ve çıkarım motoruyla harici çalışma zamanı bağımlılığını kaldırmaktır. Rust CPU çıkarım çekirdeği ve MKAOS uyumlu HTTP sunucusu geliştirilmektedir; ancak mevcut HTTP sunucusunun aday ağırlıkları hâlâ üçüncü taraf SmolLM2-135M-Instruct'tır. Sentetik CI eğitimi mimari/aktarım testidir; gerçek Türkçe yetenek kanıtı değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
-MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. Sohbet ve tüm üretim görevleri yalnızca Rust MKAOS servisine gider; `MKAOS_ENABLED` sağlayıcı değiştirmez. MKAOS erişilemiyorsa hata görünür kalır. Ollama şu an yalnızca RAG varsayılanı çevrimdışı `mkaos-native` sözcük/karakter n-gram taban çizgisidir. Bu eğitilmiş semantik model değildir; Ollama embedding'i yalnızca açık opt-in ile kullanılabilir.
+MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. Sohbet üretimi yalnızca MKAOS servisine gider; `MKAOS_ENABLED` sağlayıcı değiştirmez ve MKAOS erişilemiyorsa hata görünür kalır. RAG varsayılanı çevrimdışı `mkaos-native` sözcük/karakter n-gram taban çizgisidir. Bu eğitilmiş semantik embedding modeli değildir; eski Ollama embedding sağlayıcısı yalnızca açık opt-in ile kullanılabilir.
 
 ## Bağımsız çıkarım motoru — aşamalı geçiş
 
@@ -19,7 +19,7 @@ MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik t
 
    `python tools/fetch_model.py --output-dir models/smollm2-135m-instruct`
 
-2. `.env.example` dosyasını `.env` olarak kopyalayın. Sohbet için MKAOS zorunludur; embedding modeli geçici olarak Ollama'dan sağlanır.
+2. `.env.example` dosyasını `.env` olarak kopyalayın. Sohbet için MKAOS zorunludur; RAG varsayılan olarak çevrimdışı yerel n-gram embedding kullanır.
 3. Servisi dahili Docker ağı üzerinde başlatın:
 
    `docker compose --profile mkaos up --build`
