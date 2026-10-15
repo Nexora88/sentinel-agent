@@ -30,6 +30,18 @@ MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik t
 
 Geri alma için `.env` içinde `MKAOS_ENABLED=false` yapıp `docker compose up -d sentinel` çalıştırın. İlk model yüklemesi birkaç saniye veya daha uzun sürebilir; sonraki isteklerde süreç yeniden başlatılmadıkça ağırlıklar bellekte kalır. API şu an token-token streaming sağlamaz ve istekleri sıralı işler.
 
+**Hedef cihazda kalite ve sürekli-istek ölçümü (TTFT testi bu aşamada çalıştırılmaz):**
+
+```bash
+# Yalnızca yerel test için MKAOS ve Ollama portlarını host loopback'ine açar.
+docker compose -f docker-compose.yml -f docker-compose.mkaos-local-test.yml --profile mkaos up --build -d
+docker compose exec ollama ollama pull smollm2:135m-instruct-fp16
+python tools/evaluate_mkaos_quality.py --server-url http://127.0.0.1:11435 --output memory/benchmarks/mkaos-quality.json
+python tools/benchmark_mkaos_vs_ollama.py --mkaos-url http://127.0.0.1:11435 --ollama-url http://127.0.0.1:11434 --ollama-model smollm2:135m-instruct-fp16 --runs 2 --max-new-tokens 32
+```
+
+Bu test overlay'i yalnızca güvenilir, yerel geliştirme cihazında kullan; üretimde port yayınlamayan varsayılan Compose dosyasını kullan. Raporlar yanıt doğruluğu, istek süresi, token/s, istem önbelleği ve örneklenmiş bellek ölçümlerini içerir. Bunlar anlamsal uzman değerlendirmesi veya TTFT ölçümü değildir.
+
 - Yol haritası: [`docs/MKAOS_INDEPENDENCE_MILESTONES.md`](docs/MKAOS_INDEPENDENCE_MILESTONES.md).
 - Türkçe/tarihî veri menşei ve eğitim politikası: [`docs/MKAOS_TURKISH_DATA_GOVERNANCE.md`](docs/MKAOS_TURKISH_DATA_GOVERNANCE.md).
 
