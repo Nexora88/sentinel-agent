@@ -3,6 +3,11 @@
 //! Supports one decoder layer and one token sequence per call. No tokenizer,
 //! checkpoint loader, batching, KV cache, quantization or GPU backend yet.
 #![forbid(unsafe_code)]
+
+pub mod checkpoint;
+pub mod sampling;
+pub mod sha256;
+pub mod tokenizer;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
