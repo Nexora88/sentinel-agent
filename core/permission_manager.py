@@ -1,15 +1,19 @@
 """
 Permission Manager
 Write, push and external side effects require explicit human approval.
-Approval IDs are stable within the process; requests are not silently auto-approved.
+Approval requests are persisted locally with stable IDs and atomic writes.
 """
 
 from __future__ import annotations
 
+import json
+import os
+import tempfile
 import threading
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from core.config import settings
@@ -29,21 +33,68 @@ class Action(str, Enum):
 
 
 class PermissionManager:
-    def __init__(self):
+    def __init__(self, store_path: str = "./memory/approvals.json"):
         self.require_approval = settings.require_approval
         self.rules = settings.permissions.get("actions", {})
-        self.pending_approvals: List[Dict] = []
+        self.store_path = Path(store_path)
         self._lock = threading.RLock()
+        self.pending_approvals: List[Dict] = self._load()
+
+    def _load(self) -> List[Dict]:
+        if not self.store_path.exists():
+            return []
+        try:
+            data = json.loads(self.store_path.read_text(encoding="utf-8"))
+            if not isinstance(data, list) or any(not isinstance(item, dict) for item in data):
+                raise ValueError("approval store must be a JSON list")
+            # Legacy records without IDs cannot be approved by positional index.
+            for item in data:
+                item.setdefault("id", uuid.uuid4().hex)
+                item.setdefault("status", "pending")
+            return data
+        except Exception as exc:
+            # Never overwrite a damaged approval history automatically.
+            raise RuntimeError(
+                f"Approval store is unreadable; preserve and recover {self.store_path} before restarting."
+            ) from exc
+
+    def _save(self) -> None:
+        self.store_path.parent.mkdir(parents=True, exist_ok=True)
+        # Keep a bounded audit trail; pending requests are never pruned.
+        if len(self.pending_approvals) > 5000:
+            completed = [r for r in self.pending_approvals if r.get("status") != "pending"]
+            keep_completed = set(id(r) for r in completed[-4500:])
+            self.pending_approvals = [
+                r for r in self.pending_approvals
+                if r.get("status") == "pending" or id(r) in keep_completed
+            ]
+        temp_name = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=str(self.store_path.parent),
+                prefix=".approvals-", suffix=".tmp", delete=False
+            ) as temp:
+                json.dump(self.pending_approvals, temp, ensure_ascii=False, indent=2, default=str)
+                temp.flush()
+                os.fsync(temp.fileno())
+                temp_name = temp.name
+            try:
+                os.chmod(temp_name, 0o600)
+            except OSError:
+                pass
+            os.replace(temp_name, self.store_path)
+            try:
+                os.chmod(self.store_path, 0o600)
+            except OSError:
+                pass
+        finally:
+            if temp_name and os.path.exists(temp_name):
+                os.unlink(temp_name)
 
     def can_perform(self, action: Action | str) -> bool:
         """Return true only for explicitly allowed low-risk actions."""
         action_key = action.value if isinstance(action, Action) else str(action)
-        rule = self.rules.get(action_key, "needs_approval")
-        if rule == "allowed":
-            return True
-        # Unknown or approval-required actions are denied unless an explicit
-        # approval flow is used; configuration must never silently bypass it.
-        return False
+        return self.rules.get(action_key, "needs_approval") == "allowed"
 
     def request_approval(
         self, action: Action | str, details: str, context: Optional[dict] = None
@@ -60,6 +111,7 @@ class PermissionManager:
         }
         with self._lock:
             self.pending_approvals.append(request)
+            self._save()
         return (
             f"⚠️ APPROVAL REQUIRED\n"
             f"Request ID: {request_id}\n"
@@ -74,7 +126,7 @@ class PermissionManager:
             return [dict(r) for r in self.pending_approvals if r["status"] == "pending"]
 
     def approve(self, request_id: str = "") -> bool:
-        """Approve a specific request by stable ID; legacy numeric indexes fail closed."""
+        """Approve a specific request by stable ID; positional indexes fail closed."""
         if not isinstance(request_id, str) or not request_id:
             return False
         with self._lock:
@@ -82,11 +134,12 @@ class PermissionManager:
                 if request["id"] == request_id and request["status"] == "pending":
                     request["status"] = "approved"
                     request["approved_at"] = datetime.now(timezone.utc).isoformat()
+                    self._save()
                     return True
         return False
 
     def reject(self, request_id: str = "") -> bool:
-        """Reject a specific request by stable ID; legacy numeric indexes fail closed."""
+        """Reject a specific request by stable ID; positional indexes fail closed."""
         if not isinstance(request_id, str) or not request_id:
             return False
         with self._lock:
@@ -94,5 +147,6 @@ class PermissionManager:
                 if request["id"] == request_id and request["status"] == "pending":
                     request["status"] = "rejected"
                     request["rejected_at"] = datetime.now(timezone.utc).isoformat()
+                    self._save()
                     return True
         return False
