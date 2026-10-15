@@ -83,7 +83,7 @@ Doğrulayıcı yalnızca metadata tutarlılığı kontrol eder; lisans iznini, k
 - [x] Korpus içeriği SHA-256/manifest eşleştirmesi, manifest dışı örnek engeli ve boş test split'i reddi için testler eklendi.
 - [ ] Eğitim için yetkili gerçek Türkçe korpus henüz sağlanmadı; eğitilmiş MKAOS checkpoint'i veya kullanılabilir Türkçe kalite sonucu henüz üretilmedi.
 - [ ] Eğitilen checkpoint'in Rust decoder ile uçtan uca yükleme/üretim testi ve bağımsız Türkçe held-out değerlendirmesi henüz geçmedi.
-- [ ] HTTP sohbet servisi üçüncü taraf SmolLM2 adayını kullanmaya devam ediyor; yerel model üretim varsayılanına alınmadı.
+- [x] HTTP sohbet yolu yerel Rust CLI'a bağlandı ve varsayılanı native-rust oldu; onaylı checkpoint henüz olmadığı için uçtan uca kullanılabilirlik kanıtlanmadı.
 - [ ] CUDA/ROCm/Metal/Gaudi fiziksel cihaz testi, yatay Kubernetes ve paylaşılan kalıcı durum, canlı mTLS mesh/sertifika iptali ve çok düğümlü güvenlik testleri açık kabul kapıları olarak kalıyor.
 
 Bu adım bir **eğitim altyapısı** ekler; eğitimin gerçekten çalıştırıldığı, modelin iyi Türkçe bildiği veya yüzde yüz yerli üretim sistemine ulaşıldığı iddiası değildir.
