@@ -1,0 +1,40 @@
+name: MKAOS real-model validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-smollm2-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Python and dependencies
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install reference model libraries
+        run: python -m pip install --upgrade pip torch transformers tokenizers accelerate
+      - name: Download pinned model and measure exact SHA-256
+        run: python tools/fetch_model.py --output-dir artifacts/smollm2-135m-instruct --lock-file models/smollm2-135m-instruct/model-lock.json
+      - name: Compare tokenizer IDs and chat template
+        run: python tools/validate_tokenizer.py --model-dir artifacts/smollm2-135m-instruct
+      - name: Compare real-model logits with Hugging Face
+        run: python tools/validate_model_logits.py --model-dir artifacts/smollm2-135m-instruct
+      - name: Preserve measured hashes and validation inputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkaos-real-model-validation
+          if-no-files-found: warn
+          path: |
+            artifacts/smollm2-135m-instruct/SHA256SUMS
+            artifacts/smollm2-135m-instruct/model-lock.generated.json
+            models/smollm2-135m-instruct/model-lock.json
