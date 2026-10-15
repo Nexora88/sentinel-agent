@@ -47,9 +47,9 @@ jobs:
             sleep 2
           done
           curl --fail --silent http://127.0.0.1:11434/api/tags >/dev/null
-          docker exec ollama ollama pull smollm2:135m-instruct
+          docker exec ollama ollama pull smollm2:135m-instruct-fp16
       - name: Run same-runner MKAOS vs Ollama benchmark
-        run: python tools/benchmark_mkaos_vs_ollama.py --model-dir artifacts/smollm2-135m-instruct --ollama-model smollm2:135m-instruct --runs 2
+        run: python tools/benchmark_mkaos_vs_ollama.py --model-dir artifacts/smollm2-135m-instruct --ollama-model smollm2:135m-instruct-fp16 --runs 2
       - name: Upload benchmark report
         if: always()
         uses: actions/upload-artifact@v4
