@@ -35,6 +35,24 @@ jobs:
           docker compose -f docker-compose.bootstrap.yml config --quiet
       - name: Build container image
         run: docker build --tag seka-agent-ci .
+      - name: Smoke-test web startup without Ollama
+        run: |
+          set -eu
+          docker run -d --name seka-web-smoke -p 127.0.0.1:18000:8000 -e AUTH_REQUIRED=true seka-agent-ci
+          trap 'docker rm -f seka-web-smoke >/dev/null 2>&1 || true' EXIT
+          healthy=0
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18000/health; then
+              healthy=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$healthy" -ne 1 ]; then
+            docker logs seka-web-smoke
+            exit 1
+          fi
+          echo "Web panel is healthy without requiring Ollama at startup."
       - name: Run security regression tests
         run: python -m unittest discover -s tests -v
       - name: Scan repository for likely hardcoded secrets
