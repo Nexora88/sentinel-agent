@@ -199,15 +199,15 @@ def main() -> int:
 
         @staticmethod
         def rope(x):
-            # x: [batch, heads, seq, head_dim], Llama-style interleaved pairs.
+            # Match the Rust engine's split-half RoPE exactly.
             length = x.shape[-2]
             half = x.shape[-1] // 2
             positions = torch.arange(length, device=x.device, dtype=x.dtype)
-            inv = 1.0 / (10000.0 ** (torch.arange(0, x.shape[-1], 2, device=x.device, dtype=x.dtype) / x.shape[-1]))
+            inv = 1.0 / (10000.0 ** (torch.arange(half, device=x.device, dtype=x.dtype) * 2 / x.shape[-1]))
             angles = torch.outer(positions, inv)
             cos, sin = angles.cos()[None, None, :, :], angles.sin()[None, None, :, :]
-            even, odd = x[..., 0::2], x[..., 1::2]
-            return torch.stack((even * cos - odd * sin, even * sin + odd * cos), dim=-1).flatten(-2)
+            first, second = x[..., :half], x[..., half:]
+            return torch.cat((first * cos - second * sin, second * cos + first * sin), dim=-1)
 
         def forward(self, x):
             b, length, _ = x.shape
