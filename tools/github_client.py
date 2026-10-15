@@ -126,11 +126,21 @@ class GitHubClient:
             return f"❌ GitHub yazma hatası: {e}"
 
     def create_issue(self, owner: str, repo: str, title: str, body: str = "") -> str:
+        """Create an issue only when the configured policy explicitly permits it."""
+        if not self.enabled:
+            return "❌ GitHub token tanımlı değil."
+        if not self.permissions.can_perform(Action.OPEN_GITHUB_ISSUE):
+            return self.permissions.request_approval(
+                Action.OPEN_GITHUB_ISSUE,
+                f"GitHub issue: {owner}/{repo} — {title}",
+                context={"owner": owner, "repo": repo, "title": title, "body_preview": body[:400]},
+            )
         try:
             result = self._post(f"/repos/{owner}/{repo}/issues", {"title": title, "body": body})
             return f"✅ Issue açıldı: {result.get('html_url')}"
         except Exception as e:
-            return f"❌ Issue oluşturulamadı: {e}"
+            logger.error("GitHub issue creation failed: %s", type(e).__name__)
+            return "❌ Issue oluşturulamadı; hata ayrıntıları güvenlik için gizlendi."
 
     def create_pull_request(
         self,
