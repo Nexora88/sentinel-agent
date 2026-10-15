@@ -1,4 +1,4 @@
-# SEKA v6 — Sentinel Agent
+# SEKA v6.1 — Sentinel Agent
 
 **Yerel Türkçe ajan altyapısı.** Ollama üzerinden yerel çıkarım; bulut model API'si zorunlu değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
@@ -12,6 +12,25 @@ SEKA; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik ta
 - **Onay varsayılanı açık:** GitHub yazma, commit, push ve dosya değişiklikleri otomatik yapılmamalıdır. Her onay kararlı bir istek kimliğine bağlıdır.
 - **Savunmacı tarama:** web tarayıcısı yerel/özel IP'leri ve doğrulanmayan yönlendirmeleri engeller. Yalnızca sahibi olduğun veya tarama iznin olan hedeflerde kullan.
 - **Güvenlik dürüstlüğü:** uygulama tek başına “veri asla dışarı çıkamaz” garantisi veremez. Bu; uygulama ayarlarına, işletim sistemi/firewall'a, model endpoint'ine, yedeklemeye ve etkinleştirilen entegrasyonlara bağlıdır.
+
+## Kesin çevrimdışı çalışma profili
+
+`docker-compose.offline.yml` ayrı bir çalışma zamanı profili sağlar: SEKA ve Ollama yalnızca birbirleriyle konuşan, internet çıkışı olmayan bir Docker ağına bağlanır. GitHub token'ı, web araştırması, dış bildirim ve harici görsel üretimi bu profilde kapalıdır. Bu nedenle canlı finans verisi, GitHub yazma ve web taraması çevrimdışı profilde çalışmaması beklenen özelliklerdir.
+
+1. Docker imajlarını ve gerekli Ollama modellerini internet bağlantısı varken önceden hazırla.
+2. `models/voices/` içine Piper'ın Türkçe `tr_TR-fettah-medium.onnx` ve `tr_TR-dfki-medium.onnx` dosyalarını (ve eşlik eden `.onnx.json` dosyalarını) yerleştir.
+3. `models/whisper-small/` içine yerel faster-whisper uyumlu model dosyalarını yerleştir. Model bulunamazsa konuşma özelliği hata verir; otomatik bulut yedeği yoktur.
+4. İlk hazırlık ve model indirmeleri bittikten sonra `docker compose -f docker-compose.yml -f docker-compose.offline.yml up -d --build` komutuyla çalıştır. Model/imaj hazırlığını tamamladıktan sonra ağı internetten yalıtılmış halde tut.
+
+`internal: true` ağı, uygulama konteynerlerinin normal internet çıkışını engeller; yine de bu, ana bilgisayarın veya başka uygulamaların ağ erişimini sınırlandırmaz. En yüksek güvence için ana bilgisayarın güvenlik duvarı kurallarını da denetle.
+
+## Yerel Türkçe ses
+
+- **Erkek sesi:** tok ve bilge profil; varsayılan Piper `tr_TR-fettah-medium`.
+- **Kadın sesi:** enerjik ve net profil; varsayılan Piper `tr_TR-dfki-medium`.
+- **Kedi dublajı:** yerel `ffmpeg` ile ses perdesi efekti. Modelin gerçek ses rengi, kurulu Türkçe ses paketinin kalitesine bağlıdır; yayımdan önce gerçek cihazda dinleyerek doğrula.
+- **Sesli komut:** tarayıcıdaki bulut tabanlı `SpeechRecognition` kullanılmaz. Mikrofon kaydı yalnızca yerel SEKA sunucusuna gönderilir; çözümleme yerel faster-whisper veya whisper.cpp modeliyle yapılır. Modeller hazır değilse ses işlevi açıkça hata verir.
+- Kurulum için `pip install -r requirements-voice.txt` kullanabilir veya Docker imajında isteğe bağlı ses bağımlılıklarını kurabilirsin. Model dosyaları kaynak depoya eklenmemelidir.
 
 ## Güvenli kurulum
 
