@@ -2,14 +2,14 @@
 
 **Yerel Türkçe ajan işletim sistemi altyapısı.** Uzun vadeli hedef; kendi model biçimi, tokenizer'ı ve çıkarım motoruyla harici çalışma zamanı bağımlılığını kaldırmaktır. Bu geçiş aşamalıdır: `engine/mkaos-inference/` altında bağımsız Rust CPU çekirdeği başlatılmıştır; mevcut uygulama henüz Ollama üzerinden model çalıştırır ve bu entegrasyon geçici uyumluluk katmanıdır. Yerine geçecek motor uçtan uca model çalıştırıp testleri geçmeden Ollama'yı silmek mevcut yerel sohbet işlevini kırar, bağımsızlık sağlamaz. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
-MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. Sohbet ve tüm üretim görevleri yalnızca Rust MKAOS servisine gider; `MKAOS_ENABLED` sağlayıcı değiştirmez. MKAOS erişilemiyorsa hata görünür kalır. Ollama şu an yalnızca RAG embedding'leri için geçici olarak tutulur; bu nedenle tam Ollama bağımsızlığı henüz tamamlanmış değildir.
+MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. Sohbet ve tüm üretim görevleri yalnızca Rust MKAOS servisine gider; `MKAOS_ENABLED` sağlayıcı değiştirmez. MKAOS erişilemiyorsa hata görünür kalır. Ollama şu an yalnızca RAG varsayılanı çevrimdışı `mkaos-native` sözcük/karakter n-gram taban çizgisidir. Bu eğitilmiş semantik model değildir; Ollama embedding'i yalnızca açık opt-in ile kullanılabilir.
 
 ## Bağımsız çıkarım motoru — aşamalı geçiş
 
 - Çekirdek: [`engine/mkaos-inference/`](engine/mkaos-inference/) — Rust CPU tensör işlemleri, Transformer decoder ve KV cache.
 - HF uyumluluk katmanı: [`engine/mkaos-hf-adapter/`](engine/mkaos-hf-adapter/).
 - Yerleşik servis: `mkaos_server` model ağırlıklarını/tokenizer'ı başlangıçta bir kez yükler ve yerel HTTP API'si sağlar. Aynı sistem istemi için sınırlı KV önek önbelleği kullanır.
-- Sohbet üretimi yalnızca MKAOS'a yönlendirilir; `MKAOS_ENABLED=false` Ollama sohbet yolunu açmaz. Embedding'ler geçici olarak Ollama'da kalır.
+- Sohbet üretimi yalnızca MKAOS'a yönlendirilir; `MKAOS_ENABLED=false` Ollama sohbet yolunu açmaz. RAG varsayılanı `mkaos-native` olup Ollama embedding'i açık opt-in'dir.
 - Sunucu varsayılan olarak loopback'e bağlanır. Docker Compose dağıtımı, portu host'a yayınlamadan yalnızca dahili ağa bağlar; container arayüzüne bağlanmak için açık bir ayar gerekir.
 - Şimdiki aday ağırlıklar üçüncü taraf SmolLM2-135M-Instruct'tır. Motorun bağımsız kodu geliştirilse de model ağırlıkları henüz MKAOS tarafından eğitilmiş değildir. Türkçe anlamsal kalite ve hedef cihaz performansı geçiş kapılarıdır.
 
@@ -238,7 +238,7 @@ cargo run --release --manifest-path engine/mkaos-hf-adapter/Cargo.toml --bin mka
 
 Varsayılan adres `http://127.0.0.1:11435` şeklindedir. `/health`, `/api/chat`, `/api/generate` ve `/api/tags` uç noktaları desteklenir. İstek gövdesinde `stream: true` kullanıldığında yanıt token parçaları halinde NDJSON akışıyla gönderilir. Sunucu varsayılan olarak aynı anda 4 isteği işler; `MKAOS_MAX_CONCURRENT_REQUESTS` 1–64 aralığında ayarlanabilir. Kapasite dolduğunda sınırsız bellek kuyruğu yerine `503 Service Unavailable` döner.
 
-Uygulamayı MKAOS'a yönlendirmek için `.env` içinde `MKAOS_BASE_URL=http://127.0.0.1:11435` ayarlanır; `MKAOS_ENABLED` sohbet için artık geçersizdir. **Geri alma yok:** sohbet üretimi yalnızca MKAOS'a gider. MKAOS kapalıysa hata görünür; Ollama sohbet sağlayıcısı olarak kullanılmaz. RAG embedding varsayılanı çevrimdışı `mkaos-native` sözcük/karakter n-gram taban çizgisidir; bu eğitilmiş anlamsal bir model değildir. İsteğe bağlı Ollama embedding için `SEKA_EMBEDDINGS_PROVIDER=ollama` ayarlanır; eski koleksiyonlar farklı vektör uzayları arasında karıştırılmamalıdır. MKAOS sunucusu çalışmıyorsa uygulama otomatik olarak Ollama'ya geçmez; sessiz sağlayıcı değişimi yerine açık hata davranışı korunur.
+Uygulamayı MKAOS'a yönlendirmek için `.env` içinde `MKAOS_BASE_URL=http://127.0.0.1:11435` ayarlanır; `MKAOS_ENABLED` sohbet için artık geçersizdir. **Geri alma yok:** sohbet üretimi yalnızca MKAOS'a gider. MKAOS kapalıysa hata görünür; Ollama sohbet sağlayıcısı olarak kullanılmaz. RAG embedding varsayılanı çevrimdışı `mkaos-native` sözcük/karakter n-gram taban çizgisidir; bu eğitilmiş anlamsal bir model değildir. İsteğe bağlı Ollama embedding için `SEKA_EMBEDDINGS_PROVIDER=ollama` ve Compose'ta `--profile legacy-ollama-embeddings` etkinleştirilir; farklı vektör uzayları ayrı koleksiyonlarda tutulur. MKAOS sunucusu çalışmıyorsa uygulama otomatik olarak Ollama'ya geçmez; sessiz sağlayıcı değişimi yerine açık hata davranışı korunur.
 
 Bu özellik deneysel durumdadır. Mevcut aday ağırlıklar üçüncü taraf SmolLM2'dir; bu sunucu kendi ağırlıklarımızı eğitmez. Türkçe kalite, semantik doğruluk ve hedef cihaz performansı sabit değerlendirme kümesiyle ölçülmeden varsayılan yapılmamalıdır. Kalite raporu:
 
