@@ -24,13 +24,12 @@ pub fn apply_repetition_penalty(
     if penalty == 1.0 {
         return Ok(());
     }
-    // A token repeated several times should be penalized once, not exponentially.
-    let mut seen = vec![false; logits.len()];
-    for &token in previous_tokens {
-        if seen[token] {
-            continue;
-        }
-        seen[token] = true;
+    // Deduplicate only the short generated-token list; avoid allocating a
+    // vocabulary-sized bitmap on every decode step.
+    let mut seen_tokens = previous_tokens.to_vec();
+    seen_tokens.sort_unstable();
+    seen_tokens.dedup();
+    for token in seen_tokens {
         if logits[token] > 0.0 {
             logits[token] /= penalty;
         } else {
