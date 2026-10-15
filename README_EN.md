@@ -121,7 +121,7 @@ See LICENSE for the license and third-party notices.
 
 ## Experimental resident MKAOS runtime (opt-in)
 
-The resident HTTP server loads model weights and the tokenizer once at startup and creates a fresh KV cache per request. For safety, it binds only to loopback:
+The resident HTTP server loads model weights and the tokenizer once at startup; repeated identical system prompts reuse a bounded KV-prefix cache while each request gets its own context state. For safety, it binds only to loopback:
 
 ```bash
 python tools/fetch_model.py
