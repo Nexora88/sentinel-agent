@@ -30,7 +30,9 @@ class PersonalMemory:
         self,
         persist_directory: str = "./memory/personal",
         ollama: Optional[OllamaClient] = None,
+        tenant_id: Optional[str] = None,
     ):
+        self.tenant_id = str(tenant_id).strip().lower() if tenant_id else None
         self.persist_directory = Path(persist_directory)
         self.persist_directory.mkdir(parents=True, exist_ok=True)
         self.profile_path = self.persist_directory / "profile.json"
@@ -123,6 +125,7 @@ class PersonalMemory:
                     page_content=fact,
                     metadata={
                         "type": "fact",
+                        **({"tenant_id": getattr(self, "tenant_id", None)} if getattr(self, "tenant_id", None) else {}),
                         "category": category,
                         "timestamp": datetime.utcnow().isoformat(),
                     },
@@ -150,6 +153,7 @@ class PersonalMemory:
                     page_content=f"{role}: {content}",
                     metadata={
                         "type": "conversation",
+                        **({"tenant_id": self.tenant_id} if self.tenant_id else {}),
                         "role": role,
                         "timestamp": datetime.utcnow().isoformat(),
                     },
@@ -158,7 +162,7 @@ class PersonalMemory:
         )
 
     def search(self, query: str, k: int = 8) -> List[Document]:
-        return self.vectorstore.similarity_search(query, k=k)
+        return self.vectorstore.similarity_search(query, k=max(1, min(int(k), 20)), **({"filter": {"tenant_id": getattr(self, "tenant_id", None)}} if getattr(self, "tenant_id", None) else {}))
 
     def get_context_for_prompt(self, query: str = "", k: int = 6) -> str:
         """Build a rich context string about the user for the LLM."""

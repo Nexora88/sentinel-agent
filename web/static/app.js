@@ -760,7 +760,7 @@ $("#finance-btn").addEventListener("click", async () => {
 });
 
 let lastMediaFilename = "";
-function renderMediaResult(data) {
+async function renderMediaResult(data) {
   const box = $("#image-result");
   if (data.status === "queued" && data.id) {
     box.textContent = "Donanım eşiği nedeniyle görev kuyruğa alındı (" + data.id + "). Egemenlik Kontrol Odası'ndan kaynaklar uygun olduğunda çalıştırabilirsin.";
@@ -773,19 +773,27 @@ function renderMediaResult(data) {
   }
   lastMediaFilename = data.filename;
   const url = "/api/images/" + encodeURIComponent(data.filename);
-  if (data.filename.endsWith(".mp4")) {
-    const video = document.createElement("video");
-    video.src = url; video.controls = true; video.preload = "metadata";
-    video.style.maxWidth = "100%"; video.style.borderRadius = "12px";
-    box.replaceChildren(video);
-  } else {
-    const image = document.createElement("img");
-    image.src = url; image.alt = "MKAOS tarafından yerel olarak işlenen görsel";
-    image.loading = "lazy"; image.style.maxWidth = "100%"; image.style.borderRadius = "12px";
-    const save = document.createElement("a");
-    save.href = url; save.download = data.filename; save.textContent = "Görseli indir";
-    save.className = "media-download";
-    box.replaceChildren(image, save);
+  try {
+    // <img>/<video>/<a> cannot attach Authorization headers; fetch through the authenticated API wrapper.
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error("Dosya bu kullanıcı için erişilebilir değil.");
+    const objectUrl = URL.createObjectURL(await response.blob());
+    if (data.filename.endsWith(".mp4")) {
+      const video = document.createElement("video");
+      video.src = objectUrl; video.controls = true; video.preload = "metadata";
+      video.style.maxWidth = "100%"; video.style.borderRadius = "12px";
+      box.replaceChildren(video);
+    } else {
+      const image = document.createElement("img");
+      image.src = objectUrl; image.alt = "MKAOS tarafından yerel olarak işlenen görsel";
+      image.loading = "lazy"; image.style.maxWidth = "100%"; image.style.borderRadius = "12px";
+      const save = document.createElement("a");
+      save.href = objectUrl; save.download = data.filename; save.textContent = "Görseli indir";
+      save.className = "media-download";
+      box.replaceChildren(image, save);
+    }
+  } catch (error) {
+    box.textContent = error.message || "Görsel güvenli biçimde alınamadı.";
   }
 }
 $("#image-btn").addEventListener("click", async () => {
@@ -1148,7 +1156,19 @@ async function loadControlRoom() {
       const desc=document.createElement("div"); desc.textContent=job.status+" — "+(job.reason||"");
       detail.append(name,desc); card.appendChild(detail);
       if (job.status === "done" && /^[A-Za-z0-9_-]{1,80}\\.(png|jpg|jpeg|webp|mp4)$/i.test(String(job.result?.filename || ""))) {
-        const link=document.createElement("a"); link.href="/api/images/"+encodeURIComponent(job.result.filename); link.target="_blank"; link.rel="noopener noreferrer"; link.textContent="Üretilen dosyayı aç"; link.className="media-download"; card.appendChild(link);
+        const link=document.createElement("a"); link.href="/api/images/"+encodeURIComponent(job.result.filename); link.textContent="Üretilen dosyayı aç"; link.className="media-download";
+        link.addEventListener("click", async (event) => {
+          event.preventDefault();
+          try {
+            const response = await fetch(link.href, { cache: "no-store" });
+            if (!response.ok) throw new Error("Dosyaya erişilemiyor.");
+            const objectUrl = URL.createObjectURL(await response.blob());
+            const download = document.createElement("a"); download.href = objectUrl;
+            download.download = job.result.filename; download.click();
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
+          } catch (_) { desc.textContent = "Dosya güvenli biçimde alınamadı."; }
+        });
+        card.appendChild(link);
       }
       if (job.status==="queued") {
         const run=document.createElement("button"); run.textContent="Kaynak uygunsa çalıştır";

@@ -1,7 +1,7 @@
 """Regression tests for tenant storage boundaries."""
 import tempfile
 import unittest
-from core.tenant_storage import tenant_file, tenant_root
+from core.tenant_storage import tenant_file, tenant_root, tenant_storage_id
 
 class TenantStorageTests(unittest.TestCase):
     def test_each_user_gets_a_distinct_root_and_file(self):
@@ -24,6 +24,11 @@ class TenantStorageTests(unittest.TestCase):
             for filename in ("../secret.txt", "/tmp/secret.txt", "", ".."):
                 with self.subTest(filename=filename), self.assertRaises(ValueError):
                     tenant_file(temp, "alice", filename)
+
+    def test_username_storage_keys_are_safe_and_stable(self):
+        self.assertEqual(tenant_storage_id("Alice@Example.com"), tenant_storage_id("alice@example.com"))
+        self.assertNotEqual(tenant_storage_id("alice@example.com"), tenant_storage_id("bob@example.com"))
+        self.assertRegex(tenant_storage_id("Alice@Example.com"), r"^u-[a-f0-9]{32}$")
 
     def test_case_normalization_is_stable(self):
         with tempfile.TemporaryDirectory() as temp:
