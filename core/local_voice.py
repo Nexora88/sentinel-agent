@@ -32,9 +32,10 @@ def _model_path(voice: str) -> Path:
         raise LocalVoiceError("Ses seçimi geçersiz.")
     root = VOICE_DIR.resolve()
     path = (root / VOICE_MODELS[voice]).resolve()
-    if root not in path.parents or not path.is_file():
+    sidecar = path.with_suffix(path.suffix + ".json")
+    if root not in path.parents or not path.is_file() or not sidecar.is_file():
         raise LocalVoiceError(
-            f"Yerel {voice} sesi bulunamadı. Model dosyasını {root} dizinine yerleştir."
+            f"Yerel {voice} sesi veya .onnx.json eş dosyası bulunamadı. Modeli {root} dizinine yerleştir."
         )
     return path
 
@@ -47,7 +48,11 @@ def voice_status() -> dict:
         "faster_whisper_available": importlib.util.find_spec("faster_whisper") is not None and Path(FASTER_WHISPER_MODEL).is_dir(),
         "whisper_available": (shutil.which(WHISPER_BIN) is not None and bool(WHISPER_MODEL and Path(WHISPER_MODEL).is_file())) or (__import__("importlib.util").util.find_spec("faster_whisper") is not None and Path(FASTER_WHISPER_MODEL).is_dir()),
         "voices": {
-            key: {"configured": (VOICE_DIR / filename).is_file(), "file": filename}
+            key: {
+                "configured": (VOICE_DIR / filename).is_file()
+                    and (VOICE_DIR / filename).with_suffix(Path(filename).suffix + ".json").is_file(),
+                "file": filename,
+            }
             for key, filename in VOICE_MODELS.items()
         },
         "cat_effect_available": shutil.which("ffmpeg") is not None,
