@@ -12,7 +12,7 @@ Bu belge bir eğitim sonucu duyurusu değildir. Amaç, MKAOS'un kendi ağırlık
 Komutlar:
 
     python tools/validate_mkaos_training_manifest.py path/to/approved-manifest.json
-    python -m unittest tests.test_mkaos_training_manifest -v
+    python -m unittest discover -s tests -p test_mkaos_training_manifest.py -v
 
 ## Bağımsız Türkçe değerlendirme protokolü
 
