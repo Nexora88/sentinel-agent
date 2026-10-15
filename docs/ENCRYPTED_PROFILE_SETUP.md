@@ -21,7 +21,9 @@ When encrypted mode is disabled or unset, the existing `profile.json` behavior r
 Run:
 
 ```bash
-python -m unittest tests.test_encrypted_personal_profile tests.test_encrypted_store tests.test_local_media -v
+python -m unittest discover -s tests -p 'test_encrypted_personal_profile.py' -v
+python -m unittest discover -s tests -p 'test_encrypted_store.py' -v
+python -m unittest discover -s tests -p 'test_local_media.py' -v
 ```
 
 The CI suite also checks the default profile behavior and local media boundaries. Production deployment still requires a full storage inventory, external key-management policy, backup/recovery drill, and per-tenant isolation review.
