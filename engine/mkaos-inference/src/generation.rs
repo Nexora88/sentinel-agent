@@ -7,7 +7,7 @@ pub struct GenerationConfig {
     pub eos_token_ids: Vec<usize>,
     pub stop_sequences: Vec<Vec<usize>>,
 }
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Sampling {
     Greedy,
     TopK { k: usize, temperature_milli: u32 },
