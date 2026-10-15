@@ -104,7 +104,21 @@ const sendBtn = $("#send-btn");
 function addMessage(role, content) {
   const div = document.createElement("div");
   div.className = `message ${role}`;
-  div.textContent = content;
+  const body = document.createElement("div");
+  body.className = "message-content";
+  body.textContent = content;
+  div.appendChild(body);
+  if (role === "assistant") {
+    const actions = document.createElement("div");
+    actions.className = "message-actions";
+    const speak = document.createElement("button");
+    speak.type = "button";
+    speak.className = "message-speak";
+    speak.textContent = "🔊 Seslendir";
+    speak.addEventListener("click", () => speakText(content));
+    actions.appendChild(speak);
+    div.appendChild(actions);
+  }
   chatBox.appendChild(div);
   chatBox.scrollTop = chatBox.scrollHeight;
 }
@@ -312,39 +326,153 @@ async function exportPack() {
 
 $("#pack-btn")?.addEventListener("click", exportPack);
 
-// Voice
+// Local-only Turkish voice: no browser SpeechRecognition/TTS cloud fallback.
 const voiceBtn = $("#voice-btn");
-let recognizing = false;
-let recognition = null;
-if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SR();
-  recognition.lang = "tr-TR";
-  recognition.continuous = false;
-  recognition.onresult = (e) => {
-    chatInput.value = e.results[0][0].transcript;
-    sendMessage();
-  };
-  recognition.onend = () => {
-    recognizing = false;
-    voiceBtn.classList.remove("recording");
-    voiceBtn.textContent = "🎤";
-  };
-  recognition.onerror = () => {
-    recognizing = false;
-    voiceBtn.classList.remove("recording");
-  };
-  voiceBtn.addEventListener("click", () => {
-    if (recognizing) {
-      recognition.stop();
+const voiceSelect = $("#voice-select");
+const catDubToggle = $("#cat-dub-toggle");
+const voiceStatus = $("#voice-status");
+let mediaRecorder = null;
+let recordingChunks = [];
+let recordingTimer = null;
+let activeAudio = null;
+let activeAudioUrl = null;
+
+async function loadVoiceStatus() {
+  try {
+    const response = await fetch("/api/voice/status");
+    if (!response.ok) throw new Error("Ses durumu okunamadı");
+    const data = await response.json();
+    const male = data.voices?.male?.configured;
+    const female = data.voices?.female?.configured;
+    const stt = data.whisper_available;
+    const piper = data.piper_available;
+    if (voiceStatus) {
+      voiceStatus.textContent = `Piper ${piper ? "hazır" : "eksik"} · Erkek ${male ? "hazır" : "model eksik"} · Kadın ${female ? "hazır" : "model eksik"} · Yerel STT ${stt ? "hazır" : "model eksik"}`;
+      voiceStatus.classList.toggle("is-ready", Boolean(piper && male && female && stt));
+    }
+    if (voiceBtn && (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder)) {
+      voiceBtn.disabled = true;
+      voiceBtn.title = "Bu tarayıcı yerel ses kaydını desteklemiyor.";
+    }
+  } catch (_) {
+    if (voiceStatus) voiceStatus.textContent = "Ses motoru durumu alınamadı";
+  }
+}
+
+async function speakText(text) {
+  if (activeAudio) {
+    activeAudio.pause();
+    activeAudio = null;
+  }
+  if (activeAudioUrl) {
+    URL.revokeObjectURL(activeAudioUrl);
+    activeAudioUrl = null;
+  }
+  try {
+    const response = await fetch("/api/voice/synthesize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: String(text).slice(0, 4000),
+        voice: voiceSelect?.value || "male",
+        cat_mode: Boolean(catDubToggle?.checked)
+      })
+    });
+    if (!response.ok) {
+      let message = "Yerel ses üretilemedi.";
+      try { message = (await response.json()).detail || message; } catch (_) {}
+      addMessage("assistant", message);
       return;
     }
-    recognizing = true;
+    activeAudioUrl = URL.createObjectURL(await response.blob());
+    activeAudio = new Audio(activeAudioUrl);
+    activeAudio.addEventListener("ended", () => {
+      activeAudio = null;
+      if (activeAudioUrl) URL.revokeObjectURL(activeAudioUrl);
+      activeAudioUrl = null;
+    }, { once: true });
+    await activeAudio.play();
+  } catch (error) {
+    addMessage("assistant", "Yerel ses hatası: " + error.message);
+  }
+}
+
+$("#voice-test-btn")?.addEventListener("click", () => {
+  const text = catDubToggle?.checked
+    ? "Merhaba! Ben SEKA. Bu yerel kedi dublajı denemesidir."
+    : voiceSelect?.value === "female"
+      ? "Merhaba, ben SEKA. Türkçe konuşma kalitemi yerel ses motoruyla test ediyoruz."
+      : "Merhaba. Ben SEKA. Sakin, tok ve anlaşılır Türkçe ses denemesi.";
+  speakText(text);
+});
+
+$("#voice-stop-btn")?.addEventListener("click", () => {
+  if (activeAudio) activeAudio.pause();
+  activeAudio = null;
+  if (activeAudioUrl) URL.revokeObjectURL(activeAudioUrl);
+  activeAudioUrl = null;
+  if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+});
+
+async function transcribeRecording(blob) {
+  const form = new FormData();
+  const extension = blob.type.includes("ogg") ? "ogg" : blob.type.includes("mp4") ? "m4a" : "webm";
+  form.append("file", blob, `seka-speech.${extension}`);
+  if (voiceStatus) voiceStatus.textContent = "Ses yerel modelde çözümleniyor…";
+  try {
+    const response = await fetch("/api/voice/transcribe", { method: "POST", body: form });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Yerel konuşma tanıma başarısız.");
+    chatInput.value = data.text || "";
+    chatInput.focus();
+    if (voiceStatus) voiceStatus.textContent = "Metin hazır · gönder tuşuyla onayla";
+  } catch (error) {
+    addMessage("assistant", error.message);
+    loadVoiceStatus();
+  }
+}
+
+voiceBtn?.addEventListener("click", async () => {
+  if (!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia) {
+    addMessage("assistant", "Bu tarayıcı yerel ses kaydını desteklemiyor.");
+    return;
+  }
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : "";
+    mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    recordingChunks = [];
+    mediaRecorder.addEventListener("dataavailable", (event) => {
+      if (event.data?.size) recordingChunks.push(event.data);
+    });
+    mediaRecorder.addEventListener("stop", async () => {
+      clearTimeout(recordingTimer);
+      stream.getTracks().forEach((track) => track.stop());
+      voiceBtn.classList.remove("recording");
+      voiceBtn.textContent = "🎤";
+      const blob = new Blob(recordingChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+      recordingChunks = [];
+      if (blob.size) await transcribeRecording(blob);
+    }, { once: true });
+    mediaRecorder.start();
     voiceBtn.classList.add("recording");
-    voiceBtn.textContent = "🔴";
-    recognition.start();
-  });
-} else if (voiceBtn) voiceBtn.style.display = "none";
+    voiceBtn.textContent = "⏹";
+    if (voiceStatus) voiceStatus.textContent = "Kayıt açık · en fazla 45 saniye";
+    recordingTimer = setTimeout(() => {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+    }, 45000);
+  } catch (error) {
+    addMessage("assistant", "Mikrofon izni alınamadı: " + error.message);
+  }
+});
+
+loadVoiceStatus();
 
 // SSE jobs
 function renderJobs(jobs) {
@@ -622,39 +750,77 @@ $("#gh-refresh").addEventListener("click", loadGithub);
 
 async function loadApprovals() {
   const box = $("#approvals-list");
-  const res = await fetch("/api/approvals");
-  const data = await res.json();
-  const pending = data.pending || [];
-  if (!pending.length) {
-    box.innerHTML = '<p class="empty">Bekleyen yok</p>';
-    return;
+  if (!box) return;
+  try {
+    const res = await fetch("/api/approvals");
+    const data = await res.json();
+    const actionable = data.pending || [];
+    if (!actionable.length) {
+      box.innerHTML = '<p class="empty">Bekleyen veya yürütülmeye hazır onay yok</p>';
+      return;
+    }
+    box.innerHTML = "";
+    actionable.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "approval-card";
+      const details = document.createElement("div");
+      details.className = "details";
+      const name = document.createElement("div");
+      name.className = "action-name";
+      name.textContent = item.action || "İşlem";
+      const description = document.createElement("div");
+      description.className = "approval-description";
+      description.textContent = item.details || "";
+      const state = document.createElement("div");
+      state.className = "approval-state";
+      state.textContent = "Durum: " + (item.status || "pending");
+      details.append(name, description, state);
+      const actions = document.createElement("div");
+      actions.className = "approval-actions";
+      if (item.status === "pending") {
+        const approve = document.createElement("button");
+        approve.className = "approve";
+        approve.textContent = "Onayla";
+        approve.addEventListener("click", async () => {
+          const result = await fetch(`/api/approvals/${encodeURIComponent(item.id)}/approve`, { method: "POST" });
+          if (!result.ok) addMessage("assistant", "Onay kaydedilemedi.");
+          await loadApprovals();
+        });
+        const reject = document.createElement("button");
+        reject.className = "reject";
+        reject.textContent = "Reddet";
+        reject.addEventListener("click", async () => {
+          const result = await fetch(`/api/approvals/${encodeURIComponent(item.id)}/reject`, { method: "POST" });
+          if (!result.ok) addMessage("assistant", "Reddetme işlemi kaydedilemedi.");
+          await loadApprovals();
+        });
+        actions.append(approve, reject);
+      } else if (item.status === "approved" && ["open_github_issue", "create_pull_request"].includes(item.action)) {
+        const execute = document.createElement("button");
+        execute.className = "primary";
+        execute.textContent = "Onaylı işlemi yürüt";
+        execute.addEventListener("click", async () => {
+          if (!confirm("Bu GitHub işlemi dış sistemde değişiklik yapacak. Ayrıntıları ve hedef depoyu kontrol ettin mi?")) return;
+          execute.disabled = true;
+          const result = await fetch(`/api/approvals/${encodeURIComponent(item.id)}/execute`, { method: "POST" });
+          const payload = await result.json();
+          addMessage("assistant", payload.result || payload.detail || "İşlem sonucu alınamadı.");
+          await loadApprovals();
+        });
+        actions.appendChild(execute);
+      } else if (item.status === "approved") {
+        const note = document.createElement("span");
+        note.className = "approval-note";
+        note.textContent = "Onay kaydedildi; bu işlem türü için güvenli yürütücü henüz yok.";
+        actions.appendChild(note);
+      }
+      card.append(details, actions);
+      box.appendChild(card);
+    });
+  } catch (error) {
+    box.innerHTML = '<p class="empty">Onay listesi alınamadı.</p>';
   }
-  box.innerHTML = "";
-  pending.forEach((item) => {
-    const card = document.createElement("div");
-    card.className = "approval-card";
-    card.innerHTML = `
-      <div class="details"><div class="action-name">${item.action}</div><div>${item.details}</div></div>
-      <div class="approval-actions">
-        <button class="approve" data-id="${item.id}">Onayla</button>
-        <button class="reject" data-id="${item.id}">Reddet</button>
-      </div>`;
-    box.appendChild(card);
-  });
-  box.querySelectorAll(".approve").forEach((btn) =>
-    btn.addEventListener("click", async () => {
-      await fetch(`/api/approvals/${btn.dataset.id}/approve`, { method: "POST" });
-      loadApprovals();
-    })
-  );
-  box.querySelectorAll(".reject").forEach((btn) =>
-    btn.addEventListener("click", async () => {
-      await fetch(`/api/approvals/${btn.dataset.idx}/reject`, { method: "POST" });
-      loadApprovals();
-    })
-  );
 }
-
 async function loadStatus() {
   try {
     const res = await fetch("/api/status");
