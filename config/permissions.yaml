@@ -9,7 +9,7 @@ actions:
   read_code: allowed
   run_static_analysis: allowed
   create_report: allowed
-  send_notification: allowed
+  send_notification: needs_approval
   scan_website: allowed
 
   open_github_issue: needs_approval
