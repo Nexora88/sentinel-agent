@@ -196,9 +196,9 @@ class ImageGenerator:
                 manifest = Path(handle.name)
                 for frame in frames:
                     escaped = str(frame).replace("'", "'\\''")
-                    handle.write(f"file '{escaped}'\\n")
-                    handle.write(f"duration {duration / len(frames):.4f}\\n")
-                handle.write(f"file '{str(frames[-1]).replace(chr(39), chr(39)+chr(92)+chr(39)+chr(39))}'\\n")
+                    handle.write(f"file '{escaped}'\n")
+                    handle.write(f"duration {duration / len(frames):.4f}\n")
+                handle.write(f"file '{str(frames[-1]).replace(chr(39), chr(39)+chr(92)+chr(39)+chr(39))}'\n")
             try:
                 os.chmod(manifest, 0o600)
             except OSError:
