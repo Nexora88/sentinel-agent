@@ -27,6 +27,13 @@ class ExternalFinancePrivacyTests(unittest.TestCase):
                     self.assertIsNone(engine.get_price("BTC"))
                     get.assert_not_called()
 
+    def test_website_scanning_is_disabled_without_opt_in(self):
+        from core.pipeline import SentinelPipeline
+        pipeline = object.__new__(SentinelPipeline)
+        with patch.dict(os.environ, {"ALLOW_SITE_SCANNING": "false"}):
+            result = pipeline.scan_website("https://example.com")
+        self.assertIn("varsayılan olarak kapalı", result)
+
     def test_corrupt_portfolio_fails_closed_instead_of_resetting(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "portfolio.json"
