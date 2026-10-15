@@ -27,6 +27,13 @@ services:
     networks:
       - offline_internal
     restart: unless-stopped
+
+  # Keep the optional MKAOS service on the same isolated offline-only network
+  # as the app when this overlay is used with --profile mkaos.
+  mkaos:
+    networks:
+      - offline_internal
+
 networks:
   seka_isolated:
     internal: true
