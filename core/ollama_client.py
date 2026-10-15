@@ -43,7 +43,7 @@ class OllamaClient:
         model: Optional[str] = None,
         embed_model: Optional[str] = None,
         base_url: Optional[str] = None,
-        temperature: float = 0.2,
+        temperature: Optional[float] = None,
     ):
         self.base_url = validate_local_ollama_url(base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
         self.mkaos_enabled = os.getenv("MKAOS_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
@@ -58,7 +58,16 @@ class OllamaClient:
             if self.mkaos_enabled else (model or os.getenv("OLLAMA_MODEL", "qwen2.5:7b"))
         )
         self.embed_model_name = embed_model or os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
-        self.temperature = temperature
+        # Keep legacy Ollama defaults unchanged while honoring MKAOS sampling settings
+        # when the resident Rust backend is explicitly enabled.
+        if temperature is not None:
+            self.temperature = temperature
+        elif self.mkaos_enabled:
+            self.temperature = float(os.getenv("MKAOS_TEMPERATURE", "0.15"))
+        else:
+            self.temperature = 0.2
+        self.repetition_penalty = float(os.getenv("MKAOS_REPETITION_PENALTY", "1.10"))
+        self.top_p = float(os.getenv("MKAOS_TOP_P", "0.9"))
 
         self._llm: Optional[ChatOllama] = None
         self._embeddings: Optional[OllamaEmbeddings] = None
@@ -66,11 +75,15 @@ class OllamaClient:
     @property
     def llm(self) -> ChatOllama:
         if self._llm is None:
-            self._llm = ChatOllama(
-                model=self.model_name,
-                base_url=self.chat_base_url,
-                temperature=self.temperature,
-            )
+            options = {
+                "model": self.model_name,
+                "base_url": self.chat_base_url,
+                "temperature": self.temperature,
+            }
+            if self.mkaos_enabled:
+                options["repeat_penalty"] = self.repetition_penalty
+                options["top_p"] = self.top_p
+            self._llm = ChatOllama(**options)
         return self._llm
 
     @property
