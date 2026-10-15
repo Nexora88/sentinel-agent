@@ -14,7 +14,7 @@ const bytesToB64url = (value) => {
   const bytes = new Uint8Array(value);
   let binary = "";
   bytes.forEach((b) => { binary += String.fromCharCode(b); });
-  return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 };
 function prepareCredentialOptions(publicKey, registration) {
   const options = { ...publicKey, challenge: b64urlToBytes(publicKey.challenge) };
