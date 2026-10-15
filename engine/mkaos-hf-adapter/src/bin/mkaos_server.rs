@@ -7,6 +7,7 @@ use mkaos_hf_adapter::{
 use mkaos_inference::{sampling, stacked_decoder::GqaDecoder, stacked_decoder::KvCache};
 use serde_json::{json, Value};
 use std::{
+    collections::HashMap,
     env, fs,
     io::{BufRead, BufReader, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
@@ -159,17 +160,49 @@ fn generate(
     penalty: f32,
     temperature: f32,
     top_p: f32,
-) -> Result<(String, usize, usize, u128, u128, u128), String> {
+    prefix_cache: &mut HashMap<String, KvCache>,
+) -> Result<(String, usize, usize, u128, u128, u128, bool), String> {
     let prompt_ids_u32 = tokenizer.encode_chat(messages, true).map_err(|e| e.to_string())?;
     let prompt_ids: Vec<usize> = prompt_ids_u32.iter().map(|&x| x as usize).collect();
-    let mut cache = KvCache::new(model.weights.layers.len());
     let request_start = Instant::now();
+    let mut cache = KvCache::new(model.weights.layers.len());
+    let mut prefix_len = 0usize;
+    let mut prefix_cache_hit = false;
+    let mut prefill_ns = 0u128;
+
+    // Cache only the exact leading system-message prefix. A cache hit skips its
+    // attention/MLP work; the user's current prompt and history are still evaluated.
+    if let Some(system) = messages.first().filter(|message| message.role == "system") {
+        let key = system.content.clone();
+        let prefix_ids_u32 = tokenizer.encode_chat(std::slice::from_ref(system), false)
+            .map_err(|e| e.to_string())?;
+        let prefix_ids: Vec<usize> = prefix_ids_u32.iter().map(|&x| x as usize).collect();
+        if !prefix_ids.is_empty() && prompt_ids.starts_with(&prefix_ids) && prefix_ids.len() < prompt_ids.len() {
+            if let Some(saved_cache) = prefix_cache.get(&key) {
+                cache = saved_cache.clone();
+                prefix_cache_hit = true;
+            } else {
+                let prefix_start = Instant::now();
+                model.prefill(&prefix_ids, &mut cache).map_err(|e| e.to_string())?;
+                prefill_ns += prefix_start.elapsed().as_nanos();
+                if prefix_cache.len() >= 8 {
+                    if let Some(oldest_key) = prefix_cache.keys().next().cloned() {
+                        prefix_cache.remove(&oldest_key);
+                    }
+                }
+                prefix_cache.insert(key, cache.clone());
+            }
+            prefix_len = prefix_ids.len();
+        }
+    }
+
     let prefill_start = Instant::now();
     let mut random_state = prompt_ids.iter().fold(0xcbf29ce484222325_u64,
         |state, id| (state ^ (*id as u64)).wrapping_mul(0x100000001b3));
     if random_state == 0 { random_state = 0x9e3779b97f4a7c15; }
-    let mut logits = model.prefill(&prompt_ids, &mut cache).map_err(|e| e.to_string())?;
-    let prefill_ns = prefill_start.elapsed().as_nanos();
+    let remaining = &prompt_ids[prefix_len..];
+    let mut logits = model.prefill(remaining, &mut cache).map_err(|e| e.to_string())?;
+    prefill_ns += prefill_start.elapsed().as_nanos();
     let decode_start = Instant::now();
     let mut generated = Vec::<u32>::new();
     for index in 0..max_new {
@@ -191,7 +224,7 @@ fn generate(
     let decode_ns = decode_start.elapsed().as_nanos();
     let total_ns = request_start.elapsed().as_nanos();
     let answer = tokenizer.decode(&generated, true).map_err(|e| e.to_string())?;
-    Ok((answer, prompt_ids.len(), generated.len(), prefill_ns, decode_ns, total_ns))
+    Ok((answer, prompt_ids.len(), generated.len(), prefill_ns, decode_ns, total_ns, prefix_cache_hit))
 }
 
 fn handle(
@@ -201,6 +234,7 @@ fn handle(
     eos_ids: &[u32],
     default_system: &str,
     penalty_default: f32,
+    prefix_cache: &mut HashMap<String, KvCache>,
 ) {
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(30)));
     let _ = stream.set_write_timeout(Some(std::time::Duration::from_secs(900)));
@@ -239,8 +273,8 @@ fn handle(
             }
         };
     let started = Instant::now();
-    match generate(model, tokenizer, eos_ids, &messages, max_new, penalty, temperature, top_p) {
-        Ok((answer, prompt_count, generated_count, prefill_ns, decode_ns, total_ns)) => {
+    match generate(model, tokenizer, eos_ids, &messages, max_new, penalty, temperature, top_p, prefix_cache) {
+        Ok((answer, prompt_count, generated_count, prefill_ns, decode_ns, total_ns, prefix_cache_hit)) => {
             let total_ns = total_ns.max(started.elapsed().as_nanos());
             let payload = if path == "/api/chat" {
                 json!({
@@ -252,18 +286,20 @@ fn handle(
                     "prompt_eval_count":prompt_count,
                     "prompt_eval_duration":prefill_ns,
                     "eval_count":generated_count,
-                    "eval_duration":decode_ns
+                    "eval_duration":decode_ns,
+                    "mkaos_prefix_cache_hit":prefix_cache_hit
                 })
             } else {
                 json!({
                     "model":"mkaos-local","response":answer,"done":true,
                     "total_duration":total_ns,"load_duration":0,
                     "prompt_eval_count":prompt_count,"prompt_eval_duration":prefill_ns,
-                    "eval_count":generated_count,"eval_duration":decode_ns
+                    "eval_count":generated_count,"eval_duration":decode_ns,
+                    "mkaos_prefix_cache_hit":prefix_cache_hit
                 })
             };
             let _ = send_json(&mut stream, "200 OK", payload, true);
-            eprintln!("request path={path} prompt_tokens={prompt_count} generated_tokens={generated_count} temperature={temperature:.2} top_p={top_p:.2} prefill_ms={:.2} decode_ms={:.2} total_ms={:.2}",
+            eprintln!("request path={path} prompt_tokens={prompt_count} generated_tokens={generated_count} prefix_cache_hit={prefix_cache_hit} temperature={temperature:.2} top_p={top_p:.2} prefill_ms={:.2} decode_ms={:.2} total_ms={:.2}",
                 prefill_ns as f64 / 1e6, decode_ns as f64 / 1e6, total_ns as f64 / 1e6);
         }
         Err(error) => {
@@ -306,9 +342,10 @@ fn main() {
     let penalty = repetition_penalty_from_env();
     let listener = TcpListener::bind(bind).unwrap_or_else(|error| { eprintln!("bind failed: {error}"); process::exit(1) });
     eprintln!("MKAOS resident server listening on http://{bind}; model loaded once in {:.2}s", load_start.elapsed().as_secs_f64());
+    let mut prefix_cache = HashMap::<String, KvCache>::new();
     for connection in listener.incoming() {
         match connection {
-            Ok(stream) => handle(stream, &model, &tokenizer, &eos_ids, &default_system, penalty),
+            Ok(stream) => handle(stream, &model, &tokenizer, &eos_ids, &default_system, penalty, &mut prefix_cache),
             Err(error) => eprintln!("accept failed: {error}"),
         }
     }
