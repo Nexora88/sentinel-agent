@@ -35,7 +35,7 @@ A local-first assistant and agent runtime built around local Ollama inference, e
 
 For Docker, inspect the Compose profiles and environment file before running: docker compose config, then docker compose up --build -d.
 
-Do not expose the development server directly to the public internet. Use a maintained HTTPS reverse proxy or VPN, host firewall restrictions, and a strong owner password.
+Do not expose the development server directly to the public internet. HTTPS is enforced for non-local requests by default. For reverse-proxy deployments, configure a maintained proxy and set TRUST_PROXY_HEADERS=true only when the proxy overwrites forwarded headers. Also use host firewall restrictions and a strong owner password.
 
 ## Passkeys / WebAuthn
 
@@ -44,7 +44,7 @@ Set these environment variables to match the exact HTTPS website origin:
 - WEBAUTHN_RP_ID: hostname only, for example sentinel.example.com.
 - WEBAUTHN_RP_NAME: human-readable authenticator label.
 - WEBAUTHN_ORIGIN: exact origin, including scheme and non-default port, for example https://sentinel.example.com.
-- REQUIRE_HTTPS=true: reject non-HTTPS non-local requests.
+- HTTPS is enforced by default for non-local requests; set REQUIRE_HTTPS=false only for local development. Production should keep REQUIRE_HTTPS=true.
 - TRUST_PROXY_HEADERS=true: only when a trusted reverse proxy strips incoming forwarded headers and sets its own X-Forwarded-Proto.
 
 The default origin http://localhost:8000 is for local development only. Passkey browser operations require frontend code using navigator.credentials.create() and navigator.credentials.get(); the browser UI includes passkey sign-in and a signed-in sidebar action to register a passkey. Browser compatibility and hardware-specific acceptance testing are still required.
