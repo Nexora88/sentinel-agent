@@ -77,6 +77,7 @@ class MemoryStore:
         self._search_cache = OrderedDict()
         self._search_cache_hits = 0
         self._search_cache_misses = 0
+        self._memory_generation = 0
         self.vectorstore = Chroma(
             collection_name=collection_name,
             embedding_function=embedding_function,
@@ -148,6 +149,7 @@ class MemoryStore:
         with self._lock:
             # Stable IDs prevent the same source/chunk from inflating the collection.
             self.vectorstore.add_documents(docs, ids=ids)
+            self._memory_generation = getattr(self, "_memory_generation", 0) + 1
             self._search_cache.clear()  # newly learned facts must be visible immediately
             self._prune_if_needed()
         return len(docs)
@@ -208,7 +210,8 @@ class MemoryStore:
         safe_k = max(1, min(int(k), 20))
         normalized_query = query.strip()[:4000]
         cache = getattr(self, "_search_cache", None)
-        cache_key = (getattr(self, "tenant_id", None), normalized_query.casefold(), safe_k)
+        generation = getattr(self, "_memory_generation", 0)
+        cache_key = (getattr(self, "tenant_id", None), generation, normalized_query.casefold(), safe_k)
         now = time.monotonic()
         if cache is not None:
             with self._lock:
