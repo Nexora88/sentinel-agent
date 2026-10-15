@@ -42,16 +42,20 @@ from agents.knowledge_expander import KnowledgeExpander
 from agents.night_researcher import NightResearcher
 from agents.curiosity import CuriosityEngine
 from agents.podcast_draft import PodcastDraft
+from core.tenant_storage import tenant_root
 
 logger = logging.getLogger("seka.pipeline")
 
 
 class SentinelPipeline:
-    def __init__(self):
+    def __init__(self, tenant_id: str = "owner"):
+        self.tenant_id = str(tenant_id).strip().lower()
+        self.storage_root = tenant_root("./memory/tenants", self.tenant_id)
+        self.storage_root.mkdir(parents=True, exist_ok=True)
         self.router = ModelRouter()
         self.ollama = self.router.default
-        self.memory = MemoryStore(ollama=self.ollama)
-        self.personal_memory = PersonalMemory(ollama=self.ollama)
+        self.memory = MemoryStore(ollama=self.ollama, persist_directory=str(self.storage_root / 'rag'), tenant_id=self.tenant_id)
+        self.personal_memory = PersonalMemory(ollama=self.ollama, persist_directory=str(self.storage_root / 'personal'), tenant_id=self.tenant_id)
         self.permissions = PermissionManager()
         self.git = GitTools()
         self.notifier = Notifier()
@@ -63,7 +67,7 @@ class SentinelPipeline:
         self.auto_finance = AutonomousFinance(ollama=self.ollama)
         self.image_gen = ImageGenerator()
         self.media_bridge = GenerationBridge([ImageGeneratorAdapter(self.image_gen)])
-        self.media_engine = MediaEngine(self.media_bridge)
+        self.media_engine = MediaEngine(self.media_bridge, state_path=str(self.storage_root / 'media_jobs.json'))
         self.secret_scanner = SecretScanner()
         self.doc_ingester = DocumentIngester(ollama=self.ollama, memory=self.memory)
         self.license_checker = LicenseChecker()
@@ -71,8 +75,8 @@ class SentinelPipeline:
         self.doc_assistant = DocumentAssistant(ollama=self.ollama)
         self.legacy = LegacyBackup()
         self.podcast = PodcastDraft(ollama=self.router.for_task("podcast"))
-        self.packs = KnowledgePack()
-        self.planner = ActionPlanner(ollama=self.router.for_task("plan"))
+        self.packs = KnowledgePack(universe_dir=str(self.storage_root / 'universe'), out_dir=str(self.storage_root / 'packs'))
+        self.planner = ActionPlanner(ollama=self.router.for_task("plan"), store_dir=str(self.storage_root / "plans"))
 
         self.reviewer = CodeReviewerAgent(ollama=self.ollama, memory=self.memory)
         self.security = SecurityScannerAgent(ollama=self.ollama, memory=self.memory)
@@ -80,7 +84,7 @@ class SentinelPipeline:
         self.reporter = ReporterAgent(ollama=self.ollama)
         self.debugger = DebuggerAgent(ollama=self.ollama, memory=self.memory)
 
-        self.expander = KnowledgeExpander(ollama=self.ollama, memory=self.memory)
+        self.expander = KnowledgeExpander(ollama=self.ollama, memory=self.memory, state_dir=str(self.storage_root / 'universe'))
         self.night = NightResearcher(
             ollama=self.router.for_task("night"),
             expander=self.expander,
