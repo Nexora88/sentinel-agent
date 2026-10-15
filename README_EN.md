@@ -16,6 +16,25 @@ A local-first assistant and agent runtime built around local Ollama inference, e
 - User-specific storage, local approval/audit flows, and explicit opt-in for external research or integrations.
 - WebAuthn/passkey registration and authentication endpoints, with short-lived single-use challenges and server-side public-key credential records.
 
+## Local reasoning, hardware and agent-cluster foundations
+
+- `core/reasoning_engine.py` provides a bounded local-model draft → critique → synthesis flow. It returns concise findings and uncertainty, not hidden chain-of-thought. It does not execute tools, mutate files or merge pull requests.
+- `core/hardware_backends.py` lists CPU, NVIDIA CUDA, AMD ROCm, Apple Metal, Intel Gaudi and NPU/TPU capabilities conservatively. Accelerator support remains unverified until tested on the exact hardware and runtime.
+- `core/agent_mesh.py` creates Ed25519-signed, time-limited, size-bounded task envelopes with replay protection and a narrow data-only task allowlist. It does not provide transport, encryption, discovery or remote execution. A real mesh still needs mTLS, peer enrollment, key revocation and explicit allowlists.
+- `scripts/benchmark_local_reasoning.py` runs the Turkish quality prompt set against local Ollama and saves response/latency data for manual review.
+
+Example local evaluation:
+
+```bash
+python scripts/benchmark_local_reasoning.py --model qwen2.5:7b --output memory/benchmarks/qwen25-7b.json
+```
+
+The report is not an automatic quality certification. Review outputs against the expected checks. A trained proprietary MKAOS-LLM, true MoE architecture, validated accelerator adapters, FHE and a live P2P transport are not claimed as completed by these foundations.
+
+Kubernetes starter manifests live in `deploy/kubernetes/`. They intentionally deploy a single replica: local sessions, WebAuthn challenges and the local PVC are not yet a horizontally scalable shared data plane. Pin a reviewed image digest and validate encrypted storage, ingress/TLS, CNI NetworkPolicy and mTLS before deployment.
+
+See `docs/REASONING_MESH_ACCELERATION.md` for the model-training plan, security boundaries and certification roadmap.
+
 ## Requirements
 
 - Python 3.11 or 3.12.
