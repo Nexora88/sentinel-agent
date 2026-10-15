@@ -1,6 +1,6 @@
 """
-Local Document Ingester
-Upload PDF / Markdown / TXT into the knowledge universe (RAG).
+Local Document Ingester + Belge Asistanı
+PDF / Markdown / TXT → RAG + tarih/tutar önerileri (ödeme yok).
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from typing import List, Optional
 from core.ollama_client import OllamaClient
 from core.rag import MemoryStore
 from core.safety import sanitize_web_content
+from tools.document_assistant import DocumentAssistant
 
 logger = logging.getLogger("sentinel.doc_ingester")
 
@@ -24,6 +25,7 @@ class DocumentIngester:
             persist_directory="./memory/universe_kb",
             ollama=self.ollama,
         )
+        self.assistant = DocumentAssistant(ollama=self.ollama)
 
     def _extract_text(self, path: Path) -> str:
         suffix = path.suffix.lower()
@@ -35,7 +37,7 @@ class DocumentIngester:
                 from pypdf import PdfReader
                 reader = PdfReader(str(path))
                 parts = []
-                for page in reader.pages[:50]:  # safety limit
+                for page in reader.pages[:50]:
                     t = page.extract_text() or ""
                     parts.append(t)
                 return "\n".join(parts)
@@ -48,7 +50,12 @@ class DocumentIngester:
 
         return ""
 
-    def ingest_file(self, file_path: str, source_label: Optional[str] = None) -> dict:
+    def ingest_file(
+        self,
+        file_path: str,
+        source_label: Optional[str] = None,
+        analyze: bool = True,
+    ) -> dict:
         path = Path(file_path)
         if not path.exists() or not path.is_file():
             return {"success": False, "error": f"Dosya bulunamadı: {file_path}"}
@@ -69,11 +76,24 @@ class DocumentIngester:
             }],
         )
         logger.info(f"Ingested local document: {label} ({len(text)} chars)")
+
+        analysis = None
+        analysis_report = None
+        if analyze:
+            try:
+                analysis = self.assistant.analyze_text(text)
+                analysis_report = self.assistant.format_report(analysis)
+            except Exception as e:
+                logger.warning(f"Document analysis failed: {e}")
+                analysis = {"error": str(e)}
+
         return {
             "success": True,
             "source": label,
             "chars": len(text),
             "message": f"✅ '{label}' bilgi evrenine eklendi ({len(text)} karakter)",
+            "analysis": analysis,
+            "analysis_report": analysis_report,
         }
 
     def ingest_directory(self, dir_path: str, extensions: Optional[List[str]] = None) -> dict:
@@ -85,7 +105,7 @@ class DocumentIngester:
         results = []
         for p in root.rglob("*"):
             if p.is_file() and p.suffix.lower() in extensions:
-                r = self.ingest_file(str(p))
+                r = self.ingest_file(str(p), analyze=False)
                 results.append(r)
 
         ok = sum(1 for r in results if r.get("success"))
