@@ -476,7 +476,9 @@ async def api_ingest(file: UploadFile = File(...), authorization: Optional[str] 
 
 @app.get("/api/approvals")
 async def api_approvals(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
+    if user.get("role") != "owner":
+        raise HTTPException(403, "Onay içeriği ve denetim geçmişi yalnızca sahibine açıktır.")
     permissions = get_pipeline().permissions
     return {"pending": permissions.list_actionable(), "history": permissions.list_history(30)}
 
@@ -525,7 +527,9 @@ async def api_reject(request_id: str, authorization: Optional[str] = Header(None
 
 @app.get("/api/github/repos")
 async def api_github_repos(authorization: Optional[str] = Header(None)):
-    get_user(authorization)
+    user = get_user(authorization)
+    if user.get("role") != "owner":
+        raise HTTPException(403, "GitHub depoları yalnızca sahibine açıktır.")
     p = get_pipeline()
     if not p.github.enabled:
         return {"error": "GITHUB_TOKEN yok", "repos": []}
