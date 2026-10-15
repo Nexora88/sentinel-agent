@@ -133,7 +133,7 @@ class GitHubClient:
             return self.permissions.request_approval(
                 Action.OPEN_GITHUB_ISSUE,
                 f"GitHub issue: {owner}/{repo} — {title}",
-                context={"owner": owner, "repo": repo, "title": title, "body_preview": body[:400]},
+                context={"owner": owner, "repo": repo, "title": title[:200], "body": body[:20000]},
             )
         try:
             result = self._post(f"/repos/{owner}/{repo}/issues", {"title": title, "body": body})
@@ -141,6 +141,36 @@ class GitHubClient:
         except Exception as e:
             logger.error("GitHub issue creation failed: %s", type(e).__name__)
             return "❌ Issue oluşturulamadı; hata ayrıntıları güvenlik için gizlendi."
+
+    def execute_approved_request(self, request: Dict) -> str:
+        """Execute only narrowly supported GitHub actions from a saved approval."""
+        if not self.enabled:
+            raise RuntimeError("GITHUB_TOKEN tanımlı değil; işlem yürütülmedi.")
+        action = request.get("action")
+        context = request.get("context") or {}
+        owner = str(context.get("owner", ""))
+        repo = str(context.get("repo", ""))
+        title = str(context.get("title", "")).strip()
+        if not owner.isalnum() or not repo.replace("-", "").replace("_", "").isalnum():
+            raise ValueError("GitHub depo kimliği geçersiz.")
+        if not title or len(title) > 200:
+            raise ValueError("Başlık boş veya çok uzun.")
+        if action == Action.OPEN_GITHUB_ISSUE.value:
+            body = str(context.get("body", ""))[:20000]
+            result = self._post(f"/repos/{owner}/{repo}/issues", {"title": title, "body": body})
+            return f"Issue oluşturuldu: {result.get('html_url', '')}"
+        if action == Action.CREATE_PULL_REQUEST.value:
+            head = str(context.get("head", "")).strip()
+            base = str(context.get("base", "main")).strip()
+            body = str(context.get("body", ""))[:20000]
+            if not head or not base or len(head) > 250 or len(base) > 250:
+                raise ValueError("PR dal bilgileri geçersiz.")
+            result = self._post(
+                f"/repos/{owner}/{repo}/pulls",
+                {"title": title, "head": head, "base": base, "body": body},
+            )
+            return f"PR oluşturuldu: {result.get('html_url', '')}"
+        raise ValueError("Bu işlem türü güvenli yürütücü tarafından desteklenmiyor; yalnızca onay kaydedildi.")
 
     def create_pull_request(
         self,
@@ -155,6 +185,7 @@ class GitHubClient:
             return self.permissions.request_approval(
                 Action.CREATE_PULL_REQUEST,
                 f"PR: {owner}/{repo} {head} → {base}: {title}",
+                context={"owner": owner, "repo": repo, "title": title[:200], "head": head, "base": base, "body": body[:20000]},
             )
         try:
             result = self._post(
