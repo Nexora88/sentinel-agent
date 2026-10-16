@@ -13,7 +13,7 @@ import os
 import secrets
 import hmac
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -143,7 +143,7 @@ class AuthManager:
             "salt": salt,
             "role": role,
             "display_name": display_name or username,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "active": True,
         }
         self._save()
@@ -161,7 +161,7 @@ class AuthManager:
             "username": username,
             "role": user["role"],
             "display_name": user["display_name"],
-            "expires": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+            "expires": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
         }
         return token
 
@@ -176,7 +176,7 @@ class AuthManager:
             "username": username,
             "role": user["role"],
             "display_name": user["display_name"],
-            "expires": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+            "expires": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
         }
         return token
 
@@ -186,7 +186,7 @@ class AuthManager:
         session = self.sessions.get(token)
         if not session:
             return None
-        if datetime.fromisoformat(session["expires"]) < datetime.utcnow():
+        if datetime.fromisoformat(session["expires"]) < datetime.now(timezone.utc):
             del self.sessions[token]
             return None
         return session
