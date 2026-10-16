@@ -4,9 +4,9 @@ Bu dizin, lisans/izin incelemesinden geçmiş veri sürümleri için yer tutucud
 
 ## Common Voice Türkçe — küçük, sürümlü ilk aday
 
-İlk aday olarak **Common Voice Scripted Speech v27.0 — Turkish (tr)** hedefleniyor. Common Voice sürüm kataloğu v27.0'ı Eylül 2026 sürümü olarak listeliyor; bu, Türkçe ürün sayfasının lisansını, belirli TSV dosyasını veya model ağırlıklarını dağıtma hakkını tek başına doğrulamaz. Kaynak sicili bu nedenle kapalı kalır.
+İlk aday **Common Voice Scripted Speech v27.0 — Turkish (tr)**. Mozilla Data Collective kataloğunda bu ürün CC0-1.0 olarak listeleniyor; ancak ürün kaydı veri kümesini yeniden barındırma/paylaşma yasağı da bildiriyor. Bu nedenle CC0 etiketi tek başına MKAOS model ağırlıklarını dağıtma iznini kanıtlamaz. Tam Türkçe ürün sayfası, indirme dosyası, seçilen TSV kapsamı ve ağırlık dağıtım şartları belgelenene kadar kaynak sicili kapalı kalır. [Resmî MDC kataloğu](https://mozilladatacollective.com/organization/cmfh0j9o10006ns07jq45h7xk) · [Common Voice sürüm kataloğu](https://github.com/common-voice/cv-dataset).
 
-1. Mozilla Data Collective üzerinden tam olarak Türkçe v27.0 ürün sayfasını ve şartlarını insan gözüyle doğrula. Giriş/erişim gerekirse yalnızca resmî, izinli akışı kullan.
+1. Mozilla Data Collective üzerinden tam Türkçe v27.0 ürün kaydını ve koşullarını insan gözüyle doğrula. Giriş/erişim gerekirse yalnızca resmî, izinli akışı kullan.
 2. Ham arşivi ve çıkarılan TSV'yi yalnızca yerel, erişimi kısıtlı dizine koy; Git'e yükleme. Ses dosyalarını bu metin-only denemeye alma.
 3. Arşiv ve seçilen TSV'nin SHA-256 değerlerini yerelde kaydet; TSV'nin lisans kapsamını ve ağırlık dağıtımı koşullarını belgelemeyi tamamlamadan onay verme.
 4. TSV'de `sentence` sütunu bulunan metin dosyasını seç ve ön adayları çıkar:
@@ -15,39 +15,39 @@ Bu dizin, lisans/izin incelemesinden geçmiş veri sürümleri için yer tutucud
 python tools/extract_common_voice_text.py \
   --input-tsv ./private-data/common-voice-tr-v27/validated.tsv \
   --release "Common Voice Scripted Speech v27.0 Turkish (tr)" \
-  --source-uri "https://commonvoice.mozilla.org/datasets" \
+  --source-uri "https://mozilladatacollective.com/organization/cmfh0j9o10006ns07jq45h7xk" \
   --output-jsonl ./private-data/mkaos/cv-tr-candidates.jsonl \
   --report-json ./private-data/mkaos/cv-tr-extraction-report.json
 ```
 
-`--source-uri` alanını mümkünse doğruladığın tam Türkçe ürün sayfasıyla değiştir. Araç çevrimdışıdır; dosyanın hash'ini alır, metinleri normalize ederek yinelenenleri ayıklar, cümle gruplarını deterministik biçimde geçici train/validation/test bölmelerine ayırır ve `client_id` gibi TSV alanlarını çıktıya taşımaz. Çıktıdaki `human_review: pending`, `pii_status: unknown` ve `training_allowed: false` kasıtlıdır. Bu araç hukuki/lisans onayı veya eğitim izni vermez.
+Araç çevrimdışıdır; dosyanın hash'ini alır, metinleri normalize ederek yinelenenleri ayıklar, cümle gruplarını deterministik biçimde geçici train/validation/test bölmelerine ayırır ve `client_id` gibi TSV alanlarını çıktıya taşımaz. Çıktıdaki `human_review: pending`, `pii_status: unknown` ve `training_allowed: false` kasıtlıdır. Bu araç hukuki/lisans onayı veya eğitim izni vermez.
 
 **Önemli sınırlama:** Tek bir Common Voice kaynağından gelen cümleler kaynak-bazında birbirinden ayrılamaz. Bu ön bölme yalnızca yinelenen cümle gruplarını ayırır; gerçek kaynak-disjoint değerlendirme için daha sonra bağımsız, onaylı kaynaklar ve ayrı bir Türkçe görev benchmark'ı gerekir. PII taraması da insan incelemesinin yerini tutmaz.
 
-## Dosya akışı
+## İncelenmiş JSONL'den gerçek eğitim manifestine
 
-1. Kaynak sicilindeki kaynağı ve **belirli sürümünü** incele.
-2. Lisans, atıf, izin, gizlilik ve ağırlık dağıtım koşulları belgelenmeden veriyi kabul etme.
-3. Onaylı Türkçe talimat/yanıt örneklerini UTF-8 JSONL olarak hazırla. Her örnek `source_id`, `source_uri`, `license_id`, `consent: true` ve `review_status: "approved"` alanlarını taşımalıdır.
-4. `source_id` değerini veri kümesi adına değil, bölme sızıntısını önlemek için mümkün olduğunca kaynak/doküman grubu düzeyinde ver.
-5. Bölme manifestini yerel olarak üret; raporu gözden geçir ve bağımsız test bölümünü kilitle.
-6. Eğitim başlamadan önce manifest ve veri dosyalarının SHA-256 değerlerini kaydet.
-
-Örnek komut (yerel dosya yollarını kendi onaylı veri dizinine göre değiştir):
+Ön adayları otomatik olarak onaylamayın. Yetkili insan incelemesi tamamlandıktan sonra yerel bir JSONL hazırlayın; her satır şu alanları taşımalı: `sample_id`, `text`, `source_id`, `source_uri`, `document_group`, `license_id`, `consent`, `language` (`tr`), `topic`, `split`, `human_review` (`approved`) ve `pii_status` (`cleared`). `consent`, `public_domain`, `open_license` veya `not_required` değerlerinden biri olmalı. Kaynak/belge grubu bölme sızıntısı, kopyalar ve PII sinyalleri ayrıca incelenmelidir.
 
 ```bash
-python -m tools.prepare_mkaos_training_dataset \
-  --input ./private-data/reviewed-tr.jsonl \
-  --output ./artifacts/mkaos-training-manifest.json \
-  --report ./artifacts/mkaos-training-report.json \
-  --min-examples-per-split 100
+python tools/audit_mkaos_local_corpus.py \
+  --input ./private-data/mkaos/reviewed-tr.jsonl \
+  --report ./private-data/mkaos/local-audit.json
+
+python tools/build_mkaos_training_manifest.py \
+  --input ./private-data/mkaos/reviewed-tr.jsonl \
+  --corpus-output ./private-data/mkaos/trainer-corpus.jsonl \
+  --manifest-output ./private-data/mkaos/training-manifest.json \
+  --report-output ./private-data/mkaos/manifest-report.json \
+  --dataset-id "mkaos-tr-reviewed" \
+  --revision "Common Voice Scripted Speech v27.0 Turkish; local TSV SHA256: <actual-hash>" \
+  --curator "<reviewing-person>"
 ```
 
-Komut ağ kullanmaz ve ağırlık eğitmez. Kaynak grubu bazlı bölme nedeniyle az sayıda kaynağın bulunduğu küçük veri kümesi bölme eşiğini geçemeyebilir; bu durumda kaynakları satır bazında karıştırarak sızıntı yaratma. Daha fazla bağımsız, onaylı kaynak ekle.
+`--confirm-human-license-review` yalnızca tam sürüm/dosya lisansı ve model ağırlığı dağıtım koşulları gerçekten insan tarafından incelenip belgelendiyse eklenmelidir. Bu işaret, kaynak sicili onayının yerine geçmez. Çıktılar yalnızca yeni yerel dosyalar oluşturur; mevcut dosyaların üzerine yazmaz. Gerçek SHA-256 değerini komut satırına eklemeden önce yerel rapordaki değerle karşılaştırın.
 
-**Eğitim güvenlik kapısı:** `tools/train_mkaos_from_scratch.py` artık `data/mkaos/source-register.json` dosyasını da kontrol eder. Kaynak `current_approved_sources` listesinde değilse, `status: approved`, `permitted_use_now: true`, sabitlenmiş `approved_revision`, `approval_evidence` ve `weight_distribution_review: approved` alanları yoksa eğitim başlamaz. Metadata doğrulaması tek başına hukuk onayı değildir.
+**Eğitim güvenlik kapısı:** `tools/train_mkaos_from_scratch.py` kaynak sicilini kontrol eder. Kaynak `current_approved_sources` listesinde değilse, `status: approved`, `permitted_use_now: true`, sabitlenmiş `approved_revision`, `approval_evidence` ve `weight_distribution_review: approved` alanları yoksa eğitim başlamaz. Metadata doğrulaması tek başına hukuk onayı değildir.
 
-**Mevcut durum:** Bu depoda gerçek/onaylı Türkçe korpus bulunmuyor. Yer tutucu README, örnek kayıt veya CI testi gerçek eğitim verisi değildir.
+**Mevcut durum:** Bu depoda gerçek/onaylı Türkçe korpus bulunmuyor. Araçların varlığı veya sentetik CI verisi gerçek eğitim verisi değildir. Yerel TSV dosyası ve gerçek SHA-256 değerleri bu çalışma ortamında mevcut olmadığı için burada gerçek korpus hazırlanmış, model eğitilmiş veya checkpoint üretilmiş olarak raporlanamaz.
 
 ## Yerel ön tarama (çevrimdışı)
 
@@ -55,10 +55,10 @@ Ham veri yalnızca yerel ve erişimi kısıtlı bir dizinde tutulmalıdır. Kayn
 
 ```bash
 python tools/audit_mkaos_local_corpus.py \
-  --input ./private-data/reviewed-tr.jsonl \
-  --report ./artifacts/mkaos-local-audit.json
+  --input ./private-data/mkaos/reviewed-tr.jsonl \
+  --report ./private-data/mkaos/local-audit.json
 ```
 
 Girdi JSONL satırları en az `sample_id`, `text`, `source_id`, `source_uri`, `document_group`, `license_id`, `split`, `human_review` ve `pii_status` alanlarını içermelidir. Bu komut ağ kullanmaz; kaynak dosyanın ve her metnin hash'ini, yinelenen metinleri, yaygın PII/gizli bilgi göstergelerini ve belge grubu bölme sızıntısını raporlar. Rapor ham metinleri içermez. Bir göstergenin çıkması insan incelemesi gerektirir; hiç gösterge çıkmaması da verinin temiz olduğunu kanıtlamaz.
 
-**Bağımsız test:** Eğitim aracı artık checkpoint seçimi tamamlandıktan sonra test bölümündeki byte-level kaybı bir kez ölçüp `training-report.json` içine yazar. Test kaybı checkpoint seçimi veya eğitim için kullanılmaz. Bu metrik tek başına Türkçe görev başarısı değildir; ayrıca bağımsız görev testleri ve insan değerlendirmesi gerekir.
+**Bağımsız test:** Eğitim aracı checkpoint seçimi tamamlandıktan sonra test bölümündeki byte-level kaybı bir kez ölçüp `training-report.json` içine yazar. Test kaybı checkpoint seçimi veya eğitim için kullanılmaz. Bu metrik tek başına Türkçe görev başarısı değildir; ayrıca bağımsız görev testleri ve insan değerlendirmesi gerekir.
