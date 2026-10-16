@@ -187,7 +187,7 @@ def main() -> int:
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
         # The strict governance validator is the canonical gate; no training starts on failure.
         from validate_mkaos_training_manifest import validate_manifest
-        manifest_messages = validate_manifest(manifest)
+        manifest_messages = validate_manifest(manifest, experimental_local_only=args.experimental_local_only)
         errors = [m for m in manifest_messages if not m.startswith("Metadata checks passed")]
         if errors:
             raise ValueError("Manifest validation failed:\n- " + "\n- ".join(errors))
