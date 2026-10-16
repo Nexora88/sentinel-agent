@@ -55,6 +55,10 @@ jobs:
           pip install -r requirements.txt
       - name: Compile Python modules
         run: python -m compileall -q agents core scripts tools web
+      - name: Validate MKAOS bootstrap shell syntax
+        run: bash -n scripts/mkaos_bootstrap.sh
+      - name: Test local semantic embedding integrity gate
+        run: python -m unittest discover -s tests -p test_local_semantic_embeddings.py -v
       - name: Test native MKAOS Rust inference engine and CLI
         run: cargo test --manifest-path engine/mkaos-inference/Cargo.toml --all-targets
       - name: Validate source register fail-closed policy
