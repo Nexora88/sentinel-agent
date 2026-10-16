@@ -22,8 +22,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-SOURCE_ID = "wikimedia-trwiki-pages-articles-20261001"
-RELEASE = "20261001"
+SOURCE_ID = "wikimedia-trwiki-pages-articles-20260901"
+RELEASE = "20260901"
 BASE_URL = f"https://dumps.wikimedia.org/trwiki/{RELEASE}"
 ARCHIVE_NAME = f"trwiki-{RELEASE}-pages-articles-multistream.xml.bz2"
 ARCHIVE_URL = f"{BASE_URL}/{ARCHIVE_NAME}"
@@ -277,7 +277,7 @@ def prepare(archive: Path, output_dir: Path, checksum_file: Path | None) -> dict
     }
     manifest: dict[str, Any] = {
         "schema_version": 1,
-        "dataset_id": "mkaos-trwiki-20261001-cleaned-v1",
+        "dataset_id": "mkaos-trwiki-20260901-cleaned-v1",
         "status": "prepared_pending_human_rights_privacy_and_content_review",
         "source": {
             "source_id": SOURCE_ID,
@@ -302,7 +302,7 @@ def prepare(archive: Path, output_dir: Path, checksum_file: Path | None) -> dict
             "mwparserfromhell": importlib.metadata.version("mwparserfromhell"),
             "text_normalization": "Unicode NFC; whitespace collapsed; markup stripped",
             "deduplication": "SHA-256 of NFC + whitespace-collapsed + casefolded cleaned text; exact duplicates only",
-            "split_strategy": "stable SHA-256 bucket from page ID; document-level 90/5/5; seed mkaos-20261001-document-split-v1",
+            "split_strategy": "stable SHA-256 bucket from page ID; document-level 90/5/5; seed mkaos-20260901-document-split-v1",
             "minimum_text_characters": MIN_TEXT_CHARS,
             "maximum_text_characters": MAX_TEXT_CHARS,
             "privacy_filter": (
