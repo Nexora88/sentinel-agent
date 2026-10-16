@@ -577,6 +577,7 @@ def main() -> int:
     best_val = float("inf")
     best_state = None
     history = []
+    step_history = []
     global_step = 0
     start_epoch = 0
     checkpoint_dir = args.output_dir / "trainer-checkpoints"
@@ -597,6 +598,7 @@ def main() -> int:
             best_val = float(saved["best_validation_loss"])
             best_state = saved.get("best_state")
             history = list(saved.get("history", []))
+            step_history = list(saved.get("step_history", []))
             random.setstate(saved["python_rng_state"])
             torch.set_rng_state(saved["torch_rng_state"])
             if device.type == "cuda" and saved.get("cuda_rng_state") is not None:
@@ -632,6 +634,14 @@ def main() -> int:
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad(set_to_none=True)
+                step_loss_values = train_losses[-group_size:]
+                step_history.append({
+                    "step": global_step,
+                    "epoch": epoch + 1,
+                    "train_loss": sum(step_loss_values) / len(step_loss_values),
+                    "validation_loss": None,
+                    "learning_rate": learning_rate,
+                })
         model.eval()
         val_losses = []
         with torch.no_grad():
@@ -643,6 +653,8 @@ def main() -> int:
             raise RuntimeError("No train/validation batches; increase corpus size or reduce sequence length")
         val_loss = sum(val_losses) / len(val_losses)
         history.append({"epoch": epoch + 1, "train_loss": sum(train_losses) / len(train_losses), "validation_loss": val_loss})
+        if step_history:
+            step_history[-1]["validation_loss"] = val_loss
         print(json.dumps(history[-1], ensure_ascii=False))
         if val_loss < best_val:
             best_val = val_loss
@@ -665,6 +677,7 @@ def main() -> int:
                 "best_validation_loss": best_val,
                 "best_state": best_state,
                 "history": history,
+                "step_history": step_history,
                 "python_rng_state": random.getstate(),
                 "torch_rng_state": torch.get_rng_state(),
                 "cuda_rng_state": torch.cuda.get_rng_state_all() if device.type == "cuda" else None,
@@ -775,6 +788,7 @@ def main() -> int:
         "independent_test_evaluated_after_checkpoint_selection": True,
         "test_used_for_training_or_model_selection": False,
         "history": history,
+        "step_history": step_history,
         "warning": "Experimental from-scratch checkpoint. Test loss is a byte-level next-token metric, not proof of Turkish task competence. Training completion does not certify useful Turkish capability; independent human evaluation remains required."
     }
     report_path = args.output_dir / "training-report.json"
