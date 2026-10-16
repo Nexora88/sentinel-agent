@@ -272,8 +272,11 @@ def main() -> int:
 
     train_start_count = len(range(0, len(train_ids) - args.sequence_length, args.sequence_length))
     if distributed:
-        train_start_count = math.ceil(train_start_count / world_size)
+        train_start_count = (train_start_count // (world_size * args.batch_size)) * args.batch_size
     train_batch_count = math.ceil(train_start_count / args.batch_size)
+    if train_batch_count < 1:
+        print("ERROR: training split is too small for the configured batch size and distributed world size.", file=sys.stderr)
+        return 2
     optimizer_steps_per_epoch = math.ceil(train_batch_count / args.gradient_accumulation_steps)
     total_optimizer_steps = args.epochs * optimizer_steps_per_epoch
     if args.warmup_steps > total_optimizer_steps:
@@ -472,8 +475,9 @@ def main() -> int:
         if shuffle:
             random.shuffle(starts)
         if distributed:
-            # Deterministically shard sequence windows so ranks do not duplicate training batches.
-            starts = starts[rank::world_size]
+            # Drop only the tail needed to give every rank the same number of batches.
+            usable = (len(starts) // (world_size * args.batch_size)) * world_size * args.batch_size
+            starts = starts[:usable][rank::world_size]
         for offset in range(0, len(starts), args.batch_size):
             chunk = starts[offset:offset + args.batch_size]
             if not chunk:
