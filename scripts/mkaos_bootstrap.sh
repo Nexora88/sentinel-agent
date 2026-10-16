@@ -35,36 +35,43 @@ text = path.read_text(encoding="utf-8")
 lines = text.splitlines()
 found = False
 password = ""
+created = False
 for i, line in enumerate(lines):
     if line.startswith("OWNER_PASSWORD="):
         found = True
         password = line.split("=", 1)[1].strip()
         if not password:
+            created = True
             alphabet = string.ascii_letters + string.digits + "-_"
             password = "".join(secrets.choice(alphabet) for _ in range(32))
             lines[i] = "OWNER_PASSWORD=" + password
         break
 if not found:
+    created = True
     password = "".join(secrets.choice(string.ascii_letters + string.digits + "-_") for _ in range(32))
     lines.append("OWNER_PASSWORD=" + password)
 path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 path.chmod(0o600)
-print(password)
+print(password if created else "")
 PY
 )"
 if [[ -n "$BOOTSTRAP_PASSWORD" ]]; then
-  info "OWNER_PASSWORD hazır. Yeni oluşturulduysa yalnızca bu ilk kurulum çıktısında gösteriliyor:"
+  info "Yeni OWNER_PASSWORD oluşturuldu; mevcut bir parola asla yeniden gösterilmez:"
   printf '\n  OWNER_PASSWORD=%s\n\n' "$BOOTSTRAP_PASSWORD"
   info "Parolayı parola yöneticisine kaydedin; terminal geçmişine veya ekran görüntülerine taşımayın."
 fi
 unset BOOTSTRAP_PASSWORD
+
+TMP_DOWNLOAD=""
+cleanup_download() { [[ -z "$TMP_DOWNLOAD" ]] || rm -f -- "$TMP_DOWNLOAD"; }
+trap cleanup_download EXIT
 
 download_assets() {
   [[ -f "$ASSET_LOCK" ]] || die "İndirilecek kilit dosyası yok: config/model-assets.lock. Önce her dosyanın güvenilir kaynağını ve SHA-256 değerini insan incelemesiyle doğrulayın."
   command -v curl >/dev/null 2>&1 || die "İsteğe bağlı model indirmesi için curl gerekli."
   command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1 || die "SHA-256 aracı gerekli."
 
-  local id url digest rel target tmp actual
+  local id url digest rel target actual
   while IFS=$'\t' read -r id url digest rel || [[ -n "${id:-}" ]]; do
     [[ -z "${id:-}" || "$id" == \#* ]] && continue
     [[ -n "${url:-}" && -n "${digest:-}" && -n "${rel:-}" ]] || die "Model kilit satırı eksik: id/url/sha256/path alanları gerekli."
@@ -79,15 +86,14 @@ download_assets() {
       if [[ "${actual,,}" == "${digest,,}" ]]; then info "$id zaten doğrulanmış."; continue; fi
       die "$rel mevcut ancak SHA-256 uyuşmuyor. Dosyayı elle inceleyin; otomatik üzerine yazılmadı."
     fi
-    tmp="$(mktemp "${target}.download.XXXXXX")"
-    trap 'rm -f -- "${tmp:-}"' RETURN
+    TMP_DOWNLOAD="$(mktemp "${target}.download.XXXXXX")"
     info "$id indiriliyor (HTTPS + SHA-256 doğrulaması)..."
-    curl --fail --silent --show-error --location --max-redirs 3 --proto '=https' --proto-redir '=https' "$url" -o "$tmp"
-    if command -v sha256sum >/dev/null 2>&1; then actual="$(sha256sum "$tmp" | cut -d ' ' -f1)"; else actual="$(shasum -a 256 "$tmp" | cut -d ' ' -f1)"; fi
+    curl --fail --silent --show-error --location --max-redirs 3 --proto '=https' --proto-redir '=https' "$url" -o "$TMP_DOWNLOAD"
+    if command -v sha256sum >/dev/null 2>&1; then actual="$(sha256sum "$TMP_DOWNLOAD" | cut -d ' ' -f1)"; else actual="$(shasum -a 256 "$TMP_DOWNLOAD" | cut -d ' ' -f1)"; fi
     [[ "${actual,,}" == "${digest,,}" ]] || die "$id SHA-256 doğrulaması başarısız; indirilen geçici dosya silinecek."
-    chmod 600 "$tmp"
-    mv -- "$tmp" "$target"
-    trap - RETURN
+    chmod 600 "$TMP_DOWNLOAD"
+    mv -- "$TMP_DOWNLOAD" "$target"
+    TMP_DOWNLOAD=""
     info "$id doğrulandı ve $rel konumuna yerleştirildi."
   done < "$ASSET_LOCK"
 }
