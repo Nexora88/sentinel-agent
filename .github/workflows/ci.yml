@@ -55,6 +55,10 @@ jobs:
           pip install -r requirements.txt
       - name: Compile Python modules
         run: python -m compileall -q agents core scripts tools web
+      - name: Validate MKAOS bootstrap shell syntax
+        run: bash -n scripts/mkaos_bootstrap.sh
+      - name: Test local semantic embedding integrity gate
+        run: python -m unittest discover -s tests -p test_local_semantic_embeddings.py -v
       - name: Test native MKAOS Rust inference engine and CLI
         run: cargo test --manifest-path engine/mkaos-inference/Cargo.toml --all-targets
       - name: Validate source register fail-closed policy
@@ -154,7 +158,7 @@ jobs:
           subject-path: artifacts/mkaos-sbom.cdx.json
   experimental-owned-model-smoke:
     name: Owner-approved local-only MKAOS training + Rust smoke
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'mkaos-owner-approved-local-training'
+    if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'mkaos-owner-approved-local-training' || github.event.pull_request.head.ref == 'mkaos-scale-rag-hardware')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
