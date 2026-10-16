@@ -274,6 +274,10 @@ def prepare(archive: Path, output_dir: Path, checksum_file: Path | None) -> dict
                 "reviewed_at_utc": None,
                 "notes": None,
             })
+            # Keep only the lowest ten deterministic keys per split to preserve streaming RAM bounds.
+            review_candidates[split] = sorted(
+                review_candidates[split], key=lambda item: item["selection_key"]
+            )[:10]
             output_bytes[split] += len(line)
             split_counts[split] += 1
             retained_chars += len(text)
