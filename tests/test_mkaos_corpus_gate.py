@@ -33,6 +33,17 @@ class MkaosCorpusGateTests(unittest.TestCase):
         registry["sources"][0]["weight_distribution_review"] = "pending"
         self.assertTrue(any("model-weight distribution" in e for e in validate_source_registry(sample_manifest(), registry)))
 
+    def test_duplicate_source_ids_block_ambiguous_registry(self):
+        registry = sample_registry()
+        registry["sources"].append({**registry["sources"][0], "status": "blocked"})
+        messages = validate_source_registry(sample_manifest(), registry)
+        self.assertTrue(any("duplicate source_id" in message for message in messages))
+        self.assertTrue(any("not explicitly approved" in message for message in messages))
+
+    def test_malformed_manifest_source_id_blocks_training(self):
+        messages = validate_source_registry({"records": [{"source_id": None}]}, sample_registry())
+        self.assertTrue(any("needs a non-empty source_id" in message for message in messages))
+
     def test_approved_source_passes_with_warning(self):
         messages = validate_source_registry(sample_manifest(), sample_registry())
         self.assertEqual(len(messages), 1)
