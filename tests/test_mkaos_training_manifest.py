@@ -47,6 +47,8 @@ class TrainingManifestValidationTests(unittest.TestCase):
         value["license_reviewed"] = False
         value["data_rights_mode"] = "owner_supplied_local_nonredistributable"
         value["source_kind"] = "owner_created_or_rights_cleared_local"
+        for record in value["records"]:
+            record["source_uri"] = "local://owner-created-notes"
         self.assertTrue(any("license_reviewed" in message for message in validate_manifest(value)))
         messages = validate_manifest(value, experimental_local_only=True)
         self.assertEqual(len(messages), 1)
