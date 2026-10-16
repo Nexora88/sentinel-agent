@@ -12,6 +12,8 @@ on:
     branches:
       - mkaos-wikimedia-corpus-pipeline
       - mkaos/turkish-1b-training-foundation
+      - mkaos/production-validation-gates-2026-10-16
+      - main
     paths:
       - ".github/workflows/mkaos-wikimedia-corpus.yml"
       - "scripts/mkaos/prepare_wikimedia_corpus.py"
