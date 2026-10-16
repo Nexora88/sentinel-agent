@@ -200,7 +200,7 @@ jobs:
               raise SystemExit("Persisted checkpoint SHA-256 differs from training report")
           def run_model(new_tokens):
               command = [
-                  "target/debug/mkaos-run",
+                  "engine/mkaos-inference/target/debug/mkaos-run",
                   "--checkpoint", str(checkpoint),
                   "--sha256", digest,
                   "--heads", "4", "--kv-heads", "2",
