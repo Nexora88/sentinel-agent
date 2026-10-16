@@ -14,8 +14,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt requirements-voice.txt ./
-RUN pip install --no-cache-dir -r requirements-voice.txt
+COPY requirements.txt requirements-voice.txt requirements-media.txt ./
+# Keep the default image lightweight. Optional local voice/STT and image-background
+# packages are only installed when explicitly requested at build time.
+ARG INSTALL_OPTIONAL_VOICE=false
+ARG INSTALL_OPTIONAL_MEDIA=false
+RUN if [ "$INSTALL_OPTIONAL_VOICE" = "true" ]; then \
+      pip install --no-cache-dir -r requirements-voice.txt; \
+    else \
+      pip install --no-cache-dir -r requirements.txt; \
+    fi && \
+    if [ "$INSTALL_OPTIONAL_MEDIA" = "true" ]; then \
+      pip install --no-cache-dir -r requirements-media.txt; \
+    fi
 
 COPY . .
 COPY --from=mkaos-rust-build /src/engine/mkaos-inference/target/release/mkaos-generate /usr/local/bin/mkaos-generate

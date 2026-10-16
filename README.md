@@ -2,7 +2,7 @@
 
 **Yerel Türkçe ajan işletim sistemi altyapısı.** HTTP sohbet yolu artık varsayılan olarak yerel Rust `mkaos-generate` CLI'ına gider ve onaylı yerel checkpoint yoksa açıkça `503` döndürür; üçüncü taraf SmolLM2'ye sessiz geri dönüş yapılmaz. Ancak henüz onaylı Türkçe korpus, eğitilmiş kullanılabilir MKAOS checkpoint'i veya bağımsız Türkçe kalite kanıtı yoktur. Sentetik CI eğitimi mimari/aktarım testidir; gerçek Türkçe yetenek kanıtı değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
-MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. POST /api/chat varsayılan olarak yerel Rust CLI yolunu kullanır ve model dosyası yoksa hata görünür kalır. RAG varsayılanı çevrimdışı mkaos-native sözcük/karakter n-gram taban çizgisidir. Bu eğitilmiş semantik embedding modeli değildir; eski Ollama embedding sağlayıcısı yalnızca açık opt-in ile kullanılabilir.
+MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. POST /api/chat varsayılan olarak yerel Rust CLI yolunu kullanır ve model dosyası yoksa hata görünür kalır. RAG varsayılanı çevrimdışı mkaos-native sözcük/karakter n-gram taban çizgisi ve BM25 tarzı hibrit yeniden sıralamadır. Bu, eğitilmiş semantik embedding modeli değildir; eski Ollama embedding sağlayıcısı yalnızca açık opt-in ile kullanılabilir. Yeni kapsam ve kanıt gereksinimleri: [MKAOS çevrimdışı ve akıl yürütme yol haritası](docs/MKAOS_OFFLINE_AND_REASONING_ROADMAP.md).
 
 ## Bağımsız çıkarım motoru — aşamalı geçiş
 
@@ -54,7 +54,7 @@ MKAOS, *Mustafa Kemal Atatürk Operating System* anlamıyla yerel egemenlik, bil
 ## Yerel medya stüdyosu
 
 - Görsel üretimi ve düzenleme yalnızca `SD_API_URL` ile açıkça yapılandırılmış, kendi yönettiğin Stable Diffusion WebUI API sunucusuna gider. Kamuya açık görsel API yedeği kaldırılmıştır; sunucu tanımlı değilse işlem başarısız olur ve görsel istemi dışarı gönderilmez.
-- `POST /api/media/edit` yerel `img2img` uç noktasını kullanır. `POST /api/media/background` isteğe bağlı `rembg` + önceden indirilmiş `u2net.onnx` modeliyle arka planı ayırıp yerel renk ile birleştirir. İlk çalıştırmada otomatik model indirme yapılmaz. Arka plan özelliğinin Python bağımlılığı için `pip install -r requirements-media.txt` kullan; `u2net.onnx` dosyasını güvenilir kaynaktan önceden indirip `U2NET_HOME` içine yerleştir.
+- `POST /api/media/edit` yerel `img2img` uç noktasını kullanır. `POST /api/media/background` isteğe bağlı `rembg` + önceden indirilmiş `u2net.onnx` modeliyle arka planı ayırıp yerel renk ile birleştirir. İlk çalıştırmada otomatik model indirme yapılmaz. Arka plan özelliğinin Python bağımlılığı için `pip install -r requirements-media.txt` kullan veya Docker imajını `--build-arg INSTALL_OPTIONAL_MEDIA=true` ile oluştur; `u2net.onnx` dosyasını güvenilir kaynaktan önceden indirip `U2NET_HOME` içine yerleştir.
 - `POST /api/media/video` yerel `ffmpeg` ile mevcut PNG görseline kısa hareket/zoom efekti verir. `POST /api/media/story-video` ise 2-6 sahne açıklamasından, açıkça yapılandırılmış yerel Stable Diffusion modelinde ayrı anahtar kareler üretir ve bunları yerel `ffmpeg` ile MP4 olarak birleştirir. Bu, çok sahneli AI storyboard videosudur; **nöral text-to-video modeli değildir**. İstek gövdesi: `{"prompts":["Sahne 1 açıklaması","Sahne 2 açıklaması"],"duration":8}`; süre 4-24 saniye ile sınırlandırılır. Ağ çıkışı veya bulut medya API'si yedeği yoktur.
 - Görseller 12 MB ve 20 MP sınırlarıyla doğrulanır; çıktılar yerel `memory/generated_images/` içinde tutulur. `SD_API_URL` boşsa üretim kapalıdır.
 
@@ -111,6 +111,25 @@ docker compose -f docker-compose.bootstrap.yml exec ollama-bootstrap ollama pull
 
 `internal: true` ağı, uygulama konteynerlerinin normal internet çıkışını engeller; ana bilgisayarın veya başka uygulamaların ağ erişimini kendiliğinden sınırlandırmaz. En yüksek güvence için ana bilgisayarın güvenlik duvarı kurallarını da denetle. Çevrimdışı mod, internete bağlanma kabiliyetini azaltır; ama tek başına ana bilgisayardaki her sürecin veri göndermesini engellemez.
 
+## Çevrimdışı kurulum denetimi (ağ erişimi yapmaz)
+
+İlk çalıştırmadan önce depo kökünde şu salt-okunur denetimi çalıştır:
+
+```bash
+python tools/mkaos_offline_doctor.py
+python tools/mkaos_offline_doctor.py --include-media
+```
+
+Araç model indirmez, ağ isteği yapmaz ve sır değerlerini yazdırmaz. Yerel Rust üreticisini, checkpoint dosyasını ve checkpoint SHA-256 pinini denetler. `present_hash_not_pinned` veya `missing` sonucu varsa yerel sohbetin hazır olduğu varsayılmamalıdır. Ses/Whisper dosyaları isteğe bağlıdır; `--include-media` bu varlıkları da zorunlu denetler.
+
+İlk sahip parolasını `.env` içindeki `OWNER_PASSWORD` ile kendin belirlemen önerilir. Değeri sağlamadıysan ilk çalıştırmada oluşturulan parolayı yalnızca yerel Docker terminalinde görüntüle:
+
+```bash
+docker compose exec sentinel cat /app/memory/first-run-password.txt
+```
+
+Bu parolayı sohbet mesajına, issue'ya, commit'e veya log paylaşımına yapıştırma. Kurulum denetimi parolayı okumaz veya yazdırmaz.
+
 ## Docker ilk açılış ve RAG sınırları
 
 `docker compose up --build -d` web panelini ve yerel Ollama hizmetini başlatır. `OWNER_PASSWORD` ayarlamadıysan ilk çalıştırmada rastgele parola `/app/memory/first-run-password.txt` içine yerel olarak yazılır; görmek için `docker compose exec sentinel cat /app/memory/first-run-password.txt` çalıştır. Parola uygulama günlüğüne yazılmaz. Panel sağlık denetimi Ollama modelinin hazır olmasına bağlı değildir; `/health` web sürecini, `Durum` paneli ise yerel Ollama bağlantısını ayrıca raporlar. Varsayılan `seka_isolated` ağı çalışma sırasında internet çıkışını engeller; bu yüzden model dosyaları önceden hazırlanmalıdır. Model ilk kurulumda otomatik indirilmez.
@@ -133,7 +152,7 @@ MKAOS her gece varsayılan olarak 03:00 (Europe/Istanbul) saatinde yerel bakım 
 - **Kadın sesi:** enerjik ve net profil; varsayılan Piper `tr_TR-dfki-medium`.
 - **Kedi dublajı:** yerel `ffmpeg` ile ses perdesi efekti. Modelin gerçek ses rengi, kurulu Türkçe ses paketinin kalitesine bağlıdır; yayımdan önce gerçek cihazda dinleyerek doğrula.
 - **Sesli komut:** tarayıcıdaki bulut tabanlı `SpeechRecognition` kullanılmaz. Mikrofon kaydı yalnızca yerel MKAOS sunucusuna gönderilir; çözümleme yerel faster-whisper veya whisper.cpp modeliyle yapılır. Modeller hazır değilse ses işlevi açıkça hata verir.
-- Kurulum için `pip install -r requirements-voice.txt` kullanabilir veya Docker imajında isteğe bağlı ses bağımlılıklarını kurabilirsin. Model dosyaları kaynak depoya eklenmemelidir.
+- Yerel Python ortamında `pip install -r requirements-voice.txt` kullan. Varsayılan Docker imajı daha hızlı ve daha küçük kurulum için ses/STT bağımlılıklarını kurmaz; bunları bilerek etkinleştirmek için `docker build --build-arg INSTALL_OPTIONAL_VOICE=true -t sentinel-agent:voice .` kullan. Görsel arka plan bağımlılıkları için ayrıca `--build-arg INSTALL_OPTIONAL_MEDIA=true` ekle. Model dosyaları kaynak depoya eklenmemelidir.
 
 ## Güvenli kurulum
 
