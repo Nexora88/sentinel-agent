@@ -6,13 +6,18 @@ from pathlib import Path
 
 from tools.train_mkaos_profile import load_profile
 from tools.evaluate_mkaos_answers import evaluate, read_answers, repetition_ratio
-from tools.train_mkaos_from_scratch import VOCAB_SIZE, encode_documents, estimate_parameter_count
+from tools.train_mkaos_from_scratch import VOCAB_SIZE, encode_documents, estimate_host_corpus_memory_bytes, estimate_parameter_count
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class MkaosMiniProfileTests(unittest.TestCase):
+    def test_corpus_memory_estimate_is_conservative_and_validated(self):
+        self.assertGreaterEqual(estimate_host_corpus_memory_bytes(100), 512 * 1024 * 1024)
+        with self.assertRaisesRegex(ValueError, "positive"):
+            estimate_host_corpus_memory_bytes(0)
+
     def test_byte_tokens_use_compact_uint16_storage_and_preserve_eos(self):
         tokens = encode_documents(["çığ", "MKAOS"])
         self.assertEqual(tokens.typecode, "H")
