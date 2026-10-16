@@ -412,10 +412,11 @@ def main() -> int:
             repeat = nh // nkh
             k = k.repeat_interleave(repeat, dim=1)
             v = v.repeat_interleave(repeat, dim=1)
-            scores = (q @ k.transpose(-2, -1)) / math.sqrt(hd)
-            causal = torch.triu(torch.ones(length, length, device=x.device, dtype=torch.bool), diagonal=1)
-            scores = scores.masked_fill(causal, float("-inf"))
-            attended = (scores.softmax(dim=-1) @ v).transpose(1, 2).contiguous().view(b, length, d)
+            # PyTorch SDPA can dispatch to fused/flash attention kernels on compatible
+            # CUDA/ROCm builds, avoiding the explicit quadratic score/mask tensors.
+            attended = F.scaled_dot_product_attention(
+                q, k, v, attn_mask=None, dropout_p=0.0, is_causal=True
+            ).transpose(1, 2).contiguous().view(b, length, d)
             x = residual + attended @ self.o_proj
             residual = x
             z = self.norm(x, self.post_attention_norm)
