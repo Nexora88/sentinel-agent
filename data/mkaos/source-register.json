@@ -74,5 +74,12 @@
   ],
   "current_approved_sources": [],
   "corpus_ready": false,
-  "model_training_allowed": false
+  "model_training_allowed": false,
+  "project_owner_authorization": {
+    "status": "granted_by_project_owner_in_chat",
+    "date": "2026-10-16",
+    "scope": "Proceed with preparing and evaluating Turkish-language training data from locally appropriate sources and pursue from-scratch MKAOS training when the exact data release, source rights, privacy review, and model-weight distribution terms are documented.",
+    "constraint": "This authorization expresses project-owner intent only. It does not grant rights to third-party source material, prove dataset licenses, clear personal data, or replace source-specific human/legal review.",
+    "training_gate_effect": "no_change_until_source_specific_evidence_is_recorded"
+  }
 }
