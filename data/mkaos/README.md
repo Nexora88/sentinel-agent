@@ -2,6 +2,28 @@
 
 Bu dizin, lisans/izin incelemesinden geçmiş veri sürümleri için yer tutucudur. Ham korpus, kişisel veri içerebilecek dosyalar ve büyük veri arşivleri Git'e yüklenmemelidir; yerel, erişimi kısıtlı bir çalışma alanında tutulmalıdır.
 
+## Common Voice Türkçe — küçük, sürümlü ilk aday
+
+İlk aday olarak **Common Voice Scripted Speech v27.0 — Turkish (tr)** hedefleniyor. Common Voice sürüm kataloğu v27.0'ı Eylül 2026 sürümü olarak listeliyor; bu, Türkçe ürün sayfasının lisansını, belirli TSV dosyasını veya model ağırlıklarını dağıtma hakkını tek başına doğrulamaz. Kaynak sicili bu nedenle kapalı kalır.
+
+1. Mozilla Data Collective üzerinden tam olarak Türkçe v27.0 ürün sayfasını ve şartlarını insan gözüyle doğrula. Giriş/erişim gerekirse yalnızca resmî, izinli akışı kullan.
+2. Ham arşivi ve çıkarılan TSV'yi yalnızca yerel, erişimi kısıtlı dizine koy; Git'e yükleme. Ses dosyalarını bu metin-only denemeye alma.
+3. Arşiv ve seçilen TSV'nin SHA-256 değerlerini yerelde kaydet; TSV'nin lisans kapsamını ve ağırlık dağıtımı koşullarını belgelemeyi tamamlamadan onay verme.
+4. TSV'de `sentence` sütunu bulunan metin dosyasını seç ve ön adayları çıkar:
+
+```bash
+python tools/extract_common_voice_text.py \
+  --input-tsv ./private-data/common-voice-tr-v27/validated.tsv \
+  --release "Common Voice Scripted Speech v27.0 Turkish (tr)" \
+  --source-uri "https://commonvoice.mozilla.org/datasets" \
+  --output-jsonl ./private-data/mkaos/cv-tr-candidates.jsonl \
+  --report-json ./private-data/mkaos/cv-tr-extraction-report.json
+```
+
+`--source-uri` alanını mümkünse doğruladığın tam Türkçe ürün sayfasıyla değiştir. Araç çevrimdışıdır; dosyanın hash'ini alır, metinleri normalize ederek yinelenenleri ayıklar, cümle gruplarını deterministik biçimde geçici train/validation/test bölmelerine ayırır ve `client_id` gibi TSV alanlarını çıktıya taşımaz. Çıktıdaki `human_review: pending`, `pii_status: unknown` ve `training_allowed: false` kasıtlıdır. Bu araç hukuki/lisans onayı veya eğitim izni vermez.
+
+**Önemli sınırlama:** Tek bir Common Voice kaynağından gelen cümleler kaynak-bazında birbirinden ayrılamaz. Bu ön bölme yalnızca yinelenen cümle gruplarını ayırır; gerçek kaynak-disjoint değerlendirme için daha sonra bağımsız, onaylı kaynaklar ve ayrı bir Türkçe görev benchmark'ı gerekir. PII taraması da insan incelemesinin yerini tutmaz.
+
 ## Dosya akışı
 
 1. Kaynak sicilindeki kaynağı ve **belirli sürümünü** incele.
