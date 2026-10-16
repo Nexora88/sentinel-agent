@@ -118,9 +118,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install test runner
+        run: python -m pip install pytest
       - name: Verify real ARM64 host and run portability/data-gate tests
         run: |
           python -c "import platform; print('machine=' + platform.machine()); assert platform.machine().lower() in ('aarch64', 'arm64'), platform.machine()"
-          python -m unittest discover -s tests -p test_platform_profile.py -v
-          python -m unittest discover -s tests -p test_validate_mkaos_source_register.py -v
+          python -m pytest -q tests/test_platform_profile.py tests/test_validate_mkaos_source_register.py
           python tools/validate_mkaos_source_register.py
