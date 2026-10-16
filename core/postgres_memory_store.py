@@ -110,6 +110,34 @@ class PostgresMemoryStore:
                 )
         return session_id
 
+    def list_sessions(self, tenant_id: str, limit: int = 100) -> list[dict[str, Any]]:
+        tenant = self._tenant(tenant_id)
+        if not 1 <= int(limit) <= 1000:
+            raise ValueError("limit must be between 1 and 1000.")
+        with self._tenant_transaction(tenant):
+            with self.connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT id, metadata_ciphertext, created_at, updated_at FROM mkaos_sessions "
+                    "WHERE tenant_id = %s ORDER BY updated_at DESC, id LIMIT %s",
+                    (tenant, int(limit)),
+                )
+                rows = cursor.fetchall()
+        sessions = []
+        for row in rows:
+            session_id = str(row[0])
+            metadata = {}
+            if row[1] is not None:
+                metadata = json.loads(
+                    self._decrypt(tenant, "sessions", session_id, row[1]).decode("utf-8")
+                )
+            sessions.append({
+                "id": session_id,
+                "metadata": metadata,
+                "created_at": row[2].isoformat() if row[2] else None,
+                "updated_at": row[3].isoformat() if row[3] else None,
+            })
+        return sessions
+
     def append_message(self, tenant_id: str, session_id: str, role: str, content: str) -> str:
         tenant = self._tenant(tenant_id)
         try:
