@@ -5,7 +5,7 @@ use mkaos_inference::{
     stacked_decoder::{GqaConfig, GqaDecoder},
     tokenizer::ByteTokenizer,
 };
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Instant};
 
 fn usage() {
     eprintln!("Usage: mkaos-run --checkpoint FILE --sha256 HEX --prompt TEXT [--heads N] [--kv-heads N] [--max-new-tokens N] [--max-seq-len N]");
@@ -53,6 +53,7 @@ fn run(args: &[String]) -> Result<(), String> {
     if prompt_tokens.len() >= max_sequence_len {
         return Err(format!("prompt has {} byte tokens; max sequence length is {max_sequence_len}", prompt_tokens.len()));
     }
+    let started = Instant::now();
     let result = generate_cached(
         &model,
         &prompt_tokens,
@@ -64,12 +65,15 @@ fn run(args: &[String]) -> Result<(), String> {
         Sampling::Greedy,
         &[],
     ).map_err(|e| e.to_string())?;
+    let elapsed = started.elapsed();
     let text = tokenizer.decode(&result.generated_tokens).map_err(|e| e.to_string())?;
     println!("{text}");
     eprintln!("checkpoint_sha256={}", checkpoint.sha256);
     eprintln!("prompt_byte_tokens={}", result.prompt_tokens.len());
     eprintln!("generated_tokens={}", result.generated_tokens.len());
     eprintln!("stopped_on_eos={}", result.stopped_on_eos);
+    eprintln!("elapsed_ms={}", elapsed.as_millis());
+    if elapsed.as_secs_f64() > 0.0 { eprintln!("tokens_per_second={:.3}", result.generated_tokens.len() as f64 / elapsed.as_secs_f64()); }
     eprintln!("decoder=owned-rust-gqa-kv-cache");
     Ok(())
 }
