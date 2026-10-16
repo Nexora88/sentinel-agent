@@ -1,7 +1,7 @@
 """
-Safety layer for Sentinel.
+Safety layer for MKAOS / Sentinel.
 Protects against prompt injection from scraped web content and
-blocks any attempt at arbitrary shell / destructive commands.
+blocks arbitrary shell / destructive commands.
 Also provides lightweight source credibility heuristics (not a truth oracle).
 """
 
@@ -11,7 +11,10 @@ import re
 from typing import List, Tuple
 from urllib.parse import urlparse
 
+from core.safety.command_whitelist import validate_command
+
 INJECTION_PATTERNS = [
+    # English
     r"ignore\s+(all\s+)?(previous|prior|above)\s+instructions",
     r"disregard\s+(all\s+)?(previous|prior|above)",
     r"you\s+are\s+now\s+",
@@ -33,6 +36,17 @@ INJECTION_PATTERNS = [
     r"curl\s+.*\|\s*sh",
     r"wget\s+.*\|\s*sh",
     r"base64\s+-d\s+.*\|\s*sh",
+    # Turkish
+    r"önceki\s+(tüm\s+)?talimat",
+    r"önceki\s+komutları\s+yoksay",
+    r"talimatları\s+görmezden",
+    r"şimdi\s+sen\s+bir\s+",
+    r"sistem\s+komutu\s*:",
+    r"tüm\s+dosyaları\s+sil",
+    r"kök\s+dizini\s+sil",
+    r"şifreleri\s+gönder",
+    r"api\s*anahtar",
+    r"gizli\s+anahtar",
 ]
 
 ALLOWED_ACTIONS_WHITELIST = {
@@ -46,6 +60,8 @@ ALLOWED_ACTIONS_WHITELIST = {
     "push_to_remote",
     "create_pull_request",
     "open_github_issue",
+    "generate_media",
+    "run_whitelisted_command",
 }
 
 FORBIDDEN_SHELL_PATTERNS = [
@@ -60,7 +76,6 @@ FORBIDDEN_SHELL_PATTERNS = [
     r"wget\s+.*\|\s*(ba)?sh",
 ]
 
-# Higher trust domains for research-style ingestion (heuristic only)
 HIGHER_TRUST_DOMAINS = {
     "arxiv.org",
     "pubmed.ncbi.nlm.nih.gov",
@@ -76,6 +91,9 @@ HIGHER_TRUST_DOMAINS = {
     "owasp.org",
     "nist.gov",
     "cve.mitre.org",
+    "resmigazete.gov.tr",
+    "kvkk.gov.tr",
+    "btk.gov.tr",
 }
 
 LOWER_TRUST_HINTS = [
@@ -85,6 +103,9 @@ LOWER_TRUST_HINTS = [
     r"miracle cure",
     r"100% guaranteed",
     r"secret they don't want",
+    r"kesin çözüm",
+    r"doktorlar bunu",
+    r"%100 garanti",
 ]
 
 
@@ -106,6 +127,9 @@ def contains_injection(text: str) -> bool:
 
 
 def is_forbidden_shell(cmd: str) -> bool:
+    ok, _ = validate_command(cmd)
+    if not ok:
+        return True
     for pat in FORBIDDEN_SHELL_PATTERNS:
         if re.search(pat, cmd, re.IGNORECASE):
             return True
@@ -119,9 +143,6 @@ def validate_action(action: str) -> Tuple[bool, str]:
 
 
 def source_credibility(url: str, text: str = "") -> Tuple[str, float]:
-    """
-    Return (label, score 0-1). Heuristic only — not a fact-checker.
-    """
     try:
         host = urlparse(url).netloc.lower().removeprefix("www.")
     except Exception:
@@ -129,7 +150,7 @@ def source_credibility(url: str, text: str = "") -> Tuple[str, float]:
     score = 0.45
     if any(host == d or host.endswith("." + d) for d in HIGHER_TRUST_DOMAINS):
         score = 0.8
-    if host.endswith(".gov") or host.endswith(".edu"):
+    if host.endswith(".gov") or host.endswith(".edu") or host.endswith(".gov.tr"):
         score = max(score, 0.75)
     blob = (text or "")[:2000].lower()
     for pat in LOWER_TRUST_HINTS:
@@ -140,3 +161,13 @@ def source_credibility(url: str, text: str = "") -> Tuple[str, float]:
     if score <= 0.3:
         return "lower", score
     return "medium", score
+
+
+__all__ = [
+    "sanitize_web_content",
+    "contains_injection",
+    "is_forbidden_shell",
+    "validate_action",
+    "source_credibility",
+    "validate_command",
+]
