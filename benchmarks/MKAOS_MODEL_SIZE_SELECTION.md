@@ -30,3 +30,7 @@ Do not select the final size by parameter count alone. Before spending on long t
 The source register currently has no approved sources and explicitly sets `corpus_ready=false` and `model_training_allowed=false`. No cloud GPU runner is provisioned in the repository configuration. Therefore, training must remain blocked. The existing GitHub Actions workflow expects a private self-hosted Linux x64 GPU runner and does not rent or provision a cloud GPU itself.
 
 This document is an engineering decision framework, not a claim that training or a model-size sweep has occurred.
+
+## Low-resource PC preparation
+
+For the reported older i5 computer with 8 GB RAM and 40 GB free space, follow [`docs/MKAOS_LOW_RESOURCE_PC_PREP.md`](../docs/MKAOS_LOW_RESOURCE_PC_PREP.md) before installing dependencies or staging any dataset. It prioritizes system/disk health, a small smoke test, and keeping enough free space; it does not authorize or trigger training.
