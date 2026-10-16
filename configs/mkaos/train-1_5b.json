@@ -10,7 +10,7 @@
   },
   "model": {
     "hidden_size": 2560,
-    "layers": 23,
+    "layers": 21,
     "heads": 20,
     "kv_heads": 5,
     "intermediate_size": 6912
