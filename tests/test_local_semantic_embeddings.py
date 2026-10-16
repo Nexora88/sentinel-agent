@@ -15,6 +15,7 @@ class FakeSentenceTransformer:
         self.kwargs = kwargs
 
     def encode(self, texts, **kwargs):
+        self.encode_kwargs = kwargs
         return [[3.0, 4.0] for _ in texts]
 
 
@@ -35,6 +36,8 @@ class LocalSemanticEmbeddingTests(unittest.TestCase):
             self.assertTrue(embedder.model.kwargs["local_files_only"])
             self.assertFalse(embedder.model.kwargs["trust_remote_code"])
             self.assertEqual(embedder.embed_query("Türkçe soru"), [3.0, 4.0])
+            self.assertTrue(embedder.model.encode_kwargs["normalize_embeddings"])
+            self.assertFalse(embedder.model.encode_kwargs["show_progress_bar"])
             self.assertEqual(embedder.embed_documents(["a", "b"]), [[3.0, 4.0], [3.0, 4.0]])
 
 
