@@ -79,18 +79,29 @@ download_assets() {
     [[ "$digest" =~ ^[a-fA-F0-9]{64}$ ]] || die "$id için geçerli 64 haneli SHA-256 gerekli."
     [[ "$rel" == models/* && "$rel" != *..* && "$rel" != /* ]] || die "$id yolu models/ altında güvenli bir göreli yol olmalı."
     target="$ROOT/$rel"
-    mkdir -p -- "$(dirname -- "$target")"
+    parent="$ROOT/models"
+    [[ ! -L "$parent" ]] || die "models/ sembolik bağlantısı reddedildi."
+    IFS='/' read -r -a components <<< "${rel#models/}"
+    for ((index=0; index<${#components[@]}-1; index++)); do
+      parent="$parent/${components[index]}"
+      [[ ! -L "$parent" ]] || die "Sembolik bağlantı dizini reddedildi: $parent"
+    done
+    mkdir -p "$(dirname "$target")"
     [[ ! -L "$target" ]] || die "Sembolik bağlantı hedefi reddedildi: $rel"
     if [[ -f "$target" ]]; then
       if command -v sha256sum >/dev/null 2>&1; then actual="$(sha256sum "$target" | cut -d ' ' -f1)"; else actual="$(shasum -a 256 "$target" | cut -d ' ' -f1)"; fi
-      if [[ "${actual,,}" == "${digest,,}" ]]; then info "$id zaten doğrulanmış."; continue; fi
+      actual_lower="$(printf '%s' "$actual" | tr '[:upper:]' '[:lower:]')"
+      digest_lower="$(printf '%s' "$digest" | tr '[:upper:]' '[:lower:]')"
+      if [[ "$actual_lower" == "$digest_lower" ]]; then info "$id zaten doğrulanmış."; continue; fi
       die "$rel mevcut ancak SHA-256 uyuşmuyor. Dosyayı elle inceleyin; otomatik üzerine yazılmadı."
     fi
     TMP_DOWNLOAD="$(mktemp "${target}.download.XXXXXX")"
     info "$id indiriliyor (HTTPS + SHA-256 doğrulaması)..."
     curl --fail --silent --show-error --location --max-redirs 3 --proto '=https' --proto-redir '=https' "$url" -o "$TMP_DOWNLOAD"
     if command -v sha256sum >/dev/null 2>&1; then actual="$(sha256sum "$TMP_DOWNLOAD" | cut -d ' ' -f1)"; else actual="$(shasum -a 256 "$TMP_DOWNLOAD" | cut -d ' ' -f1)"; fi
-    [[ "${actual,,}" == "${digest,,}" ]] || die "$id SHA-256 doğrulaması başarısız; indirilen geçici dosya silinecek."
+    actual_lower="$(printf '%s' "$actual" | tr '[:upper:]' '[:lower:]')"
+    digest_lower="$(printf '%s' "$digest" | tr '[:upper:]' '[:lower:]')"
+    [[ "$actual_lower" == "$digest_lower" ]] || die "$id SHA-256 doğrulaması başarısız; indirilen geçici dosya silinecek."
     chmod 600 "$TMP_DOWNLOAD"
     mv -- "$TMP_DOWNLOAD" "$target"
     TMP_DOWNLOAD=""
