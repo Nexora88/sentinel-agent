@@ -14,9 +14,9 @@ class CommonVoiceTextExtractorTests(unittest.TestCase):
 
     def test_split_is_deterministic_and_uses_three_buckets(self) -> None:
         self.assertEqual(split_for_group("12345678"), split_for_group("12345678"))
-        self.assertEqual(split_for_group("00000001"), "validation")
+        self.assertEqual(split_for_group("00000050"), "validation")
         self.assertEqual(split_for_group("00000000"), "train")
-        self.assertEqual(split_for_group("0000000a"), "test")
+        self.assertEqual(split_for_group("0000005a"), "test")
 
     def test_extracts_text_only_deduplicates_and_keeps_review_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
