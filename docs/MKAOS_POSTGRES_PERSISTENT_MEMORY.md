@@ -15,6 +15,8 @@ This migration is the first persistent-storage foundation, not a claim that the 
 
 Migration: deploy/postgres/001_mkaos_encrypted_sessions.sql
 
+Install the optional driver after the base project dependencies: `pip install -r requirements-postgres.txt`.
+
 The existing local Chroma/RAG and personal-memory stores are not automatically migrated by this SQL. A runtime adapter still needs to connect using an approved PostgreSQL driver, apply transaction-local tenant context on every operation, encrypt/decrypt payloads, handle migrations and retry/idempotency, and provide backup/restore. The embedding column is encrypted opaque data; it is not a vector index and does not make retrieval semantic by itself. A later Rust local encoder and a separately evaluated vector-index design remain required.
 
 ## Key custody
