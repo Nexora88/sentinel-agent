@@ -15,6 +15,7 @@ import math
 import random
 import struct
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,45 @@ VOCAB_SIZE = TOKENIZER_CONTRACT["vocab_size"]
 
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def estimate_parameter_count(vocab_size: int, hidden_size: int, layers: int,
+                             heads: int, kv_heads: int, intermediate_size: int) -> int:
+    """Exact parameter count for this implementation's untied GQA/SwiGLU decoder."""
+    if min(vocab_size, hidden_size, layers, heads, kv_heads, intermediate_size) < 1:
+        raise ValueError("Model dimensions must be positive")
+    if hidden_size % heads or heads % kv_heads:
+        raise ValueError("hidden_size must divide heads and heads must divide evenly by kv_heads")
+    kv_width = hidden_size // heads * kv_heads
+    per_layer = (
+        2 * hidden_size  # two RMSNorm weights
+        + hidden_size * hidden_size  # Q
+        + 2 * hidden_size * kv_width  # K and V
+        + hidden_size * hidden_size  # attention output
+        + 3 * hidden_size * intermediate_size  # SwiGLU gate, up, down
+    )
+    return vocab_size * hidden_size * 2 + layers * per_layer + hidden_size
+
+
+def estimate_training_memory_bytes(parameter_count: int, batch_size: int,
+                                   sequence_length: int, hidden_size: int,
+                                   layers: int, intermediate_size: int,
+                                   activation_bytes: int = 4) -> int:
+    """Conservative planning estimate, not a guarantee of peak allocator usage.
+
+    Parameter/gradient/AdamW-state allowance is 16 bytes per parameter. Activation
+    allowance is intentionally approximate; allocator fragmentation and attention
+    workspaces can increase the real peak.
+    """
+    if min(parameter_count, batch_size, sequence_length, hidden_size, layers,
+           intermediate_size, activation_bytes) < 1:
+        raise ValueError("Memory-estimate inputs must be positive")
+    parameter_and_optimizer = parameter_count * 16
+    activations = (
+        batch_size * sequence_length * (8 * hidden_size + 3 * intermediate_size)
+        * layers * activation_bytes
+    )
+    return parameter_and_optimizer + activations
 
 
 def read_corpus(path: Path) -> dict[str, str]:
@@ -166,6 +206,10 @@ def main() -> int:
     parser.add_argument("--warmup-steps", type=int, default=0, help="linear learning-rate warmup steps; 0 disables warmup")
     parser.add_argument("--min-learning-rate-ratio", type=float, default=0.1, help="cosine schedule floor as a fraction of --learning-rate")
     parser.add_argument("--seed", type=int, default=20261016)
+    parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto",
+                        help="Training device; auto prefers a locally available CUDA/ROCm runtime.")
+    parser.add_argument("--precision", choices=("auto", "fp32", "fp16", "bf16"), default="auto",
+                        help="Training precision; auto uses fp32 on CPU and the safest supported mixed precision on CUDA.")
     args = parser.parse_args()
 
     if min(args.epochs, args.batch_size, args.sequence_length, args.hidden_size,
@@ -239,12 +283,82 @@ def main() -> int:
 
     random.seed(args.seed)
     torch.manual_seed(args.seed)
-    if torch.cuda.is_available():
+    cuda_available = bool(torch.cuda.is_available())
+    if args.device == "cuda" and not cuda_available:
+        print("ERROR: --device cuda was requested but no compatible local CUDA/ROCm training runtime is available.", file=sys.stderr)
+        return 2
+    device = torch.device("cuda" if (args.device == "cuda" or (args.device == "auto" and cuda_available)) else "cpu")
+    if device.type == "cuda":
         torch.cuda.manual_seed_all(args.seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     d, nh, nkh = args.hidden_size, args.heads, args.kv_heads
     hd, kv_width = d // nh, d // nh * nkh
     intermediate = args.intermediate_size
+
+    if args.precision == "auto":
+        if device.type != "cuda":
+            precision = "fp32"
+        elif hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported():
+            precision = "bf16"
+        else:
+            precision = "fp16"
+    else:
+        precision = args.precision
+    if device.type != "cuda" and precision != "fp32":
+        print("ERROR: fp16/bf16 training is currently enabled only for the CUDA/ROCm training path.", file=sys.stderr)
+        return 2
+    if device.type == "cuda" and precision == "bf16" and not (
+        hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported()
+    ):
+        print("ERROR: bf16 was requested but the detected accelerator does not report bf16 support.", file=sys.stderr)
+        return 2
+
+    parameter_count = estimate_parameter_count(
+        VOCAB_SIZE, d, args.layers, nh, nkh, intermediate
+    )
+    activation_bytes = 2 if device.type == "cuda" and precision in {"fp16", "bf16"} else 4
+    estimated_memory_bytes = estimate_training_memory_bytes(
+        parameter_count, args.batch_size, args.sequence_length, d, args.layers,
+        intermediate, activation_bytes=activation_bytes
+    )
+    try:
+        if device.type == "cuda":
+            available_memory_bytes = int(torch.cuda.mem_get_info(device)[0])
+        else:
+            try:
+                import psutil
+                available_memory_bytes = int(psutil.virtual_memory().available)
+            except ImportError:
+                available_memory_bytes = 0
+    except Exception as exc:
+        print(f"ERROR: could not safely determine available memory: {type(exc).__name__}", file=sys.stderr)
+        return 2
+    if available_memory_bytes and estimated_memory_bytes > int(available_memory_bytes * 0.80):
+        print(
+            "ERROR: memory preflight blocked training before model allocation. "
+            f"Estimated requirement={estimated_memory_bytes} bytes; "
+            f"available={available_memory_bytes} bytes; policy limit=80%. "
+            "Use a smaller architecture/sequence/batch, gradient accumulation, or a larger verified machine.",
+            file=sys.stderr,
+        )
+        return 2
+
+    if device.type == "cuda":
+        backend_runtime = "rocm" if getattr(torch.version, "hip", None) else "cuda"
+        device_name = torch.cuda.get_device_name(device)
+    else:
+        backend_runtime = "cpu"
+        device_name = "CPU"
+    print(json.dumps({
+        "event": "training_preflight",
+        "device": str(device),
+        "backend_runtime": backend_runtime,
+        "device_name": device_name,
+        "precision": precision,
+        "parameter_count": parameter_count,
+        "estimated_training_memory_bytes": estimated_memory_bytes,
+        "available_memory_bytes_before_model": available_memory_bytes or None,
+        "memory_estimate_is_not_a_peak_usage_guarantee": True,
+    }, ensure_ascii=False))
 
     class MkaosLayer(nn.Module):
         def __init__(self):
@@ -330,6 +444,15 @@ def main() -> int:
 
     model = MkaosFromScratch().to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+    scaler = torch.cuda.amp.GradScaler(
+        enabled=(device.type == "cuda" and precision == "fp16")
+    )
+
+    def autocast_context():
+        if device.type != "cuda" or precision == "fp32":
+            return nullcontext()
+        dtype = torch.float16 if precision == "fp16" else torch.bfloat16
+        return torch.autocast(device_type="cuda", dtype=dtype)
     best_val = float("inf")
     best_state = None
     history = []
@@ -339,12 +462,13 @@ def main() -> int:
         train_losses = []
         optimizer.zero_grad(set_to_none=True)
         for batch_index, (xx, yy) in enumerate(batches(train_ids, True)):
-            loss = F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1))
+            with autocast_context():
+                loss = F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1))
             if not torch.isfinite(loss):
                 raise RuntimeError("Non-finite training loss; aborting without checkpoint export")
             group_start = (batch_index // args.gradient_accumulation_steps) * args.gradient_accumulation_steps
             group_size = min(args.gradient_accumulation_steps, train_batch_count - group_start)
-            (loss / group_size).backward()
+            scaler.scale(loss / group_size).backward()
             train_losses.append(float(loss.detach().cpu()))
             batch_number = batch_index + 1
             if batch_number % args.gradient_accumulation_steps == 0 or batch_number == train_batch_count:
@@ -355,14 +479,18 @@ def main() -> int:
                 )
                 for group in optimizer.param_groups:
                     group["lr"] = learning_rate
+                scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-                optimizer.step()
+                scaler.step(optimizer)
+                scaler.update()
                 optimizer.zero_grad(set_to_none=True)
         model.eval()
         val_losses = []
         with torch.no_grad():
             for xx, yy in batches(val_ids, False):
-                val_losses.append(float(F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1)).cpu()))
+                with autocast_context():
+                    val_loss_batch = F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1))
+                val_losses.append(float(val_loss_batch.cpu()))
         if not train_losses or not val_losses:
             raise RuntimeError("No train/validation batches; increase corpus size or reduce sequence length")
         val_loss = sum(val_losses) / len(val_losses)
@@ -381,7 +509,9 @@ def main() -> int:
     test_losses = []
     with torch.no_grad():
         for xx, yy in batches(test_ids, False):
-            test_losses.append(float(F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1)).cpu()))
+            with autocast_context():
+                test_loss_batch = F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1))
+            test_losses.append(float(test_loss_batch.cpu()))
     if not test_losses:
         raise RuntimeError("No independent-test batches; increase test corpus or reduce sequence length")
     independent_test_loss = sum(test_losses) / len(test_losses)
@@ -424,6 +554,12 @@ def main() -> int:
         "manifest_sha256": sha256(args.manifest.read_bytes()),
         "seed": args.seed,
         "device": str(device),
+        "backend_runtime": backend_runtime,
+        "device_name": device_name,
+        "precision": precision,
+        "parameter_count": parameter_count,
+        "estimated_training_memory_bytes": estimated_memory_bytes,
+        "available_memory_bytes_before_model": available_memory_bytes or None,
         "training_config": {
             "optimizer": "AdamW",
             "initial_learning_rate": args.learning_rate,
