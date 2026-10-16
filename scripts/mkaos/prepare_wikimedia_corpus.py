@@ -11,6 +11,7 @@ import argparse
 import bz2
 import hashlib
 import html
+import importlib.metadata
 import json
 import re
 import sys
@@ -299,7 +300,7 @@ def prepare(archive: Path, output_dir: Path, checksum_file: Path | None) -> dict
         "preparation": {
             "script": "scripts/mkaos/prepare_wikimedia_corpus.py",
             "python": sys.version.split()[0],
-            "mwparserfromhell": __import__("mwparserfromhell").__version__,
+            "mwparserfromhell": importlib.metadata.version("mwparserfromhell"),
             "text_normalization": "Unicode NFC; whitespace collapsed; markup stripped",
             "deduplication": "SHA-256 of NFC + whitespace-collapsed + casefolded cleaned text; exact duplicates only",
             "split_strategy": "stable SHA-256 bucket from page ID; document-level 90/5/5; seed mkaos-20261001-document-split-v1",
