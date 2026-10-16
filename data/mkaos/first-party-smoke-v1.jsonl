@@ -1,0 +1,12 @@
+{"sample_id":"train-001","text":"MKAOS, Türkçe metinleri bayt tabanlı bir sözleşmeyle işler. Her metin UTF-8 olarak kodlanır ve belge sonu belirteciyle ayrılır."}
+{"sample_id":"train-002","text":"Bir yazılım testi, beklenen sonucu gerçek sonuçla karşılaştırır. Fark bulunduğunda hata kaydı oluşturulur ve neden araştırılır."}
+{"sample_id":"train-003","text":"Güvenli bir veri hattı, kaynağı ve kullanım iznini kaydeder. Gizli bilgiler eğitim kümesine eklenmeden önce ayıklanır."}
+{"sample_id":"train-004","text":"Bir model rastgele başlangıçla eğitildiğinde ağırlıkları önceden eğitilmiş bir modelden alınmaz. Eğitim sonucu ölçülerek raporlanır."}
+{"sample_id":"validation-001","text":"Türkçede büyük ve küçük harf dönüşümü yapılırken I, İ, ı ve i karakterleri ayrı ayrı dikkate alınmalıdır."}
+{"sample_id":"validation-002","text":"Bağımsız doğrulama kümesi, eğitim sırasında ağırlık güncellemek için kullanılmaz. Bu ayrım ölçümün anlamını korur."}
+{"sample_id":"validation-003","text":"Bir dosyanın SHA-256 özeti, dosya içeriğindeki değişiklikleri tespit etmeye yardımcı olur. Özet tek başına lisans kanıtı değildir."}
+{"sample_id":"validation-004","text":"Yerel çalışan bir sistem, ağ bağlantısı olmadan da dosyaları okuyabilir. Ağ erişiminin kapalı olması ayrıca test edilmelidir."}
+{"sample_id":"test-001","text":"Bağımsız test kümesi eğitim ve doğrulama örneklerinden farklı belgeler içermelidir. Test sonuçları model seçimine yön vermemelidir."}
+{"sample_id":"test-002","text":"Checkpoint, ağırlıkların ve model yapısının saklandığı dosyadır. Aynı dosya Rust motorunda yüklenerek uyumluluk ölçülebilir."}
+{"sample_id":"test-003","text":"Bir deneyin raporu veri sürümünü, rastgelelik tohumunu, eğitim adımlarını ve checkpoint özetini kaydetmelidir."}
+{"sample_id":"test-004","text":"Küçük bir deney, dilin tamamını öğrenmiş bir model anlamına gelmez. Sonuçlar yalnızca ölçülen görev ve veri kapsamı için yorumlanmalıdır."}
