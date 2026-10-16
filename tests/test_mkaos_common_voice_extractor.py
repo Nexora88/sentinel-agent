@@ -59,9 +59,10 @@ class CommonVoiceTextExtractorTests(unittest.TestCase):
             self.assertFalse(report["training_allowed"])
             self.assertFalse(report["audio_read_or_copied"])
             # Duplicate normalized text retains every source label rather than silently losing provenance.
-            duplicate = next(row for row in rows if row["text_hash"] == __import__("hashlib").sha256(
-                normalize("Merhaba dünya.").encode("utf-8")
-            ).hexdigest())
+            duplicate = next(
+                row for row in rows
+                if normalize(row["text"]) == normalize("Merhaba dünya.")
+            )
             self.assertEqual(
                 duplicate["all_observed_source_labels"],
                 ["review-pending-source-A", "review-pending-source-B"],
