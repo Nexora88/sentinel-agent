@@ -271,6 +271,8 @@ def main() -> int:
         return 2
 
     train_start_count = len(range(0, len(train_ids) - args.sequence_length, args.sequence_length))
+    if distributed:
+        train_start_count = math.ceil(train_start_count / world_size)
     train_batch_count = math.ceil(train_start_count / args.batch_size)
     optimizer_steps_per_epoch = math.ceil(train_batch_count / args.gradient_accumulation_steps)
     total_optimizer_steps = args.epochs * optimizer_steps_per_epoch
@@ -302,8 +304,8 @@ def main() -> int:
         world_size = dist.get_world_size()
     else:
         rank, world_size, local_rank = 0, 1, 0
-    random.seed(args.seed + rank)
-    torch.manual_seed(args.seed + rank)
+    random.seed(args.seed)
+    torch.manual_seed(args.seed)
     cuda_available = bool(torch.cuda.is_available())
     if args.device == "cuda" and not cuda_available:
         print("ERROR: --device cuda was requested but no compatible local CUDA/ROCm training runtime is available.", file=sys.stderr)
