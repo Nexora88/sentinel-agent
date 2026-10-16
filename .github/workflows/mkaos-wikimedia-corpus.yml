@@ -81,8 +81,8 @@ jobs:
           {
             echo "# MKAOS Wikimedia corpus workflow"
             echo
-            echo "- Pinned release: `20261001`"
-            echo "- Source archive: `trwiki-20261001-pages-articles-multistream.xml.bz2`"
+            echo '- Pinned release: `20261001`'
+            echo '- Source archive: `trwiki-20261001-pages-articles-multistream.xml.bz2`'
             echo "- This workflow does not train a model or approve the source."
             echo "- Full corpus retention is disabled by default because this is a public repository and source-specific rights/privacy review is pending."
           } > data/wikimedia/report/README.md
