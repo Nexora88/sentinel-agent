@@ -57,3 +57,16 @@ Model weights and resumable checkpoints stay on the private persistent runner di
 Use the same versioned test set, prompts, decoding options, software commit, device and repeat count for baseline and new model. Preserve raw answer JSONL, evaluator output, hardware metadata, tokenizer/model hashes, and human review. Report per-category instruction-following, Turkish quality, factuality/evidence/uncertainty, repeated output, p50/p95 latency, tokens/second, and peak RAM/VRAM separately. The current lexical expected-term evaluator is only a smoke test; human factuality and evidence review is mandatory.
 
 Do not tune on the held-out test split. Fix failures on a separate development set, then rerun the unchanged test set. Do not claim speed or quality improvements without same-device measurements.
+
+
+## Fixed baseline-versus-candidate report
+
+Generate both answer JSONL files with the same exact prompts, generation settings, and hardware, then run the evaluator on each with the same dataset file:
+
+```bash
+python tools/evaluate_mkaos_answers.py --dataset benchmarks/mkaos-general-llm-tr-001.json --answers artifacts/baseline-answers.jsonl --output artifacts/baseline-report.json
+python tools/evaluate_mkaos_answers.py --dataset benchmarks/mkaos-general-llm-tr-001.json --answers artifacts/candidate-answers.jsonl --output artifacts/candidate-report.json
+python tools/compare_mkaos_evaluations.py --baseline artifacts/baseline-report.json --candidate artifacts/candidate-report.json --output artifacts/fixed-test-comparison.json
+```
+
+The evaluator records the dataset file SHA-256. The comparison tool refuses reports whose dataset hash or case IDs differ, and reports per-category deltas, improved/regressed case IDs, repeated four-gram ratio, median/p95 latency, and peak memory. This does not replace human factuality/evidence review. Use `tools/benchmark_mkaos_device.py` for same-device tokens/sec and runtime memory measurements.
