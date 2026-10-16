@@ -31,11 +31,6 @@ def _bm25_scores(query: str, documents: Sequence[Document]) -> list[float]:
 
     lengths = [len(row) for row in token_rows]
     average_length = sum(lengths) / max(1, len(lengths))
-    document_frequency = Counter(
-        term for term in query_terms
-        for present in [{token for token in row if token == term}]
-        if present
-    )
     scores = []
     for row, length in zip(token_rows, lengths):
         counts = Counter(row)
@@ -57,8 +52,8 @@ def hybrid_rerank(
     dense_documents: Sequence[Document],
     *,
     limit: int = 6,
-    dense_weight: float = 0.65,
-    lexical_weight: float = 0.35,
+    dense_weight: float = 0.55,
+    lexical_weight: float = 0.45,
 ) -> list[Document]:
     """Rerank a bounded dense candidate set; preserve stable ordering for ties."""
     if not isinstance(query, str) or not query.strip() or not dense_documents:
