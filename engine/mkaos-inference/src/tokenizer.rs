@@ -40,7 +40,7 @@ mod tests {
     fn shared_golden_vectors_match_python_contract() {
         let vectors = include_str!("../../../data/mkaos/tokenizer-golden-vectors.tsv");
         for (line_number, line) in vectors.lines().enumerate() {
-            let mut parts = line.splitn(3, '\\t');
+            let mut parts = line.splitn(3, '\t');
             let name = parts.next().expect("vector name");
             let text = parts.next().expect("vector text");
             let encoded = parts.next().expect("vector token ids");
