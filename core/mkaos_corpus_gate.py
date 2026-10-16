@@ -63,3 +63,39 @@ def validate_source_registry(manifest: Any, registry: Any) -> list[str]:
     if errors:
         return errors
     return ["Source register checks passed; this does not replace independent legal, privacy, or quality review."]
+
+
+def validate_experimental_local_manifest(manifest: Any, registry: Any) -> list[str]:
+    """Allow an owner-authorized, local-only experiment without claiming source clearance.
+
+    This path is intentionally separate from production/distribution approval. It
+    requires an explicit CLI opt-in and a manifest that declares the data is
+    owner-created or separately rights-cleared, local-only, and non-redistributable.
+    """
+    if not isinstance(manifest, dict):
+        return ["Experimental manifest must be a JSON object."]
+    if not isinstance(registry, dict):
+        return ["Source register must be a JSON object."]
+    authorization = registry.get("project_owner_authorization")
+    if not isinstance(authorization, dict) or authorization.get("status") != "granted_by_project_owner_in_chat":
+        return ["Experimental local training requires recorded project-owner authorization."]
+    if manifest.get("data_rights_mode") != "owner_supplied_local_nonredistributable":
+        return [
+            "Experimental mode requires manifest data_rights_mode="
+            "'owner_supplied_local_nonredistributable'."
+        ]
+    if manifest.get("source_kind") != "owner_created_or_rights_cleared_local":
+        return [
+            "Experimental mode requires source_kind="
+            "'owner_created_or_rights_cleared_local'; third-party candidate datasets are not accepted."
+        ]
+    records = manifest.get("records")
+    if not isinstance(records, list) or not records:
+        return ["Experimental manifest must contain records."]
+    for index, row in enumerate(records):
+        if not isinstance(row, dict) or not isinstance(row.get("source_id"), str) or not row["source_id"].strip():
+            return [f"Experimental manifest records[{index}] needs a non-empty source_id."]
+    return [
+        "Experimental local-only gate passed. This does NOT clear third-party rights, "
+        "PII/privacy, or model-weight redistribution; the resulting checkpoint must not be distributed."
+    ]
