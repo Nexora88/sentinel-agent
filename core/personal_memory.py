@@ -10,7 +10,7 @@ import json
 import logging
 import os
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -83,7 +83,7 @@ class PersonalMemory:
                 raise RuntimeError(
                     f"Local profile is unreadable; preserve and recover {self.profile_path} before restarting."
                 ) from exc
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         return {
             "name": None,
             "preferred_language": "tr",
@@ -96,7 +96,7 @@ class PersonalMemory:
         }
 
     def _save_profile(self) -> None:
-        self._profile["updated_at"] = datetime.utcnow().isoformat()
+        self._profile["updated_at"] = datetime.now(timezone.utc).isoformat()
         self.profile_path.parent.mkdir(parents=True, exist_ok=True)
         payload = json.dumps(self._profile, ensure_ascii=False, indent=2).encode("utf-8")
         if self.encrypt_profile:
@@ -152,7 +152,7 @@ class PersonalMemory:
                         "type": "fact",
                         **({"tenant_id": getattr(self, "tenant_id", None)} if getattr(self, "tenant_id", None) else {}),
                         "category": category,
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                     },
                 )
             ]
@@ -180,7 +180,7 @@ class PersonalMemory:
                         "type": "conversation",
                         **({"tenant_id": self.tenant_id} if self.tenant_id else {}),
                         "role": role,
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                     },
                 )
             ]
