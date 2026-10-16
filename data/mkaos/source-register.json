@@ -12,13 +12,17 @@
       "status": "candidate_pending_release_review",
       "permitted_use_now": false,
       "review_required": [
-        "pin exact dataset release and Turkish subset",
-        "verify license covers exact text files",
-        "record SHA-256 for each source archive/file",
-        "exclude audio unless separately licensed and reviewed",
-        "human review of content and privacy"
+        "confirm the exact Turkish v27.0 product page and download record in Mozilla Data Collective",
+        "verify the exact Turkish text TSV is covered by CC0-1.0; do not infer from a generic repository statement",
+        "download only through the official authorized dataset flow; keep the archive and text TSV outside Git",
+        "record SHA-256 for the original archive and selected TSV locally",
+        "exclude audio and speaker/client identifiers from the training corpus",
+        "run local duplicate, PII/secrets, split-leakage, and human content review",
+        "document permission to train and redistribute resulting model weights"
       ],
-      "evidence_note": "Repository-level description is not proof of the terms for every released Turkish file or any audio/derived model weights."
+      "evidence_note": "The upstream cv-dataset metadata reports Scripted Speech v27.0 as the latest release in September 2026, but the exact Turkish product page, selected text file hash, and applicable weight-distribution conditions have not been verified here. Candidate only; not training approval.",
+      "candidate_release": "Common Voice Scripted Speech v27.0 — Turkish (tr), target release only; not approved",
+      "release_verification_status": "pending_exact_Turkish_product_page_and_local_file_hashes"
     },
     {
       "source_id": "wikimedia-turkish-wikipedia",
