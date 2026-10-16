@@ -207,6 +207,10 @@ def main() -> int:
     parser.add_argument("--warmup-steps", type=int, default=0, help="linear learning-rate warmup steps; 0 disables warmup")
     parser.add_argument("--min-learning-rate-ratio", type=float, default=0.1, help="cosine schedule floor as a fraction of --learning-rate")
     parser.add_argument("--seed", type=int, default=20261016)
+    parser.add_argument("--gradient-checkpointing", action="store_true", help="Recompute decoder-layer activations during backward to reduce activation memory.")
+    parser.add_argument("--resume-from", type=Path, help="Resume from a trusted local trainer checkpoint saved at an epoch boundary.")
+    parser.add_argument("--distributed", action="store_true", help="Enable torchrun DDP when WORLD_SIZE > 1; launch with torchrun.")
+    parser.add_argument("--optimizer-state-sharding", action="store_true", help="Shard AdamW optimizer states across distributed ranks using ZeroRedundancyOptimizer.")
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto",
                         help="Training device; auto prefers a locally available CUDA/ROCm runtime.")
     parser.add_argument("--precision", choices=("auto", "fp32", "fp16", "bf16"), default="auto",
@@ -284,15 +288,30 @@ def main() -> int:
         print("ERROR: PyTorch is required for training. Install a locally approved PyTorch build; no model downloads are used.", file=sys.stderr)
         return 2
 
-    random.seed(args.seed)
-    torch.manual_seed(args.seed)
+    distributed_env_world_size = int(os.environ.get("WORLD_SIZE", "1"))
+    distributed = args.distributed and distributed_env_world_size > 1
+    if args.optimizer_state_sharding and not distributed:
+        print("ERROR: --optimizer-state-sharding requires --distributed with torchrun WORLD_SIZE > 1.", file=sys.stderr)
+        return 2
+    if distributed:
+        import torch.distributed as dist
+        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+        dist_backend = "nccl" if torch.cuda.is_available() else "gloo"
+        dist.init_process_group(backend=dist_backend, init_method="env://")
+        rank = dist.get_rank()
+        world_size = dist.get_world_size()
+    else:
+        rank, world_size, local_rank = 0, 1, 0
+    random.seed(args.seed + rank)
+    torch.manual_seed(args.seed + rank)
     cuda_available = bool(torch.cuda.is_available())
     if args.device == "cuda" and not cuda_available:
         print("ERROR: --device cuda was requested but no compatible local CUDA/ROCm training runtime is available.", file=sys.stderr)
         return 2
-    device = torch.device("cuda" if (args.device == "cuda" or (args.device == "auto" and cuda_available)) else "cpu")
+    device = torch.device("cuda", local_rank) if distributed and cuda_available else torch.device("cuda" if (args.device == "cuda" or (args.device == "auto" and cuda_available)) else "cpu")
     if device.type == "cuda":
-        torch.cuda.manual_seed_all(args.seed)
+        torch.cuda.set_device(device)
+        torch.cuda.manual_seed_all(args.seed + rank)
     d, nh, nkh = args.hidden_size, args.heads, args.kv_heads
     hd, kv_width = d // nh, d // nh * nkh
     intermediate = args.intermediate_size
@@ -438,7 +457,11 @@ def main() -> int:
         def forward(self, tokens):
             x = self.token_embedding(tokens)
             for layer in self.layers:
-                x = layer(x)
+                if args.gradient_checkpointing and self.training and torch.is_grad_enabled():
+                    from torch.utils.checkpoint import checkpoint
+                    x = checkpoint(layer, x, use_reentrant=False)
+                else:
+                    x = layer(x)
             x = x * torch.rsqrt(x.pow(2).mean(dim=-1, keepdim=True) + 1e-5) * self.final_norm
             return x @ self.lm_head
 
@@ -446,6 +469,9 @@ def main() -> int:
         starts = list(range(0, len(ids) - args.sequence_length, args.sequence_length))
         if shuffle:
             random.shuffle(starts)
+        if distributed:
+            # Deterministically shard sequence windows so ranks do not duplicate training batches.
+            starts = starts[rank::world_size]
         for offset in range(0, len(starts), args.batch_size):
             chunk = starts[offset:offset + args.batch_size]
             if not chunk:
@@ -455,7 +481,14 @@ def main() -> int:
             yield xx, yy
 
     model = MkaosFromScratch().to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+    if distributed:
+        from torch.nn.parallel import DistributedDataParallel
+        model = DistributedDataParallel(model, device_ids=[local_rank] if device.type == "cuda" else None)
+    if args.optimizer_state_sharding:
+        from torch.distributed.optim import ZeroRedundancyOptimizer
+        optimizer = ZeroRedundancyOptimizer(model.parameters(), optimizer_class=torch.optim.AdamW, lr=args.learning_rate)
+    else:
+        optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     scaler = torch.cuda.amp.GradScaler(
         enabled=(device.type == "cuda" and precision == "fp16")
     )
@@ -469,7 +502,35 @@ def main() -> int:
     best_state = None
     history = []
     global_step = 0
-    for epoch in range(args.epochs):
+    start_epoch = 0
+    checkpoint_dir = args.output_dir / "trainer-checkpoints"
+    if args.resume_from:
+        try:
+            # Checkpoints contain Python/PyTorch pickle data: resume only from a trusted local file.
+            saved = torch.load(args.resume_from, map_location="cpu", weights_only=False)
+            if saved.get("format_version") != 1 or saved.get("tokenizer_sha256") != sha256(TOKENIZER_CONTRACT_PATH.read_bytes()):
+                raise ValueError("checkpoint format or tokenizer contract mismatch")
+            expected_config = {"hidden_size": d, "layers": args.layers, "heads": nh, "kv_heads": nkh, "intermediate_size": intermediate, "sequence_length": args.sequence_length, "batch_size": args.batch_size, "gradient_accumulation_steps": args.gradient_accumulation_steps, "seed": args.seed}
+            if saved.get("training_config") != expected_config:
+                raise ValueError("resume configuration does not match checkpoint architecture/data-shaping settings")
+            model_to_save = model.module if hasattr(model, "module") else model
+            model_to_save.load_state_dict(saved["model_state"])
+            optimizer.load_state_dict(saved["optimizer_state"])
+            scaler.load_state_dict(saved.get("scaler_state", {}))
+            start_epoch = int(saved["epoch"]) + 1
+            global_step = int(saved["global_step"])
+            best_val = float(saved["best_validation_loss"])
+            best_state = saved.get("best_state")
+            history = list(saved.get("history", []))
+            random.setstate(saved["python_rng_state"])
+            torch.set_rng_state(saved["torch_rng_state"])
+            if device.type == "cuda" and saved.get("cuda_rng_state") is not None:
+                torch.cuda.set_rng_state_all(saved["cuda_rng_state"])
+            print(json.dumps({"event": "checkpoint_resumed", "epoch": start_epoch, "global_step": global_step, "path": str(args.resume_from)}))
+        except (OSError, RuntimeError, KeyError, TypeError, ValueError) as exc:
+            print(f"ERROR: could not safely resume checkpoint: {exc}", file=sys.stderr)
+            return 2
+    for epoch in range(start_epoch, args.epochs):
         model.train()
         train_losses = []
         optimizer.zero_grad(set_to_none=True)
@@ -510,10 +571,44 @@ def main() -> int:
         print(json.dumps(history[-1], ensure_ascii=False))
         if val_loss < best_val:
             best_val = val_loss
-            best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+            model_for_state = model.module if hasattr(model, "module") else model
+            best_state = {key: value.detach().cpu().clone() for key, value in model_for_state.state_dict().items()}
 
-    assert best_state is not None
-    model.load_state_dict(best_state)
+        # Epoch-boundary checkpoints include optimizer/scaler/RNG state for resumption.
+        if args.optimizer_state_sharding:
+            optimizer.consolidate_state_dict(to=0)
+        if rank == 0:
+            checkpoint_dir.mkdir(parents=True, exist_ok=True)
+            model_for_state = model.module if hasattr(model, "module") else model
+            trainer_state = {
+                "format_version": 1,
+                "epoch": epoch,
+                "global_step": global_step,
+                "model_state": model_for_state.state_dict(),
+                "optimizer_state": optimizer.state_dict(),
+                "scaler_state": scaler.state_dict(),
+                "best_validation_loss": best_val,
+                "best_state": best_state,
+                "history": history,
+                "python_rng_state": random.getstate(),
+                "torch_rng_state": torch.get_rng_state(),
+                "cuda_rng_state": torch.cuda.get_rng_state_all() if device.type == "cuda" else None,
+                "tokenizer_sha256": sha256(TOKENIZER_CONTRACT_PATH.read_bytes()),
+                "training_config": {"hidden_size": d, "layers": args.layers, "heads": nh, "kv_heads": nkh, "intermediate_size": intermediate, "sequence_length": args.sequence_length, "batch_size": args.batch_size, "gradient_accumulation_steps": args.gradient_accumulation_steps, "seed": args.seed},
+            }
+            temporary = checkpoint_dir / "latest.pt.tmp"
+            torch.save(trainer_state, temporary)
+            os.replace(temporary, checkpoint_dir / "latest.pt")
+            print(json.dumps({"event": "checkpoint_saved", "epoch": epoch + 1, "path": str(checkpoint_dir / "latest.pt"), "resumable": True}))
+        if distributed:
+            import torch.distributed as dist
+            dist.barrier()
+
+    if best_state is None:
+        print("ERROR: no training epochs ran; use --resume-from with --epochs greater than the saved epoch.", file=sys.stderr)
+        return 2
+    model_for_state = model.module if hasattr(model, "module") else model
+    model_for_state.load_state_dict(best_state)
 
     # The held-out test split is evaluated exactly once, after checkpoint selection.
     # It is never used for gradients, early stopping, or selecting the best checkpoint.
@@ -528,12 +623,13 @@ def main() -> int:
         raise RuntimeError("No independent-test batches; increase test corpus or reduce sequence length")
     independent_test_loss = sum(test_losses) / len(test_losses)
 
+    model_for_export = model.module if hasattr(model, "module") else model
     tensors: dict[str, Any] = {
-        "token_embedding.weight": model.token_embedding.weight,
-        "final_norm.weight": model.final_norm.unsqueeze(0),
-        "lm_head.weight": model.lm_head,
+        "token_embedding.weight": model_for_export.token_embedding.weight,
+        "final_norm.weight": model_for_export.final_norm.unsqueeze(0),
+        "lm_head.weight": model_for_export.lm_head,
     }
-    for i, layer in enumerate(model.layers):
+    for i, layer in enumerate(model_for_export.layers):
         prefix = f"layers.{i}."
         for name in ("q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"):
             tensors[prefix + name + ".weight"] = getattr(layer, name)
@@ -541,6 +637,12 @@ def main() -> int:
         tensors[prefix + "post_attention_norm.weight"] = layer.post_attention_norm.unsqueeze(0)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    if rank != 0:
+        if distributed:
+            import torch.distributed as dist
+            dist.barrier()
+            dist.destroy_process_group()
+        return 0
     checkpoint_path = args.output_dir / "mkaos-owned.mkaosw"
     checkpoint_hash = write_mkaos_checkpoint(checkpoint_path, tensors)
     tokenizer_bytes = TOKENIZER_CONTRACT_PATH.read_bytes()
@@ -574,7 +676,12 @@ def main() -> int:
         "available_memory_bytes_before_model": available_memory_bytes or None,
         "hardware_runtime_probe": hardware_runtime_probe,
         "training_config": {
-            "optimizer": "AdamW",
+            "optimizer": "ZeroRedundancyOptimizer(AdamW)" if args.optimizer_state_sharding else "AdamW",
+            "distributed_world_size": world_size,
+            "distributed_data_parallel": distributed,
+            "optimizer_state_sharding": args.optimizer_state_sharding,
+            "gradient_checkpointing": args.gradient_checkpointing,
+            "resume_from": str(args.resume_from) if args.resume_from else None,
             "initial_learning_rate": args.learning_rate,
             "schedule": "linear-warmup-then-cosine-decay",
             "warmup_steps": args.warmup_steps,
@@ -599,6 +706,10 @@ def main() -> int:
     print(f"Exported MKAOS-native checkpoint: {checkpoint_path}")
     print(f"SHA-256: {checkpoint_hash}")
     print("WARNING: this is a from-scratch experimental model, not a validated production assistant.")
+    if distributed:
+        import torch.distributed as dist
+        dist.barrier()
+        dist.destroy_process_group()
     return 0
 
 
