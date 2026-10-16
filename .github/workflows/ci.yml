@@ -214,7 +214,7 @@ jobs:
                   raise SystemExit("Rust inference failed: " + result.stderr[-3000:])
               values = {}
               for key in ("checkpoint_sha256", "elapsed_ms", "generated_tokens", "tokens_per_second"):
-                  match = re.search(r"^" + re.escape(key) + r"=([^\\r\\n]+)$", result.stderr, re.M)
+                  match = re.search(r"^" + re.escape(key) + r"=([^\r\n]+)$", result.stderr, re.M)
                   if match:
                       values[key] = match.group(1)
               if values.get("checkpoint_sha256") != digest:
