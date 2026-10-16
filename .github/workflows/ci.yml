@@ -36,6 +36,7 @@ jobs:
           python -m unittest discover -s tests -p test_job_bus_tenant_isolation.py -v
           python -m unittest discover -s tests -p test_offline_egress_contract.py -v
           python -m unittest discover -s tests -p test_turkish_quality_contract.py -v
+          python -m unittest discover -s tests -p test_validate_mkaos_source_register.py -v
 
   test:
     runs-on: ubuntu-latest
@@ -54,6 +55,8 @@ jobs:
           pip install -r requirements.txt
       - name: Compile Python modules
         run: python -m compileall -q agents core scripts tools web
+      - name: Validate source register fail-closed policy
+        run: python tools/validate_mkaos_source_register.py
       - name: Check frontend JavaScript syntax
         run: node --check web/static/app.js
       - name: Validate Docker Compose profiles
@@ -102,3 +105,23 @@ jobs:
               raise SystemExit("Potential hardcoded credentials found.")
           print("No likely hardcoded credentials found.")
           PY
+
+  portable-arm64:
+    name: Portable unit tests (Ubuntu ARM64, Python 3.12)
+    # GitHub-hosted ARM64 runners are available for public repositories.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test runner
+        run: python -m pip install pytest
+      - name: Verify real ARM64 host and run portability/data-gate tests
+        run: |
+          python -c "import platform; print('machine=' + platform.machine()); assert platform.machine().lower() in ('aarch64', 'arm64'), platform.machine()"
+          python -m pytest -q tests/test_platform_profile.py tests/test_validate_mkaos_source_register.py
+          python tools/validate_mkaos_source_register.py
