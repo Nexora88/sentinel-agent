@@ -22,7 +22,12 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 MAGIC = b"MKAOSW1\0"
-VOCAB_SIZE = 257  # UTF-8 bytes 0..255 plus EOS=256
+ROOT = Path(__file__).resolve().parents[1]
+TOKENIZER_CONTRACT_PATH = ROOT / "spec" / "mkaos-tokenizer-v1.json"
+TOKENIZER_CONTRACT = json.loads(TOKENIZER_CONTRACT_PATH.read_text(encoding="utf-8"))
+if TOKENIZER_CONTRACT.get("format") != "mkaos-byte-v1" or TOKENIZER_CONTRACT.get("vocab_size") != 257 or TOKENIZER_CONTRACT.get("eos_id") != 256:
+    raise RuntimeError(f"Unsupported or inconsistent shared tokenizer contract: {TOKENIZER_CONTRACT_PATH}")
+VOCAB_SIZE = TOKENIZER_CONTRACT["vocab_size"]
 
 
 def sha256(data: bytes) -> str:
@@ -388,8 +393,10 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path = args.output_dir / "mkaos-owned.mkaosw"
     checkpoint_hash = write_mkaos_checkpoint(checkpoint_path, tensors)
-    tokenizer_payload = {"format": "mkaos-byte-v1", "vocab_size": VOCAB_SIZE, "eos_id": 256, "mapping": "UTF-8 byte value -> same token ID; 256 is EOS"}
-    tokenizer_bytes = (json.dumps(tokenizer_payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+    tokenizer_bytes = TOKENIZER_CONTRACT_PATH.read_bytes()
+    tokenizer_payload = json.loads(tokenizer_bytes.decode("utf-8"))
+    if tokenizer_payload["vocab_size"] != VOCAB_SIZE or tokenizer_payload["eos_id"] != 256:
+        raise RuntimeError("Shared tokenizer contract changed during training; refusing export")
     tokenizer_path = args.output_dir / "tokenizer.json"
     tokenizer_path.write_bytes(tokenizer_bytes)
     report = {
