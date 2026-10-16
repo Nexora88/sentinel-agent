@@ -49,20 +49,30 @@ class MemoryStore:
         self.tenant_id = str(tenant_id).strip().lower() if tenant_id else None
         self.persist_directory = Path(persist_directory)
         self.persist_directory.mkdir(parents=True, exist_ok=True)
-        # Offline lexical retrieval is the default. Ollama embeddings are explicit opt-in.
+        # Native n-gram hashing is a transparent offline baseline, not semantic understanding.
+        # For semantic retrieval, opt into a pre-installed local model; downloads are disabled.
         self.embedding_provider = os.getenv("SEKA_EMBEDDINGS_PROVIDER", "mkaos-native").strip().lower()
         if self.embedding_provider == "mkaos-native":
             from core.native_embeddings import NativeHashEmbeddings
             embedding_function = NativeHashEmbeddings()
             self.ollama = ollama  # Do not construct or contact a model server in native mode.
+        elif self.embedding_provider == "local-semantic":
+            from core.local_semantic_embeddings import LocalSemanticEmbeddings
+            embedding_function = LocalSemanticEmbeddings()
+            self.ollama = ollama  # The semantic model is loaded from disk; no server is contacted.
         elif self.embedding_provider == "ollama":
             self.ollama = ollama or OllamaClient()
             embedding_function = self.ollama.embeddings
         else:
-            raise ValueError("SEKA_EMBEDDINGS_PROVIDER must be ollama or mkaos-native")
+            raise ValueError("SEKA_EMBEDDINGS_PROVIDER must be ollama, mkaos-native, or local-semantic")
         self.collection_name = collection_name
         # Never mix vectors produced by different embedding spaces, even if dimensions match.
-        provider_suffix = "_native_hash_v1" if self.embedding_provider == "mkaos-native" else "_ollama"
+        suffixes = {
+            "mkaos-native": "_native_hash_v1",
+            "local-semantic": "_local_semantic_v1",
+            "ollama": "_ollama",
+        }
+        provider_suffix = suffixes[self.embedding_provider]
         base_name = collection_name[:63 - len(provider_suffix)].rstrip("-_") or "seka"
         self.storage_collection_name = base_name + provider_suffix
         self.max_documents = _limit(max_documents, "SEKA_RAG_MAX_DOCUMENTS", 10000, 100000)
