@@ -36,9 +36,7 @@ CREATE TABLE IF NOT EXISTS mkaos_memories (
     embedding_model_id TEXT,
     source_session_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    FOREIGN KEY (tenant_id, source_session_id)
-        REFERENCES mkaos_sessions (tenant_id, id) ON DELETE SET NULL
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS mkaos_memories_tenant_updated
     ON mkaos_memories (tenant_id, updated_at DESC);
