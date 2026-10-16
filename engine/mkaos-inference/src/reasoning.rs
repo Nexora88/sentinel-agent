@@ -18,7 +18,7 @@ impl std::error::Error for ReasoningError {}
 pub fn reason(input: &str) -> Result<ReasoningResult, ReasoningError> {
     let prompt = input.trim();
     if prompt.is_empty() { return Err(ReasoningError::EmptyInput); }
-    let lower = prompt.to_lowercase();
+    let lower = normalize_statement(prompt);
 
     if let Some(value) = arithmetic(&lower) {
         return Ok(ReasoningResult {
@@ -40,7 +40,7 @@ pub fn reason(input: &str) -> Result<ReasoningResult, ReasoningError> {
         });
     }
 
-    // Minimal forward chaining: "A ise B. A" => infer B.
+    // Bounded forward chaining: derive new facts repeatedly, with cycle protection.
     let statements: Vec<String> = prompt.split(|c| c == '.' || c == '\n' || c == ';')
         .map(normalize_statement).filter(|s| !s.is_empty()).collect();
     let mut rules: Vec<(String, String)> = Vec::new();
@@ -48,19 +48,31 @@ pub fn reason(input: &str) -> Result<ReasoningResult, ReasoningError> {
     for statement in &statements {
         if let Some((left, right)) = split_rule(statement) {
             if !left.is_empty() && !right.is_empty() { rules.push((left, right)); }
-        } else { facts.push(statement.clone()); }
+        } else if !facts.contains(statement) { facts.push(statement.clone()); }
     }
-    for (antecedent, consequent) in &rules {
-        if facts.iter().any(|fact| fact == antecedent) {
-            return Ok(ReasoningResult {
-                answer: format!("Çıkarım: {consequent}."),
-                trace: vec![
-                    format!("Kural bulundu: '{antecedent}' doğruysa '{consequent}' sonucu çıkar."),
-                    format!("Verilen olgu eşleşti: '{antecedent}'."),
-                    format!("Modus ponens uygulandı; sonuç: '{consequent}'."),
-                ],
-            });
+    let mut trace = Vec::new();
+    let mut derived = Vec::new();
+    const MAX_ROUNDS: usize = 16;
+    for round in 0..MAX_ROUNDS {
+        let mut additions = Vec::new();
+        for (antecedent, consequent) in &rules {
+            if facts.iter().any(|fact| fact == antecedent)
+                && !facts.contains(consequent) && !additions.contains(consequent) {
+                additions.push(consequent.clone());
+                trace.push(format!("Adım {}: '{antecedent}' olgusundan '{consequent}' çıkarıldı.", round + 1));
+            }
         }
+        if additions.is_empty() { break; }
+        for fact in additions {
+            facts.push(fact.clone());
+            derived.push(fact);
+        }
+    }
+    if !derived.is_empty() {
+        return Ok(ReasoningResult {
+            answer: format!("Çıkarım: {}.", derived.join("; ")),
+            trace,
+        });
     }
     if lower.contains("neden") || lower.contains("nasıl") || lower.contains("düşün") || lower.contains("akıl yürüt") {
         return Ok(ReasoningResult {
@@ -74,7 +86,8 @@ pub fn reason(input: &str) -> Result<ReasoningResult, ReasoningError> {
     })
 }
 fn normalize_statement(s: &str) -> String {
-    s.trim().trim_end_matches(&['.', ',', '?', '!', ':'][..]).trim().to_lowercase()
+    s.trim().trim_end_matches(&['.', ',', '?', '!', ':'][..]).trim()
+        .replace('İ', "i").replace('I', "ı").to_lowercase()
 }
 fn split_rule(s: &str) -> Option<(String, String)> {
     let (left, right) = s.split_once(" ise ")?;
@@ -105,6 +118,14 @@ mod tests {
         assert_eq!(r.answer, "Çıkarım: yol ıslaktır."); assert_eq!(r.trace.len(), 3);
     }
     #[test] fn computes_arithmetic() { assert_eq!(reason("12 * 3").unwrap().answer, "Sonuç: 36"); }
+    #[test] fn chains_multiple_rules_and_stops_cycles() {
+        let r = reason("yağmur var ise yol ıslak. yol ıslak ise trafik yavaş. yağmur var").unwrap();
+        assert_eq!(r.answer, "Çıkarım: yol ıslak; trafik yavaş.");
+        assert_eq!(r.trace.len(), 2);
+    }
+    #[test] fn handles_turkish_dotted_and_dotless_i() {
+        assert_eq!(reason("İstanbul ise şehir. İstanbul").unwrap().answer, "Çıkarım: şehir.");
+    }
     #[test] fn rejects_empty_input() { assert_eq!(reason(" ").unwrap_err(), ReasoningError::EmptyInput); }
     #[test] fn admits_limits_instead_of_fabricating() {
         assert!(reason("Neden gökyüzü mavi?").unwrap().answer.contains("güvenilir biçimde"));
