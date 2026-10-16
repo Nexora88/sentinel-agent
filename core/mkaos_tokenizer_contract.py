@@ -46,7 +46,7 @@ def load_golden_vectors() -> list[tuple[str, str, list[int]]]:
     for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if not line or line.startswith("#"):
             continue
-        parts = line.split("\\t")
+        parts = line.split("\t")
         if len(parts) != 3:
             raise ValueError(f"{path}:{line_number}: expected name, text, token ids")
         name, text, encoded = parts
