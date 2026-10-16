@@ -1,0 +1,77 @@
+name: MKAOS PostgreSQL memory integration
+
+on:
+  pull_request:
+    paths:
+      - "core/postgres_memory_store.py"
+      - "deploy/postgres/**"
+      - "tests/test_postgres_memory_store.py"
+      - "tests/integration/test_postgres_memory_store_integration.py"
+      - ".github/workflows/mkaos-postgres-integration.yml"
+      - "requirements-postgres.txt"
+  push:
+    branches:
+      - main
+      - mkaos/production-validation-gates-2026-10-16
+    paths:
+      - "core/postgres_memory_store.py"
+      - "deploy/postgres/**"
+      - "tests/test_postgres_memory_store.py"
+      - "tests/integration/test_postgres_memory_store_integration.py"
+      - ".github/workflows/mkaos-postgres-integration.yml"
+      - "requirements-postgres.txt"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mkaos-postgres-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: mkaos_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mkaos_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGPASSWORD: postgres
+      MKAOS_TEST_POSTGRES_DSN: postgresql://mkaos_app:mkaos_ci_password@localhost:5432/mkaos_test
+      MKAOS_MEMORY_ENCRYPTION_KEY: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PostgreSQL adapter and crypto dependency
+        run: python -m pip install -r requirements-postgres.txt cryptography
+      - name: Create least-privilege app role and apply migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres@localhost:5432/mkaos_test" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE mkaos_app LOGIN PASSWORD 'mkaos_ci_password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+          SQL
+          psql "postgresql://postgres:postgres@localhost:5432/mkaos_test" -v ON_ERROR_STOP=1 -f deploy/postgres/001_mkaos_encrypted_sessions.sql
+          psql "postgresql://postgres:postgres@localhost:5432/mkaos_test" -v ON_ERROR_STOP=1 <<'SQL'
+          GRANT CONNECT ON DATABASE mkaos_test TO mkaos_app;
+          GRANT USAGE ON SCHEMA public TO mkaos_app;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON mkaos_sessions, mkaos_messages, mkaos_memories TO mkaos_app;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO mkaos_app;
+          SQL
+      - name: Run crypto contract tests
+        run: python -m unittest tests.test_postgres_memory_store -v
+      - name: Run live PostgreSQL tenant-isolation and persistence tests
+        run: python -m unittest discover -s tests/integration -p "test_postgres_memory_store_integration.py" -v
