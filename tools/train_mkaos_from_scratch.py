@@ -116,6 +116,31 @@ def write_mkaos_checkpoint(path: Path, tensors: dict[str, Any]) -> str:
     return sha256(bytes(payload))
 
 
+def learning_rate_for_step(
+    base_learning_rate: float,
+    step: int,
+    total_steps: int,
+    warmup_steps: int = 0,
+    min_learning_rate_ratio: float = 0.1,
+) -> float:
+    """Linear warmup followed by cosine decay; deterministic and independent of PyTorch."""
+    if base_learning_rate <= 0:
+        raise ValueError("base_learning_rate must be positive")
+    if total_steps < 1 or not 1 <= step <= total_steps:
+        raise ValueError("step must be in 1..total_steps")
+    if warmup_steps < 0 or warmup_steps > total_steps:
+        raise ValueError("warmup_steps must be in 0..total_steps")
+    if not 0 < min_learning_rate_ratio <= 1:
+        raise ValueError("min_learning_rate_ratio must be in (0, 1]")
+    if warmup_steps and step <= warmup_steps:
+        return base_learning_rate * step / warmup_steps
+    decay_denominator = max(1, total_steps - warmup_steps - 1)
+    progress = min(1.0, max(0.0, (step - warmup_steps - 1) / decay_denominator))
+    cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+    ratio = min_learning_rate_ratio + (1.0 - min_learning_rate_ratio) * cosine
+    return base_learning_rate * ratio
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--corpus", required=True, type=Path, help="Approved local JSONL text corpus")
@@ -131,12 +156,20 @@ def main() -> int:
     parser.add_argument("--kv-heads", type=int, default=2)
     parser.add_argument("--intermediate-size", type=int, default=128)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
+    parser.add_argument("--gradient-accumulation-steps", type=int, default=1, help="micro-batches per optimizer step; lowers activation memory")
+    parser.add_argument("--warmup-steps", type=int, default=0, help="linear learning-rate warmup steps; 0 disables warmup")
+    parser.add_argument("--min-learning-rate-ratio", type=float, default=0.1, help="cosine schedule floor as a fraction of --learning-rate")
     parser.add_argument("--seed", type=int, default=20261016)
     args = parser.parse_args()
 
     if min(args.epochs, args.batch_size, args.sequence_length, args.hidden_size,
-           args.layers, args.heads, args.kv_heads, args.intermediate_size) < 1:
-        parser.error("sizes, epochs and batch size must be positive")
+           args.layers, args.heads, args.kv_heads, args.intermediate_size,
+           args.gradient_accumulation_steps) < 1:
+        parser.error("sizes, epochs, batch size and gradient accumulation must be positive")
+    if args.warmup_steps < 0:
+        parser.error("warmup-steps cannot be negative")
+    if not (0 < args.min_learning_rate_ratio <= 1):
+        parser.error("min-learning-rate-ratio must be in (0, 1]")
     if args.hidden_size % args.heads or args.heads % args.kv_heads:
         parser.error("hidden-size must divide heads, and heads must divide evenly by kv-heads")
     if (args.hidden_size // args.heads) % 2:
@@ -173,6 +206,14 @@ def main() -> int:
         return 2
     if len(test_ids) < args.sequence_length + 1:
         print("ERROR: independent test data needs at least sequence-length + 1 byte tokens", file=sys.stderr)
+        return 2
+
+    train_start_count = len(range(0, len(train_ids) - args.sequence_length, args.sequence_length))
+    train_batch_count = math.ceil(train_start_count / args.batch_size)
+    optimizer_steps_per_epoch = math.ceil(train_batch_count / args.gradient_accumulation_steps)
+    total_optimizer_steps = args.epochs * optimizer_steps_per_epoch
+    if args.warmup_steps > total_optimizer_steps:
+        print("ERROR: warmup-steps cannot exceed the total optimizer-step count", file=sys.stderr)
         return 2
 
     try:
@@ -279,18 +320,31 @@ def main() -> int:
     best_val = float("inf")
     best_state = None
     history = []
+    global_step = 0
     for epoch in range(args.epochs):
         model.train()
         train_losses = []
-        for xx, yy in batches(train_ids, True):
-            optimizer.zero_grad(set_to_none=True)
+        optimizer.zero_grad(set_to_none=True)
+        for batch_index, (xx, yy) in enumerate(batches(train_ids, True)):
             loss = F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1))
             if not torch.isfinite(loss):
                 raise RuntimeError("Non-finite training loss; aborting without checkpoint export")
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            optimizer.step()
+            group_start = (batch_index // args.gradient_accumulation_steps) * args.gradient_accumulation_steps
+            group_size = min(args.gradient_accumulation_steps, train_batch_count - group_start)
+            (loss / group_size).backward()
             train_losses.append(float(loss.detach().cpu()))
+            batch_number = batch_index + 1
+            if batch_number % args.gradient_accumulation_steps == 0 or batch_number == train_batch_count:
+                global_step += 1
+                learning_rate = learning_rate_for_step(
+                    args.learning_rate, global_step, total_optimizer_steps,
+                    args.warmup_steps, args.min_learning_rate_ratio,
+                )
+                for group in optimizer.param_groups:
+                    group["lr"] = learning_rate
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                optimizer.step()
+                optimizer.zero_grad(set_to_none=True)
         model.eval()
         val_losses = []
         with torch.no_grad():
@@ -353,6 +407,18 @@ def main() -> int:
         "manifest_sha256": sha256(args.manifest.read_bytes()),
         "seed": args.seed,
         "device": str(device),
+        "training_config": {
+            "optimizer": "AdamW",
+            "initial_learning_rate": args.learning_rate,
+            "schedule": "linear-warmup-then-cosine-decay",
+            "warmup_steps": args.warmup_steps,
+            "min_learning_rate_ratio": args.min_learning_rate_ratio,
+            "micro_batch_size": args.batch_size,
+            "gradient_accumulation_steps": args.gradient_accumulation_steps,
+            "effective_batch_size": args.batch_size * args.gradient_accumulation_steps,
+            "total_optimizer_steps": total_optimizer_steps,
+            "gradient_clipping_max_norm": 1.0,
+        },
         "split_sample_counts": {name: len(values) for name, values in splits.items()},
         "split_utf8_bytes": {name: sum(len(value.encode("utf-8")) for value in values) for name, values in splits.items()},
         "best_validation_loss": best_val,
