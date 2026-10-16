@@ -26,3 +26,8 @@ Generation sürücüsü EOS ve durdurma dizilerini destekler; ancak her token i�
 cargo test --manifest-path engine/mkaos-inference/Cargo.toml
 
 Rust testleri CI çalışması doğrulanmadan başarılı sayılmaz. Sentetik testler model kalitesi kanıtı değildir. Ollama, gerçek model ve aynı prompt kümesindeki kalite/kararlılık/RAM/gecikme ölçümleri yeterli olana kadar korunur.
+
+
+## Yerel sembolik akıl yürütme başlangıcı
+
+`mkaos-reason` ayrı bir çevrimdışı komuttur. Temel aritmetik ve açık kurallarla tek adımlı çıkarım yapar; eğitilmiş LLM değildir. Çalıştırma örnekleri, kapsam ve gizlilik sınırları için [LOCAL_REASONING.md](LOCAL_REASONING.md) dosyasına bakın.

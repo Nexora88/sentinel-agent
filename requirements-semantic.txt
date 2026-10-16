@@ -1,0 +1,4 @@
+# Optional dependency for offline semantic retrieval.
+# Install only when using SEKA_EMBEDDINGS_PROVIDER=local-semantic.
+# Model weights must already exist locally; runtime downloads are disabled.
+sentence-transformers>=3.0.0

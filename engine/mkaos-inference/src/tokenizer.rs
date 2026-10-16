@@ -1,5 +1,5 @@
-//! Dependency-free UTF-8 byte tokenizer for tiny byte-level models and loader tests.
-//! This is NOT compatible with SentencePiece/BPE tokenizers used by most pretrained LLMs.
+//! Dependency-free UTF-8 byte tokenizer shared with the Python from-scratch trainer.
+//! Contract: spec/mkaos-tokenizer-v1.json. Not compatible with SentencePiece/BPE.
 use crate::KernelError;
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -27,6 +27,15 @@ impl ByteTokenizer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn shared_contract_is_embedded_and_matches_runtime_constants() {
+        let spec = include_str!("../../../spec/mkaos-tokenizer-v1.json");
+        assert!(spec.contains("\"format\": \"mkaos-byte-v1\""));
+        assert!(spec.contains("\"vocab_size\": 257"));
+        assert!(spec.contains("\"eos_id\": 256"));
+        assert!(spec.contains("UTF-8 byte value -> same token ID; 256 is EOS"));
+        assert_eq!(ByteTokenizer::VOCAB_SIZE, 257);
+        assert_eq!(ByteTokenizer::EOS_ID, 256);
+    }
     #[test] fn round_trips_utf8_and_skips_eos() {
         let t=ByteTokenizer;
         let text="Merhaba, dünya! 🌍";

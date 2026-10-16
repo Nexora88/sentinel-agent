@@ -129,5 +129,30 @@ class NativeHashEmbeddingTests(unittest.TestCase):
                     MemoryStore(persist_directory=str(Path(temp) / "memory"))
 
 
+    def test_required_semantic_mode_fails_clearly_when_local_model_is_missing(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(
+            os.environ,
+            {
+                "SEKA_REQUIRE_SEMANTIC_EMBEDDINGS": "true",
+                "SEKA_LOCAL_EMBEDDING_MODEL_PATH": str(Path(temp) / "missing-model"),
+            },
+            clear=False,
+        ):
+            with patch.dict("os.environ", {"SEKA_EMBEDDINGS_PROVIDER": ""}):
+                with self.assertRaisesRegex(ValueError, "does not exist"):
+                    MemoryStore(persist_directory=str(Path(temp) / "memory"))
+
+    def test_required_semantic_mode_rejects_hash_provider(self):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(
+            os.environ,
+            {
+                "SEKA_REQUIRE_SEMANTIC_EMBEDDINGS": "true",
+                "SEKA_EMBEDDINGS_PROVIDER": "mkaos-native",
+            },
+        ):
+            with self.assertRaisesRegex(ValueError, "only local-semantic"):
+                MemoryStore(persist_directory=str(Path(temp) / "memory"))
+
+
 if __name__ == "__main__":
     unittest.main()

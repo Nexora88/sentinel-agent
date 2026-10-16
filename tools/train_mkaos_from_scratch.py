@@ -12,9 +12,11 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import random
 import struct
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -22,11 +24,55 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 MAGIC = b"MKAOSW1\0"
-VOCAB_SIZE = 257  # UTF-8 bytes 0..255 plus EOS=256
+ROOT = Path(__file__).resolve().parents[1]
+TOKENIZER_CONTRACT_PATH = ROOT / "spec" / "mkaos-tokenizer-v1.json"
+TOKENIZER_CONTRACT = json.loads(TOKENIZER_CONTRACT_PATH.read_text(encoding="utf-8"))
+if TOKENIZER_CONTRACT.get("format") != "mkaos-byte-v1" or TOKENIZER_CONTRACT.get("vocab_size") != 257 or TOKENIZER_CONTRACT.get("eos_id") != 256:
+    raise RuntimeError(f"Unsupported or inconsistent shared tokenizer contract: {TOKENIZER_CONTRACT_PATH}")
+VOCAB_SIZE = TOKENIZER_CONTRACT["vocab_size"]
 
 
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def estimate_parameter_count(vocab_size: int, hidden_size: int, layers: int,
+                             heads: int, kv_heads: int, intermediate_size: int) -> int:
+    """Exact parameter count for this implementation's untied GQA/SwiGLU decoder."""
+    if min(vocab_size, hidden_size, layers, heads, kv_heads, intermediate_size) < 1:
+        raise ValueError("Model dimensions must be positive")
+    if hidden_size % heads or heads % kv_heads:
+        raise ValueError("hidden_size must divide heads and heads must divide evenly by kv_heads")
+    kv_width = hidden_size // heads * kv_heads
+    per_layer = (
+        2 * hidden_size  # two RMSNorm weights
+        + hidden_size * hidden_size  # Q
+        + 2 * hidden_size * kv_width  # K and V
+        + hidden_size * hidden_size  # attention output
+        + 3 * hidden_size * intermediate_size  # SwiGLU gate, up, down
+    )
+    return vocab_size * hidden_size * 2 + layers * per_layer + hidden_size
+
+
+def estimate_training_memory_bytes(parameter_count: int, batch_size: int,
+                                   sequence_length: int, hidden_size: int,
+                                   layers: int, intermediate_size: int,
+                                   activation_bytes: int = 4) -> int:
+    """Conservative planning estimate, not a guarantee of peak allocator usage.
+
+    Parameter/gradient/AdamW-state allowance is 16 bytes per parameter. Activation
+    allowance is intentionally approximate; allocator fragmentation and attention
+    workspaces can increase the real peak.
+    """
+    if min(parameter_count, batch_size, sequence_length, hidden_size, layers,
+           intermediate_size, activation_bytes) < 1:
+        raise ValueError("Memory-estimate inputs must be positive")
+    parameter_and_optimizer = parameter_count * 16
+    activations = (
+        batch_size * sequence_length * (8 * hidden_size + 3 * intermediate_size)
+        * layers * activation_bytes
+    )
+    return parameter_and_optimizer + activations
 
 
 def read_corpus(path: Path) -> dict[str, str]:
@@ -147,6 +193,7 @@ def main() -> int:
     parser.add_argument("--manifest", required=True, type=Path, help="Human-reviewed provenance manifest")
     parser.add_argument("--source-register", type=Path, default=Path(__file__).resolve().parents[1] / "data" / "mkaos" / "source-register.json", help="Source register; every used source must be explicitly approved")
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--experimental-local-only", action="store_true", help="Opt into owner-authorized local experiments; this does not approve third-party data or authorize checkpoint distribution")
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--sequence-length", type=int, default=128)
@@ -160,6 +207,10 @@ def main() -> int:
     parser.add_argument("--warmup-steps", type=int, default=0, help="linear learning-rate warmup steps; 0 disables warmup")
     parser.add_argument("--min-learning-rate-ratio", type=float, default=0.1, help="cosine schedule floor as a fraction of --learning-rate")
     parser.add_argument("--seed", type=int, default=20261016)
+    parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto",
+                        help="Training device; auto prefers a locally available CUDA/ROCm runtime.")
+    parser.add_argument("--precision", choices=("auto", "fp32", "fp16", "bf16"), default="auto",
+                        help="Training precision; auto uses fp32 on CPU and the safest supported mixed precision on CUDA.")
     args = parser.parse_args()
 
     if min(args.epochs, args.batch_size, args.sequence_length, args.hidden_size,
@@ -181,17 +232,24 @@ def main() -> int:
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
         # The strict governance validator is the canonical gate; no training starts on failure.
         from validate_mkaos_training_manifest import validate_manifest
-        manifest_messages = validate_manifest(manifest)
+        manifest_messages = validate_manifest(manifest, experimental_local_only=args.experimental_local_only)
         errors = [m for m in manifest_messages if not m.startswith("Metadata checks passed")]
         if errors:
             raise ValueError("Manifest validation failed:\n- " + "\n- ".join(errors))
         source_registry = json.loads(args.source_register.read_text(encoding="utf-8"))
-        from core.mkaos_corpus_gate import validate_source_registry
-        source_messages = validate_source_registry(manifest, source_registry)
-        source_errors = [m for m in source_messages if not m.startswith("Source register checks passed")]
-        if source_errors:
-            raise ValueError("Source register validation failed:\n- " + "\n- ".join(source_errors))
-        print("Source gate: " + source_messages[0])
+        from core.mkaos_corpus_gate import validate_experimental_local_manifest, validate_source_registry
+        if args.experimental_local_only:
+            source_messages = validate_experimental_local_manifest(manifest, source_registry)
+            source_errors = [m for m in source_messages if not m.startswith("Experimental local-only gate passed")]
+            if source_errors:
+                raise ValueError("Experimental local-only gate failed")
+            print("EXPERIMENTAL LOCAL-ONLY MODE: " + source_messages[0])
+        else:
+            source_messages = validate_source_registry(manifest, source_registry)
+            source_errors = [m for m in source_messages if not m.startswith("Source register checks passed")]
+            if source_errors:
+                raise ValueError("Source register validation failed:\\n- " + "\\n- ".join(source_errors))
+            print("Source gate: " + source_messages[0])
         corpus = read_corpus(args.corpus)
         splits = validate_corpus_against_manifest(corpus, manifest)
     except (OSError, json.JSONDecodeError, ValueError, ImportError) as exc:
@@ -220,18 +278,98 @@ def main() -> int:
         import torch
         import torch.nn as nn
         import torch.nn.functional as F
+        from core.hardware_backends import probe_training_runtime
+        hardware_runtime_probe = probe_training_runtime(torch)
     except ImportError:
         print("ERROR: PyTorch is required for training. Install a locally approved PyTorch build; no model downloads are used.", file=sys.stderr)
         return 2
 
     random.seed(args.seed)
     torch.manual_seed(args.seed)
-    if torch.cuda.is_available():
+    cuda_available = bool(torch.cuda.is_available())
+    if args.device == "cuda" and not cuda_available:
+        print("ERROR: --device cuda was requested but no compatible local CUDA/ROCm training runtime is available.", file=sys.stderr)
+        return 2
+    device = torch.device("cuda" if (args.device == "cuda" or (args.device == "auto" and cuda_available)) else "cpu")
+    if device.type == "cuda":
         torch.cuda.manual_seed_all(args.seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     d, nh, nkh = args.hidden_size, args.heads, args.kv_heads
     hd, kv_width = d // nh, d // nh * nkh
     intermediate = args.intermediate_size
+
+    if args.precision == "auto":
+        if device.type != "cuda":
+            precision = "fp32"
+        elif hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported():
+            precision = "bf16"
+        else:
+            precision = "fp16"
+    else:
+        precision = args.precision
+    if device.type != "cuda" and precision != "fp32":
+        print("ERROR: fp16/bf16 training is currently enabled only for the CUDA/ROCm training path.", file=sys.stderr)
+        return 2
+    if device.type == "cuda" and precision == "bf16" and not (
+        hasattr(torch.cuda, "is_bf16_supported") and torch.cuda.is_bf16_supported()
+    ):
+        print("ERROR: bf16 was requested but the detected accelerator does not report bf16 support.", file=sys.stderr)
+        return 2
+
+    parameter_count = estimate_parameter_count(
+        VOCAB_SIZE, d, args.layers, nh, nkh, intermediate
+    )
+    activation_bytes = 2 if device.type == "cuda" and precision in {"fp16", "bf16"} else 4
+    estimated_memory_bytes = estimate_training_memory_bytes(
+        parameter_count, args.batch_size, args.sequence_length, d, args.layers,
+        intermediate, activation_bytes=activation_bytes
+    )
+    try:
+        if device.type == "cuda":
+            available_memory_bytes = int(torch.cuda.mem_get_info(device)[0])
+        else:
+            try:
+                import psutil
+                available_memory_bytes = int(psutil.virtual_memory().available)
+            except ImportError:
+                try:
+                    available_memory_bytes = int(
+                        os.sysconf("SC_AVPHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")
+                    )
+                except (AttributeError, OSError, ValueError):
+                    # If the OS cannot expose available RAM, report the limitation;
+                    # never pretend an unknown budget is a measured value.
+                    available_memory_bytes = 0
+    except Exception as exc:
+        print(f"ERROR: could not safely determine available memory: {type(exc).__name__}", file=sys.stderr)
+        return 2
+    if available_memory_bytes and estimated_memory_bytes > int(available_memory_bytes * 0.80):
+        print(
+            "ERROR: memory preflight blocked training before model allocation. "
+            f"Estimated requirement={estimated_memory_bytes} bytes; "
+            f"available={available_memory_bytes} bytes; policy limit=80%. "
+            "Use a smaller architecture/sequence/batch, gradient accumulation, or a larger verified machine.",
+            file=sys.stderr,
+        )
+        return 2
+
+    if device.type == "cuda":
+        backend_runtime = "rocm" if getattr(torch.version, "hip", None) else "cuda"
+        device_name = torch.cuda.get_device_name(device)
+    else:
+        backend_runtime = "cpu"
+        device_name = "CPU"
+    print(json.dumps({
+        "event": "training_preflight",
+        "device": str(device),
+        "backend_runtime": backend_runtime,
+        "device_name": device_name,
+        "precision": precision,
+        "parameter_count": parameter_count,
+        "estimated_training_memory_bytes": estimated_memory_bytes,
+        "available_memory_bytes_before_model": available_memory_bytes or None,
+        "memory_estimate_is_not_a_peak_usage_guarantee": True,
+        "hardware_runtime_probe": hardware_runtime_probe,
+    }, ensure_ascii=False))
 
     class MkaosLayer(nn.Module):
         def __init__(self):
@@ -277,10 +415,11 @@ def main() -> int:
             repeat = nh // nkh
             k = k.repeat_interleave(repeat, dim=1)
             v = v.repeat_interleave(repeat, dim=1)
-            scores = (q @ k.transpose(-2, -1)) / math.sqrt(hd)
-            causal = torch.triu(torch.ones(length, length, device=x.device, dtype=torch.bool), diagonal=1)
-            scores = scores.masked_fill(causal, float("-inf"))
-            attended = (scores.softmax(dim=-1) @ v).transpose(1, 2).contiguous().view(b, length, d)
+            # PyTorch SDPA can dispatch to fused/flash attention kernels on compatible
+            # CUDA/ROCm builds, avoiding the explicit quadratic score/mask tensors.
+            attended = F.scaled_dot_product_attention(
+                q, k, v, attn_mask=None, dropout_p=0.0, is_causal=True
+            ).transpose(1, 2).contiguous().view(b, length, d)
             x = residual + attended @ self.o_proj
             residual = x
             z = self.norm(x, self.post_attention_norm)
@@ -317,6 +456,15 @@ def main() -> int:
 
     model = MkaosFromScratch().to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+    scaler = torch.cuda.amp.GradScaler(
+        enabled=(device.type == "cuda" and precision == "fp16")
+    )
+
+    def autocast_context():
+        if device.type != "cuda" or precision == "fp32":
+            return nullcontext()
+        dtype = torch.float16 if precision == "fp16" else torch.bfloat16
+        return torch.autocast(device_type="cuda", dtype=dtype)
     best_val = float("inf")
     best_state = None
     history = []
@@ -326,12 +474,13 @@ def main() -> int:
         train_losses = []
         optimizer.zero_grad(set_to_none=True)
         for batch_index, (xx, yy) in enumerate(batches(train_ids, True)):
-            loss = F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1))
+            with autocast_context():
+                loss = F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1))
             if not torch.isfinite(loss):
                 raise RuntimeError("Non-finite training loss; aborting without checkpoint export")
             group_start = (batch_index // args.gradient_accumulation_steps) * args.gradient_accumulation_steps
             group_size = min(args.gradient_accumulation_steps, train_batch_count - group_start)
-            (loss / group_size).backward()
+            scaler.scale(loss / group_size).backward()
             train_losses.append(float(loss.detach().cpu()))
             batch_number = batch_index + 1
             if batch_number % args.gradient_accumulation_steps == 0 or batch_number == train_batch_count:
@@ -342,14 +491,18 @@ def main() -> int:
                 )
                 for group in optimizer.param_groups:
                     group["lr"] = learning_rate
+                scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-                optimizer.step()
+                scaler.step(optimizer)
+                scaler.update()
                 optimizer.zero_grad(set_to_none=True)
         model.eval()
         val_losses = []
         with torch.no_grad():
             for xx, yy in batches(val_ids, False):
-                val_losses.append(float(F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1)).cpu()))
+                with autocast_context():
+                    val_loss_batch = F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1))
+                val_losses.append(float(val_loss_batch.cpu()))
         if not train_losses or not val_losses:
             raise RuntimeError("No train/validation batches; increase corpus size or reduce sequence length")
         val_loss = sum(val_losses) / len(val_losses)
@@ -368,7 +521,9 @@ def main() -> int:
     test_losses = []
     with torch.no_grad():
         for xx, yy in batches(test_ids, False):
-            test_losses.append(float(F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1)).cpu()))
+            with autocast_context():
+                test_loss_batch = F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1))
+            test_losses.append(float(test_loss_batch.cpu()))
     if not test_losses:
         raise RuntimeError("No independent-test batches; increase test corpus or reduce sequence length")
     independent_test_loss = sum(test_losses) / len(test_losses)
@@ -388,13 +543,17 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path = args.output_dir / "mkaos-owned.mkaosw"
     checkpoint_hash = write_mkaos_checkpoint(checkpoint_path, tensors)
-    tokenizer_payload = {"format": "mkaos-byte-v1", "vocab_size": VOCAB_SIZE, "eos_id": 256, "mapping": "UTF-8 byte value -> same token ID; 256 is EOS"}
-    tokenizer_bytes = (json.dumps(tokenizer_payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+    tokenizer_bytes = TOKENIZER_CONTRACT_PATH.read_bytes()
+    tokenizer_payload = json.loads(tokenizer_bytes.decode("utf-8"))
+    if tokenizer_payload["vocab_size"] != VOCAB_SIZE or tokenizer_payload["eos_id"] != 256:
+        raise RuntimeError("Shared tokenizer contract changed during training; refusing export")
     tokenizer_path = args.output_dir / "tokenizer.json"
     tokenizer_path.write_bytes(tokenizer_bytes)
     report = {
         "format_version": 1,
         "model_id": "MKAOS-TR-FromScratch-Experimental",
+        "training_mode": "experimental_local_only" if args.experimental_local_only else "source_approved",
+        "redistribution_allowed": not args.experimental_local_only,
         "trained_from_random_initialization": True,
         "pretrained_model_used": None,
         "external_model_weights_used": False,
@@ -407,6 +566,13 @@ def main() -> int:
         "manifest_sha256": sha256(args.manifest.read_bytes()),
         "seed": args.seed,
         "device": str(device),
+        "backend_runtime": backend_runtime,
+        "device_name": device_name,
+        "precision": precision,
+        "parameter_count": parameter_count,
+        "estimated_training_memory_bytes": estimated_memory_bytes,
+        "available_memory_bytes_before_model": available_memory_bytes or None,
+        "hardware_runtime_probe": hardware_runtime_probe,
         "training_config": {
             "optimizer": "AdamW",
             "initial_learning_rate": args.learning_rate,

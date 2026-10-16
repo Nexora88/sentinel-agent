@@ -55,10 +55,19 @@ jobs:
           pip install -r requirements.txt
       - name: Compile Python modules
         run: python -m compileall -q agents core scripts tools web
+      - name: Validate MKAOS bootstrap shell syntax
+        run: bash -n scripts/mkaos_bootstrap.sh
+      - name: Test local semantic embedding integrity gate
+        run: python -m unittest discover -s tests -p test_local_semantic_embeddings.py -v
       - name: Test native MKAOS Rust inference engine and CLI
         run: cargo test --manifest-path engine/mkaos-inference/Cargo.toml --all-targets
       - name: Validate source register fail-closed policy
         run: python tools/validate_mkaos_source_register.py
+      - name: Test MKAOS tokenizer contract and artifact hash verification
+        run: |
+          python -m unittest discover -s tests -p 'test_mkaos_tokenizer_contract.py' -v
+          python -m unittest discover -s tests -p 'test_verify_mkaos_training_artifacts.py' -v
+          python -m unittest discover -s tests -p 'test_mkaos_training_manifest.py' -v
       - name: Check frontend JavaScript syntax
         run: node --check web/static/app.js
       - name: Validate Docker Compose profiles
@@ -147,6 +156,116 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: artifacts/mkaos-sbom.cdx.json
+  experimental-owned-model-smoke:
+    name: Owner-approved local-only MKAOS training + Rust smoke
+    if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'mkaos-owner-approved-local-training' || github.event.pull_request.head.ref == 'mkaos-scale-rag-hardware')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install NumPy for checkpoint serialization
+        run: python -m pip install numpy
+      - name: Install CPU-only PyTorch
+        run: python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: Train tiny MKAOS model from random initialization
+        run: |
+          set -eu
+          mkdir -p artifacts/mkaos-local-experiment
+          python tools/train_mkaos_from_scratch.py \
+            --corpus data/mkaos/first-party-smoke-v1.jsonl \
+            --manifest data/mkaos/first-party-smoke-v1.manifest.json \
+            --source-register data/mkaos/source-register.json \
+            --output-dir artifacts/mkaos-local-experiment \
+            --experimental-local-only \
+            --epochs 3 --batch-size 2 --sequence-length 64 \
+            --hidden-size 32 --layers 1 --heads 4 --kv-heads 2 \
+            --intermediate-size 64 --seed 20261016
+          python tools/verify_mkaos_training_artifacts.py artifacts/mkaos-local-experiment/training-report.json
+      - name: Build owned Rust inference CLI
+        run: cargo build --manifest-path engine/mkaos-inference/Cargo.toml --bin mkaos-run
+      - name: Load exact checkpoint in Rust and record first-token, throughput, and RSS
+        run: |
+          set -eu
+          python - <<'PY'
+          import hashlib, json, re, resource, subprocess, time
+          from pathlib import Path
+          out = Path("artifacts/mkaos-local-experiment")
+          training = json.loads((out / "training-report.json").read_text(encoding="utf-8"))
+          checkpoint = out / "mkaos-owned.mkaosw"
+          digest = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+          if digest != training["checkpoint_sha256"]:
+              raise SystemExit("Persisted checkpoint SHA-256 differs from training report")
+          def run_model(new_tokens):
+              command = [
+                  "engine/mkaos-inference/target/debug/mkaos-run",
+                  "--checkpoint", str(checkpoint),
+                  "--sha256", digest,
+                  "--heads", "4", "--kv-heads", "2",
+                  "--max-seq-len", "64", "--max-new-tokens", str(new_tokens),
+                  "--prompt", "MKAOS", "--raw-token-ids"
+              ]
+              started = time.perf_counter()
+              result = subprocess.run(command, text=True, capture_output=True)
+              wall_ms = (time.perf_counter() - started) * 1000
+              if result.returncode != 0:
+                  raise SystemExit("Rust inference failed: " + result.stderr[-3000:])
+              values = {}
+              for key in ("checkpoint_sha256", "elapsed_ms", "generated_tokens", "tokens_per_second"):
+                  match = re.search(r"^" + re.escape(key) + r"=([^\r\n]+)$", result.stderr, re.M)
+                  if match:
+                      values[key] = match.group(1)
+              if values.get("checkpoint_sha256") != digest:
+                  raise SystemExit("Rust loader did not report the same checkpoint hash")
+              return {"wall_clock_ms_including_process_and_load": round(wall_ms, 3), **values}
+          first = run_model(1)
+          throughput = run_model(8)
+          peak_rss_kb = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+          report = {
+              "experiment": "MKAOS-TR-FromScratch-Experimental",
+              "dataset_id": training["dataset_id"],
+              "dataset_revision": training["dataset_revision"],
+              "manifest_sha256": training["manifest_sha256"],
+              "checkpoint_sha256": digest,
+              "trained_from_random_initialization": training["trained_from_random_initialization"],
+              "external_model_weights_used": training["external_model_weights_used"],
+              "training_mode": training["training_mode"],
+              "redistribution_allowed": training["redistribution_allowed"],
+              "train_samples": training["split_sample_counts"]["train"],
+              "validation_samples": training["split_sample_counts"]["validation"],
+              "independent_test_samples": training["split_sample_counts"]["test"],
+              "best_validation_loss": training["best_validation_loss"],
+              "independent_test_loss": training["independent_test_loss"],
+              "rust_loader_hash_matches": True,
+              "rust_first_token_wall_latency_ms": first["wall_clock_ms_including_process_and_load"],
+              "rust_first_token_generation_ms": int(first["elapsed_ms"]),
+              "rust_8_token_wall_elapsed_ms": throughput["wall_clock_ms_including_process_and_load"],
+              "rust_8_token_generation_tokens_per_second": float(throughput["tokens_per_second"]),
+              "experiment_peak_child_rss_kb": peak_rss_kb,
+              "quality_status": "not_established; 12 short diagnostic records are insufficient for general-purpose Turkish claims",
+              "checkpoint_policy": "ephemeral in CI; weights are not uploaded or distributed",
+              "legal_status": "local-only owner-authorized experiment; license_reviewed remains false; no redistribution rights asserted"
+          }
+          (out / "rust-smoke-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          PY
+      - name: Remove non-redistributable checkpoint before artifact publication
+        run: rm -f artifacts/mkaos-local-experiment/mkaos-owned.mkaosw artifacts/mkaos-local-experiment/tokenizer.json
+      - name: Publish metrics only (never model weights)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkaos-local-only-training-report
+          path: |
+            artifacts/mkaos-local-experiment/training-report.json
+            artifacts/mkaos-local-experiment/rust-smoke-report.json
+          if-no-files-found: error
+
   portable-arm64:
     name: Portable unit tests (Ubuntu ARM64, Python 3.12)
     # GitHub-hosted ARM64 runners are available for public repositories.

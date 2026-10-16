@@ -256,3 +256,8 @@ Bu küçük byte-tokenizer modeli başlangıç araştırma hattıdır; üretim k
 MKAOS is developed in public under the repository's MIT license. No institutional endorsement or certification is claimed. MIT applies to this repository's covered source; third-party model weights, datasets, voices, and assets may have separate terms. Public availability alone does not grant training or redistribution permission.
 
 Read the current evidence and contribution policy in [MKAOS Open-Source Readiness](docs/MKAOS_OPEN_SOURCE_READINESS.md). The current source register contains **zero approved training sources**, so a real owned-model training run is not yet cleared to start. Host-metadata CI and ARM64 tests do not certify native inference on every platform. We will publish stronger claims only alongside reproducible evidence.
+
+
+## MKAOS yerel sembolik akıl yürütme başlangıcı
+
+Önceden eğitilmiş ağırlık veya ağ çağrısı olmadan çalışan küçük Rust başlangıç çekirdeği `engine/mkaos-inference/LOCAL_REASONING.md` içinde belgelenmiştir. `mkaos-reason` komutu temel aritmetik ve açık `A ise B. A` kuralından tek adımlı çıkarım yapar; genel amaçlı LLM değildir. Test etmek için `cargo test --manifest-path engine/mkaos-inference/Cargo.toml` komutunu çalıştır. Bu yeni çekirdek uygulama sohbet API'sinin model tabanlı yolunu değiştirmez.
