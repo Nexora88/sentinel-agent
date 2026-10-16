@@ -29,14 +29,26 @@ if [ ! -f .env ]; then
   echo "Created .env from .env.example."
 fi
 
-# Create a strong owner secret once, persist it with private file permissions,
-# and display it only to this interactive terminal. Never write it to app logs.
-OWNER_SECRET="$(python3 - <<'PY'
+# Only generate and display a password when the local .env has no owner password.
+NEEDS_OWNER_SECRET="$(python3 - <<'PY'
+from pathlib import Path
+for line in Path(".env").read_text(encoding="utf-8").splitlines():
+    if line.startswith("OWNER_PASSWORD="):
+        print("yes" if not line.partition("=")[2].strip() else "no")
+        break
+else:
+    print("yes")
+PY
+)"
+OWNER_SECRET=""
+if [ "$NEEDS_OWNER_SECRET" = "yes" ]; then
+  OWNER_SECRET="$(python3 - <<'PY'
 import secrets
 print(secrets.token_urlsafe(32))
 PY
 )"
-export OWNER_SECRET
+  export OWNER_SECRET
+fi
 python3 - <<'PY'
 import os
 from pathlib import Path
@@ -64,6 +76,13 @@ if grep -q '^OWNER_PASSWORD=$' .env; then
 fi
 
 echo "Starting MKAOS web service..."
+if [ "$NEEDS_OWNER_SECRET" = "yes" ]; then
+  echo
+  echo "Initial owner password (save it now; it is stored in your private .env):"
+  echo "$OWNER_SECRET"
+  echo "Do not share this password or commit .env."
+fi
+
 if [ "$OFFLINE" -eq 1 ]; then
   echo "Offline mode: no image build or model download will be attempted."
   docker compose up -d --no-build
