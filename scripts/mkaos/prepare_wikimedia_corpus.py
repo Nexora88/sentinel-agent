@@ -146,8 +146,7 @@ def redact_contact_details(text: str) -> tuple[str, int]:
 
 
 def content_digest(text: str) -> str:
-    canonical = unicodedata.normalize("NFC", text)
-    canonical = SPACE_RE.sub(" ", canonical).strip().casefold()
+    canonical = " ".join(unicodedata.normalize("NFC", text).split()).casefold()
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
