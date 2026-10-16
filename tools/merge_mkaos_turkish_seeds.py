@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Birleştir: records.jsonl + records_batch2.jsonl → records_all.jsonl"""
+"""Birleştir: records*.jsonl → records_all.jsonl"""
 from __future__ import annotations
 
 import argparse
@@ -24,10 +24,8 @@ def main() -> int:
     p.add_argument("--output", type=Path, default=None)
     args = p.parse_args()
     out = args.output or (args.root / "records_all.jsonl")
-    batches = [
-        args.root / "records.jsonl",
-        args.root / "records_batch2.jsonl",
-    ]
+    batches = sorted(args.root.glob("records*.jsonl"))
+    batches = [b for b in batches if b.name != "records_all.jsonl"]
     seen: set[str] = set()
     merged: list[dict] = []
     for path in batches:
@@ -43,7 +41,7 @@ def main() -> int:
         "\n".join(json.dumps(r, ensure_ascii=False) for r in merged) + "\n",
         encoding="utf-8",
     )
-    print(f"MERGED count={len(merged)} path={out}")
+    print(f"MERGED count={len(merged)} batches={len(batches)} path={out}")
     return 0
 
 
