@@ -1,0 +1,173 @@
+name: MKAOS approved 133M training (self-hosted GPU only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      approval_reference:
+        description: "Human/legal review ticket or report ID that approved the exact data release and weight policy"
+        required: true
+        type: string
+      corpus_path:
+        description: "Absolute path to approved JSONL corpus on the private training runner"
+        required: true
+        type: string
+      manifest_path:
+        description: "Absolute path to approved provenance manifest on the private training runner"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mkaos-approved-training
+  cancel-in-progress: false
+
+jobs:
+  train:
+    name: Train MKAOS-Mini 133M on approved private GPU runner
+    # Register a trusted, private runner with these labels. GitHub-hosted runners are intentionally not used.
+    runs-on: [self-hosted, linux, x64, mkaos-training, gpu, ram-16g]
+    environment: mkaos-training-approved
+    timeout-minutes: 360
+    steps:
+      - name: Checkout approved source revision
+        uses: actions/checkout@v4
+
+      - name: Verify operator approval reference and private input paths
+        shell: bash
+        env:
+          APPROVAL_REFERENCE: ${{ inputs.approval_reference }}
+          CORPUS_PATH: ${{ inputs.corpus_path }}
+          MANIFEST_PATH: ${{ inputs.manifest_path }}
+        run: |
+          set -euo pipefail
+          test -n "$APPROVAL_REFERENCE"
+          case "$CORPUS_PATH" in /*) ;; *) echo "Corpus path must be absolute" >&2; exit 2;; esac
+          case "$MANIFEST_PATH" in /*) ;; *) echo "Manifest path must be absolute" >&2; exit 2;; esac
+          test -s "$CORPUS_PATH"
+          test -s "$MANIFEST_PATH"
+          test -d /opt/mkaos-private-checkpoints
+          test -w /opt/mkaos-private-checkpoints
+          printf '%s\n' "$APPROVAL_REFERENCE" > "$RUNNER_TEMP/mkaos-approval-reference.txt"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("data/mkaos/source-register.json")
+          d = json.loads(p.read_text(encoding="utf-8"))
+          approved = d.get("current_approved_sources", [])
+          if d.get("corpus_ready") is not True or d.get("model_training_allowed") is not True or not approved:
+              raise SystemExit("BLOCKED: source-register does not explicitly approve the corpus and training.")
+          sources = {s.get("source_id"): s for s in d.get("sources", [])}
+          for source_id in approved:
+              source = sources.get(source_id)
+              if not source or source.get("status") != "approved" or source.get("permitted_use_now") is not True:
+                  raise SystemExit(f"BLOCKED: {source_id!r} is not explicitly approved.")
+          print(f"Governance gate passed for {len(approved)} approved source(s).")
+          PY
+
+      - name: Verify accelerator, PyTorch and disk capacity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import shutil, torch
+          from pathlib import Path
+          print({"torch": torch.__version__, "cuda_available": torch.cuda.is_available()})
+          if not torch.cuda.is_available():
+              raise SystemExit("BLOCKED: this workflow requires a working CUDA/ROCm accelerator.")
+          print("GPU:", torch.cuda.get_device_name(0))
+          print("GPU memory GiB:", round(torch.cuda.get_device_properties(0).total_memory / 1024**3, 2))
+          root = Path("/opt/mkaos-private-checkpoints")
+          usage = shutil.disk_usage(root)
+          print("Checkpoint volume free GiB:", round(usage.free / 1024**3, 2))
+          if usage.free < 10 * 1024**3:
+              raise SystemExit("BLOCKED: at least 10 GiB free checkpoint storage is required.")
+          PY
+
+      - name: Install small runtime helper dependency
+        run: python -m pip install --disable-pip-version-check psutil
+
+      - name: Run strict training manifest validator
+        env:
+          CORPUS_PATH: ${{ inputs.corpus_path }}
+          MANIFEST_PATH: ${{ inputs.manifest_path }}
+        run: |
+          python tools/validate_mkaos_training_manifest.py --help >/dev/null
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from tools.validate_mkaos_training_manifest import validate_manifest
+          manifest = json.loads(Path(os.environ["MANIFEST_PATH"]).read_text(encoding="utf-8"))
+          messages = validate_manifest(manifest, experimental_local_only=False)
+          errors = [m for m in messages if not m.startswith("Metadata checks passed")]
+          if errors:
+              raise SystemExit("\n".join(errors))
+          print("\n".join(messages))
+          PY
+
+      - name: Train from random initialization; retain checkpoint privately
+        env:
+          CORPUS_PATH: ${{ inputs.corpus_path }}
+          MANIFEST_PATH: ${{ inputs.manifest_path }}
+          OUTPUT_DIR: /opt/mkaos-private-checkpoints/mkaos-mini-133m-run-${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/train_mkaos_profile.py \
+            --profile configs/mkaos/train-135m.json \
+            --corpus "$CORPUS_PATH" \
+            --manifest "$MANIFEST_PATH" \
+            --output-dir "$OUTPUT_DIR"
+          test -s "$OUTPUT_DIR/training-report.json"
+          test -s "$OUTPUT_DIR/mkaos-owned.mkaosw"
+          test -s "$OUTPUT_DIR/trainer-checkpoints/latest.pt"
+          echo "Private checkpoint retained at: $OUTPUT_DIR"
+
+      - name: Export non-sensitive loss and run metadata
+        if: always()
+        env:
+          OUTPUT_DIR: /opt/mkaos-private-checkpoints/mkaos-mini-133m-run-${{ github.run_id }}
+        run: |
+          python - <<'PY'
+          import csv, json, os
+          from pathlib import Path
+          root = Path(os.environ["OUTPUT_DIR"])
+          report_path = root / "training-report.json"
+          if not report_path.exists():
+              print("No completed training report; failure details remain in job logs.")
+              raise SystemExit(0)
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          rows = report.get("history", [])
+          with (root / "loss-history.csv").open("w", newline="", encoding="utf-8") as f:
+              writer = csv.DictWriter(f, fieldnames=["epoch", "train_loss", "validation_loss"])
+              writer.writeheader()
+              writer.writerows(rows)
+          # Simple SVG keeps the loss curve artifact independent of plotting packages.
+          width, height, pad = 900, 480, 56
+          values = [float(r[k]) for r in rows for k in ("train_loss", "validation_loss") if r.get(k) is not None]
+          if values:
+              lo, hi = min(values), max(values)
+              if hi <= lo: hi = lo + 1.0
+              def point(i, value):
+                  x = pad + i * (width - 2*pad) / max(1, len(rows)-1)
+                  y = height-pad - (float(value)-lo) * (height-2*pad)/(hi-lo)
+                  return f"{x:.1f},{y:.1f}"
+              train = " ".join(point(i, r["train_loss"]) for i,r in enumerate(rows))
+              val = " ".join(point(i, r["validation_loss"]) for i,r in enumerate(rows))
+              svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}"><rect width="100%" height="100%" fill="white"/><text x="{pad}" y="28" font-size="20">MKAOS training loss (epoch)</text><polyline fill="none" stroke="#2563eb" stroke-width="3" points="{train}"/><polyline fill="none" stroke="#dc2626" stroke-width="3" points="{val}"/><text x="{pad}" y="{height-18}" font-size="14">Blue: train loss · Red: validation loss · range {lo:.4f}–{hi:.4f}</text></svg>'
+              (root / "loss-curve.svg").write_text(svg, encoding="utf-8")
+          print(json.dumps({k: report.get(k) for k in ("model_id","parameter_count","checkpoint_sha256","corpus_sha256","manifest_sha256","best_validation_loss","independent_test_loss","device_name","precision","split_sample_counts")}, indent=2))
+          PY
+
+      - name: Upload evaluation metadata only (never upload private corpus or weights)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkaos-training-report-${{ github.run_id }}
+          path: |
+            /opt/mkaos-private-checkpoints/mkaos-mini-133m-run-${{ github.run_id }}/training-report.json
+            /opt/mkaos-private-checkpoints/mkaos-mini-133m-run-${{ github.run_id }}/loss-history.csv
+            /opt/mkaos-private-checkpoints/mkaos-mini-133m-run-${{ github.run_id }}/loss-curve.svg
+          if-no-files-found: warn
+          retention-days: 30
