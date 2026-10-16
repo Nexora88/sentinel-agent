@@ -9,6 +9,7 @@ Requires PyTorch only for training; no hub client, pretrained weights, or remote
 from __future__ import annotations
 
 import argparse
+from array import array
 import hashlib
 import json
 import math
@@ -139,10 +140,12 @@ def validate_corpus_against_manifest(corpus: dict[str, str], manifest: Any) -> d
     return split_texts
 
 
-def encode_documents(texts: list[str]) -> list[int]:
-    # Separator/EOS between documents prevents accidental concatenation semantics.
-    ids: list[int] = []
+def encode_documents(texts: list[str]) -> array:
+    # Use compact unsigned 16-bit token storage: Python int lists can consume tens of
+    # gigabytes for a large byte-level corpus. EOS=256 fits in array('H').
+    ids = array("H")
     for text in texts:
+        ids.frombytes(b"")  # keep array construction explicit and portable
         ids.extend(text.encode("utf-8"))
         ids.append(256)
     return ids
@@ -481,7 +484,7 @@ def main() -> int:
             x = x * torch.rsqrt(x.pow(2).mean(dim=-1, keepdim=True) + 1e-5) * self.final_norm
             return x @ self.lm_head
 
-    def batches(ids: list[int], shuffle: bool):
+    def batches(ids: array, shuffle: bool):
         starts = list(range(0, len(ids) - args.sequence_length, args.sequence_length))
         if shuffle:
             random.shuffle(starts)
@@ -493,8 +496,8 @@ def main() -> int:
             chunk = starts[offset:offset + args.batch_size]
             if not chunk:
                 continue
-            xx = torch.tensor([ids[s:s + args.sequence_length] for s in chunk], dtype=torch.long, device=device)
-            yy = torch.tensor([ids[s + 1:s + args.sequence_length + 1] for s in chunk], dtype=torch.long, device=device)
+            xx = torch.tensor([list(ids[s:s + args.sequence_length]) for s in chunk], dtype=torch.long, device=device)
+            yy = torch.tensor([list(ids[s + 1:s + args.sequence_length + 1]) for s in chunk], dtype=torch.long, device=device)
             yield xx, yy
 
     resume_config = {
