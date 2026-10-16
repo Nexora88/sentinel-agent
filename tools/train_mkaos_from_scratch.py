@@ -9,6 +9,7 @@ Requires PyTorch only for training; no hub client, pretrained weights, or remote
 from __future__ import annotations
 
 import argparse
+from array import array
 import hashlib
 import json
 import math
@@ -139,9 +140,29 @@ def validate_corpus_against_manifest(corpus: dict[str, str], manifest: Any) -> d
     return split_texts
 
 
-def encode_documents(texts: list[str]) -> list[int]:
-    # Separator/EOS between documents prevents accidental concatenation semantics.
-    ids: list[int] = []
+def estimate_host_corpus_memory_bytes(corpus_file_size: int) -> int:
+    """Conservative host-RAM allowance for JSON objects plus compact uint16 tokens."""
+    if corpus_file_size < 1:
+        raise ValueError("corpus_file_size must be positive")
+    return corpus_file_size * 7 // 2 + 512 * 1024 * 1024
+
+
+def available_host_memory_bytes() -> int:
+    """Return detected available host RAM, or zero if it cannot be measured safely."""
+    try:
+        import psutil
+        return int(psutil.virtual_memory().available)
+    except ImportError:
+        try:
+            return int(os.sysconf("SC_AVPHYS_PAGES") * os.sysconf("SC_PAGE_SIZE"))
+        except (AttributeError, OSError, ValueError):
+            return 0
+
+
+def encode_documents(texts: list[str]) -> array:
+    # Use compact unsigned 16-bit token storage: Python int lists can consume tens of
+    # gigabytes for a large byte-level corpus. EOS=256 fits in array('H').
+    ids = array("H")
     for text in texts:
         ids.extend(text.encode("utf-8"))
         ids.append(256)
@@ -263,6 +284,24 @@ def main() -> int:
             if source_errors:
                 raise ValueError("Source register validation failed:\\n- " + "\\n- ".join(source_errors))
             print("Source gate: " + source_messages[0])
+        corpus_size = args.corpus.stat().st_size
+        host_available_before_corpus = available_host_memory_bytes()
+        host_corpus_estimate = estimate_host_corpus_memory_bytes(corpus_size)
+        if not host_available_before_corpus or host_corpus_estimate > int(host_available_before_corpus * 0.70):
+            available_text = str(host_available_before_corpus) if host_available_before_corpus else "unknown"
+            raise ValueError(
+                "Host-RAM preflight blocked corpus loading before allocation: "
+                f"estimated corpus/token storage={host_corpus_estimate} bytes; "
+                f"available host RAM={available_text} bytes; "
+                "policy limit=70%. Use a smaller reviewed corpus or a larger verified host."
+            )
+        print(json.dumps({
+            "event": "host_corpus_preflight",
+            "corpus_file_size_bytes": corpus_size,
+            "estimated_host_corpus_memory_bytes": host_corpus_estimate,
+            "available_host_memory_bytes": host_available_before_corpus,
+            "memory_estimate_is_not_a_peak_usage_guarantee": True,
+        }, ensure_ascii=False))
         corpus = read_corpus(args.corpus)
         splits = validate_corpus_against_manifest(corpus, manifest)
         corpus_file_sha256 = sha256_file(args.corpus)
@@ -481,7 +520,7 @@ def main() -> int:
             x = x * torch.rsqrt(x.pow(2).mean(dim=-1, keepdim=True) + 1e-5) * self.final_norm
             return x @ self.lm_head
 
-    def batches(ids: list[int], shuffle: bool):
+    def batches(ids: array, shuffle: bool):
         starts = list(range(0, len(ids) - args.sequence_length, args.sequence_length))
         if shuffle:
             random.shuffle(starts)
@@ -493,8 +532,8 @@ def main() -> int:
             chunk = starts[offset:offset + args.batch_size]
             if not chunk:
                 continue
-            xx = torch.tensor([ids[s:s + args.sequence_length] for s in chunk], dtype=torch.long, device=device)
-            yy = torch.tensor([ids[s + 1:s + args.sequence_length + 1] for s in chunk], dtype=torch.long, device=device)
+            xx = torch.tensor([list(ids[s:s + args.sequence_length]) for s in chunk], dtype=torch.long, device=device)
+            yy = torch.tensor([list(ids[s + 1:s + args.sequence_length + 1]) for s in chunk], dtype=torch.long, device=device)
             yield xx, yy
 
     resume_config = {
@@ -538,6 +577,7 @@ def main() -> int:
     best_val = float("inf")
     best_state = None
     history = []
+    step_history = []
     global_step = 0
     start_epoch = 0
     checkpoint_dir = args.output_dir / "trainer-checkpoints"
@@ -558,6 +598,7 @@ def main() -> int:
             best_val = float(saved["best_validation_loss"])
             best_state = saved.get("best_state")
             history = list(saved.get("history", []))
+            step_history = list(saved.get("step_history", []))
             random.setstate(saved["python_rng_state"])
             torch.set_rng_state(saved["torch_rng_state"])
             if device.type == "cuda" and saved.get("cuda_rng_state") is not None:
@@ -593,6 +634,14 @@ def main() -> int:
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad(set_to_none=True)
+                step_loss_values = train_losses[-group_size:]
+                step_history.append({
+                    "step": global_step,
+                    "epoch": epoch + 1,
+                    "train_loss": sum(step_loss_values) / len(step_loss_values),
+                    "validation_loss": None,
+                    "learning_rate": learning_rate,
+                })
         model.eval()
         val_losses = []
         with torch.no_grad():
@@ -604,6 +653,8 @@ def main() -> int:
             raise RuntimeError("No train/validation batches; increase corpus size or reduce sequence length")
         val_loss = sum(val_losses) / len(val_losses)
         history.append({"epoch": epoch + 1, "train_loss": sum(train_losses) / len(train_losses), "validation_loss": val_loss})
+        if step_history:
+            step_history[-1]["validation_loss"] = val_loss
         print(json.dumps(history[-1], ensure_ascii=False))
         if val_loss < best_val:
             best_val = val_loss
@@ -626,6 +677,7 @@ def main() -> int:
                 "best_validation_loss": best_val,
                 "best_state": best_state,
                 "history": history,
+                "step_history": step_history,
                 "python_rng_state": random.getstate(),
                 "torch_rng_state": torch.get_rng_state(),
                 "cuda_rng_state": torch.cuda.get_rng_state_all() if device.type == "cuda" else None,
@@ -736,6 +788,7 @@ def main() -> int:
         "independent_test_evaluated_after_checkpoint_selection": True,
         "test_used_for_training_or_model_selection": False,
         "history": history,
+        "step_history": step_history,
         "warning": "Experimental from-scratch checkpoint. Test loss is a byte-level next-token metric, not proof of Turkish task competence. Training completion does not certify useful Turkish capability; independent human evaluation remains required."
     }
     report_path = args.output_dir / "training-report.json"

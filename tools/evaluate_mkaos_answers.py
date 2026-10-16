@@ -9,6 +9,7 @@ optional "peak_memory_mb": 512}.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import statistics
@@ -62,7 +63,7 @@ def percentile(values: list[float], fraction: float) -> float | None:
     return float(ordered[index])
 
 
-def evaluate(dataset: dict[str, Any], answers: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def evaluate(dataset: dict[str, Any], answers: dict[str, dict[str, Any]], *, dataset_bytes: bytes | None = None) -> dict[str, Any]:
     cases = dataset.get("cases")
     if not isinstance(cases, list) or not cases:
         raise ValueError("dataset must contain a non-empty cases array")
@@ -108,6 +109,7 @@ def evaluate(dataset: dict[str, Any], answers: dict[str, dict[str, Any]]) -> dic
     return {
         "schema_version": 1,
         "dataset_id": dataset.get("dataset_id"),
+        "dataset_sha256": hashlib.sha256(dataset_bytes if dataset_bytes is not None else json.dumps(dataset, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest(),
         "scoring_note": "Lexical/format smoke score only. It does not prove factual correctness, semantic understanding, citation support, or safe reasoning. Human review required.",
         "cases_total": len(cases),
         "answers_received": len(answers),
@@ -139,9 +141,10 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        dataset = json.loads(args.dataset.read_text(encoding="utf-8"))
+        dataset_bytes = args.dataset.read_bytes()
+        dataset = json.loads(dataset_bytes.decode("utf-8"))
         answers = read_answers(args.answers)
-        report = evaluate(dataset, answers)
+        report = evaluate(dataset, answers, dataset_bytes=dataset_bytes)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     except (OSError, json.JSONDecodeError, ValueError) as exc:
