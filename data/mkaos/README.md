@@ -26,3 +26,17 @@ Komut ağ kullanmaz ve ağırlık eğitmez. Kaynak grubu bazlı bölme nedeniyle
 **Eğitim güvenlik kapısı:** `tools/train_mkaos_from_scratch.py` artık `data/mkaos/source-register.json` dosyasını da kontrol eder. Kaynak `current_approved_sources` listesinde değilse, `status: approved`, `permitted_use_now: true`, sabitlenmiş `approved_revision`, `approval_evidence` ve `weight_distribution_review: approved` alanları yoksa eğitim başlamaz. Metadata doğrulaması tek başına hukuk onayı değildir.
 
 **Mevcut durum:** Bu depoda gerçek/onaylı Türkçe korpus bulunmuyor. Yer tutucu README, örnek kayıt veya CI testi gerçek eğitim verisi değildir.
+
+## Yerel ön tarama (çevrimdışı)
+
+Ham veri yalnızca yerel ve erişimi kısıtlı bir dizinde tutulmalıdır. Kaynağın sürüm/lisans ve ağırlık dağıtım incelemesi tamamlanmadan eğitim yapmayın.
+
+```bash
+python tools/audit_mkaos_local_corpus.py \
+  --input ./private-data/reviewed-tr.jsonl \
+  --report ./artifacts/mkaos-local-audit.json
+```
+
+Girdi JSONL satırları en az `sample_id`, `text`, `source_id`, `source_uri`, `document_group`, `license_id`, `split`, `human_review` ve `pii_status` alanlarını içermelidir. Bu komut ağ kullanmaz; kaynak dosyanın ve her metnin hash'ini, yinelenen metinleri, yaygın PII/gizli bilgi göstergelerini ve belge grubu bölme sızıntısını raporlar. Rapor ham metinleri içermez. Bir göstergenin çıkması insan incelemesi gerektirir; hiç gösterge çıkmaması da verinin temiz olduğunu kanıtlamaz.
+
+**Bağımsız test:** Eğitim aracı artık checkpoint seçimi tamamlandıktan sonra test bölümündeki byte-level kaybı bir kez ölçüp `training-report.json` içine yazar. Test kaybı checkpoint seçimi veya eğitim için kullanılmaz. Bu metrik tek başına Türkçe görev başarısı değildir; ayrıca bağımsız görev testleri ve insan değerlendirmesi gerekir.
