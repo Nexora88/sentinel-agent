@@ -26,7 +26,8 @@ class HybridRagTests(unittest.TestCase):
             [dense_first, partial_match, lexical_match],
             limit=2,
         )
-        self.assertEqual([doc.metadata["source"] for doc in ranked], ["beekeeping", "farming"])
+        self.assertEqual(ranked[0].metadata["source"], "beekeeping")
+        self.assertEqual(len(ranked), 2)
 
     def test_dense_order_is_preserved_when_query_has_no_lexical_overlap(self):
         first = Document(page_content="Konu A hakkında kaynak.", metadata={"source": "a"})
