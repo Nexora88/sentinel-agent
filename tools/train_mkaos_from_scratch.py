@@ -278,6 +278,8 @@ def main() -> int:
         import torch
         import torch.nn as nn
         import torch.nn.functional as F
+        from core.hardware_backends import probe_training_runtime
+        hardware_runtime_probe = probe_training_runtime(torch)
     except ImportError:
         print("ERROR: PyTorch is required for training. Install a locally approved PyTorch build; no model downloads are used.", file=sys.stderr)
         return 2
@@ -366,6 +368,7 @@ def main() -> int:
         "estimated_training_memory_bytes": estimated_memory_bytes,
         "available_memory_bytes_before_model": available_memory_bytes or None,
         "memory_estimate_is_not_a_peak_usage_guarantee": True,
+        "hardware_runtime_probe": hardware_runtime_probe,
     }, ensure_ascii=False))
 
     class MkaosLayer(nn.Module):
@@ -569,6 +572,7 @@ def main() -> int:
         "parameter_count": parameter_count,
         "estimated_training_memory_bytes": estimated_memory_bytes,
         "available_memory_bytes_before_model": available_memory_bytes or None,
+        "hardware_runtime_probe": hardware_runtime_probe,
         "training_config": {
             "optimizer": "AdamW",
             "initial_learning_rate": args.learning_rate,
