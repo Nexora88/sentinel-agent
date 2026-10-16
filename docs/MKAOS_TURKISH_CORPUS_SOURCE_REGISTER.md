@@ -14,6 +14,19 @@
 | Tatoeba Türkçe cümleleri | [Tatoeba downloads and data licensing](https://tatoeba.org/en/downloads); [Using the Tatoeba Corpus](https://en.wiki.tatoeba.org/articles/show/using-the-tatoeba-corpus) | Metin cümleleri genel olarak CC BY 2.0 FR koşuluna tabidir; katkı sahibi atfı gerekir. Cümle bazında CC0/başka lisanslar ve ses lisansları ayrı olabilir. İncelenen CC0 dil listesinin Türkçe için uygun bir alt küme sağladığı doğrulanmadı. | **Eğitim için engelli.** Cümle bazlı yazar/atıf bilgisini kaybetmeden kullanma ve eğitim/ağırlık dağıtım uyumluluğu yazılı olarak onaylanana kadar içeri alınmayacak. |
 | HPLT v2.0 — Türkçe temizlenmiş metin (tur-Latn) | [HPLT v2.0 dataset and terms](https://hplt-project.org/datasets/v2.0) | Resmî sayfa, paketlemenin CC0 olduğunu; alttaki metinlerin HPLT'ye ait olmadığını ve kullanıcıların geçerli hukuka uymasının gerektiğini belirtiyor. Türkçe temizlenmiş paket yaklaşık 426,16 GB. | **Aday — içerik hakları/gizlilik incelemesi bekliyor.** Paket lisansı, içerdiği her metin için otomatik izin anlamına gelmez. Tam arşiv Git'e yüklenmeyecek; kaynak bazlı filtreleme ve yazılı inceleme gerekir. |
 
+## Daha hafif başlangıç stratejisi (onay değildir)
+
+426,16 GB HPLT paketini indirmek bu aşama için gerekli değildir. Önce yalnızca **metin cümleleri** ve küçük bir doğrulanabilir alt küme değerlendirilmelidir; ses dosyaları, ham web taraması ve büyük toplu arşivler kapsam dışı tutulur.
+
+İlk incelenecek aday Mozilla Common Voice'ın metin/cümle verisidir. Proje deposu `server/data` altındaki cümlelerin çoğunun CC0 olduğunu bildirir; ancak bu, seçilen Türkçe dosyanın tam sürümünü, tüm içeriğini veya eğitilmiş ağırlıkların dağıtımını kendiliğinden onaylamaz. Bu yüzden:
+- Belirli bir sürüm ve dosya listesi seçilmeden kaynak **onaylanmış sayılmaz**.
+- Gerçek dosyalar yerel makinede edinildikten sonra dosya SHA-256 değerleri hesaplanır; GitHub'a ham metin/arşiv yüklenmez.
+- Önce sınırlı bir örneklem üzerinde lisans kapsamı, gizlilik, dil/kalite ve atıf kontrolleri yapılır.
+- Eğitim ve ağırlık dağıtımı için ayrı, belgelenmiş insan/hukuk kararı yoksa `current_approved_sources` boş kalır ve eğitim kapısı kapalıdır.
+- İnternet araması yalnızca kaynak keşfi ve şartları bulmak içindir; canlı web sayfalarını otomatik tarayarak izinsiz veri toplama veya lisansı varsayma yapılmaz.
+
+Yerel otomatik ön tarama aracı: `tools/audit_mkaos_local_corpus.py`. Bu araç dosya ve metin hash'lerini, normalize edilmiş tekrarları, yaygın kişisel veri/gizli bilgi göstergelerini ve belge gruplarının train/validation/test bölümleri arasında sızmasını raporlar. Bir PII tarayıcısı eksiksiz değildir; araç veri temizliği veya lisans onayı vermez ve eğitimi etkinleştirmez.
+
 ## Kabul edilecek kaynak için zorunlu kanıtlar
 
 Her sürüm ve dosya için:
