@@ -17,19 +17,33 @@ def validate_source_registry(manifest: Any, registry: Any) -> list[str]:
     if not isinstance(approved_ids, list) or not approved_ids:
         errors.append("Source register has no explicitly approved source IDs.")
         approved_ids = []
+    if any(not isinstance(source_id, str) or not source_id.strip() for source_id in approved_ids):
+        errors.append("Every approved source ID must be a non-empty string.")
+    if len(approved_ids) != len(set(item for item in approved_ids if isinstance(item, str))):
+        errors.append("Source register contains duplicate approved source IDs.")
     sources = registry.get("sources")
     if not isinstance(sources, list):
         return errors + ["Source register must contain a sources array."]
-    by_id = {
-        item.get("source_id"): item
-        for item in sources
-        if isinstance(item, dict) and isinstance(item.get("source_id"), str)
-    }
+    by_id: dict[str, dict[str, Any]] = {}
+    for index, item in enumerate(sources):
+        if not isinstance(item, dict) or not isinstance(item.get("source_id"), str) or not item["source_id"].strip():
+            errors.append(f"Source register sources[{index}] needs a non-empty source_id.")
+            continue
+        source_id = item["source_id"]
+        if source_id in by_id:
+            errors.append(f"Source register has duplicate source_id {source_id!r}; refusing ambiguous approval.")
+            continue
+        by_id[source_id] = item
     records = manifest.get("records")
     if not isinstance(records, list) or not records:
         return errors + ["Training manifest must contain records."]
-    used_ids = {row.get("source_id") for row in records if isinstance(row, dict)}
-    for source_id in sorted(used_ids, key=str):
+    used_ids: set[str] = set()
+    for index, row in enumerate(records):
+        if not isinstance(row, dict) or not isinstance(row.get("source_id"), str) or not row["source_id"].strip():
+            errors.append(f"Training manifest records[{index}] needs a non-empty source_id.")
+            continue
+        used_ids.add(row["source_id"])
+    for source_id in sorted(used_ids):
         source = by_id.get(source_id)
         if source is None:
             errors.append(f"Source {source_id!r} is absent from the source register.")
