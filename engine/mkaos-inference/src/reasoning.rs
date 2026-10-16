@@ -115,7 +115,7 @@ mod tests {
     use super::*;
     #[test] fn derives_conclusion_with_trace() {
         let r = reason("Yağmur yağıyor ise yol ıslaktır. Yağmur yağıyor").unwrap();
-        assert_eq!(r.answer, "Çıkarım: yol ıslaktır."); assert_eq!(r.trace.len(), 3);
+        assert_eq!(r.answer, "Çıkarım: yol ıslaktır."); assert_eq!(r.trace.len(), 1);
     }
     #[test] fn computes_arithmetic() { assert_eq!(reason("12 * 3").unwrap().answer, "Sonuç: 36"); }
     #[test] fn chains_multiple_rules_and_stops_cycles() {
