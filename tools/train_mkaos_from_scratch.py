@@ -301,7 +301,7 @@ def main() -> int:
     if distributed:
         import torch.distributed as dist
         local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-        dist_backend = "nccl" if torch.cuda.is_available() else "gloo"
+        dist_backend = "nccl" if torch.cuda.is_available() and args.device != "cpu" else "gloo"
         dist.init_process_group(backend=dist_backend, init_method="env://")
         rank = dist.get_rank()
         world_size = dist.get_world_size()
@@ -313,7 +313,7 @@ def main() -> int:
     if args.device == "cuda" and not cuda_available:
         print("ERROR: --device cuda was requested but no compatible local CUDA/ROCm training runtime is available.", file=sys.stderr)
         return 2
-    device = torch.device("cuda", local_rank) if distributed and cuda_available else torch.device("cuda" if (args.device == "cuda" or (args.device == "auto" and cuda_available)) else "cpu")
+    device = torch.device("cuda", local_rank) if distributed and args.device != "cpu" and cuda_available else torch.device("cuda" if (args.device == "cuda" or (args.device == "auto" and cuda_available)) else "cpu")
     if device.type == "cuda":
         torch.cuda.set_device(device)
         torch.cuda.manual_seed_all(args.seed + rank)
