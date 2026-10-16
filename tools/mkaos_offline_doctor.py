@@ -24,12 +24,15 @@ def inspect_file(label: str, path: Path, expected_sha256: str = "") -> dict[str,
     expected = expected_sha256.strip().lower()
     if expected and actual != expected:
         return {"name": label, "ok": False, "status": "sha256_mismatch", "path": str(path), "sha256": actual}
-    return {"name": label, "ok": True, "status": "verified" if expected else "present_hash_not_pinned", "path": str(path), "sha256": actual}
+    return {"name": label, "ok": bool(expected), "status": "verified" if expected else "present_hash_not_pinned", "path": str(path), "sha256": actual}
 
 
 def run_checks(root: Path, *, include_media: bool = False) -> dict:
     root = root.resolve()
-    checkpoint = Path(os.getenv("MKAOS_NATIVE_CHECKPOINT", str(root / "models/mkaos/model.mkaosw"))).expanduser()
+    checkpoint_value = os.getenv("MKAOS_NATIVE_CHECKPOINT", str(root / "models/mkaos/model.mkaosw"))
+    checkpoint = Path(checkpoint_value).expanduser()
+    if str(checkpoint).startswith("/app/"):
+        checkpoint = root / str(checkpoint).removeprefix("/app/")
     generator_env = os.getenv("MKAOS_NATIVE_GENERATOR", "")
     generator_candidates = [
         Path(generator_env).expanduser() if generator_env else None,
@@ -45,13 +48,19 @@ def run_checks(root: Path, *, include_media: bool = False) -> dict:
         {"name": "native Rust generator", "ok": generator is not None, "status": "present" if generator else "missing"},
     ]
     if include_media:
-        voice_dir = Path(os.getenv("SEKA_VOICE_MODEL_DIR", str(root / "models/voices"))).expanduser()
+        voice_value = os.getenv("SEKA_VOICE_MODEL_DIR", str(root / "models/voices"))
+        voice_dir = Path(voice_value).expanduser()
+        if str(voice_dir).startswith("/app/"):
+            voice_dir = root / str(voice_dir).removeprefix("/app/")
         for name in (
             os.getenv("SEKA_VOICE_MALE_MODEL", "tr_TR-fettah-medium.onnx"),
             os.getenv("SEKA_VOICE_FEMALE_MODEL", "tr_TR-dfki-medium.onnx"),
         ):
             checks.append({"name": f"voice model {name}", "ok": (voice_dir / name).is_file(), "status": "present" if (voice_dir / name).is_file() else "optional_media_missing"})
-        whisper_dir = Path(os.getenv("FASTER_WHISPER_MODEL_PATH", str(root / "models/whisper-small"))).expanduser()
+        whisper_value = os.getenv("FASTER_WHISPER_MODEL_PATH", str(root / "models/whisper-small"))
+        whisper_dir = Path(whisper_value).expanduser()
+        if str(whisper_dir).startswith("/app/"):
+            whisper_dir = root / str(whisper_dir).removeprefix("/app/")
         checks.append({"name": "faster-whisper model directory", "ok": whisper_dir.is_dir() and any(whisper_dir.iterdir()), "status": "present" if whisper_dir.is_dir() and any(whisper_dir.iterdir()) else "optional_media_missing"})
     core_ok = all(bool(item["ok"]) for item in checks if not str(item["status"]).startswith("optional_media"))
     media_ok = all(bool(item["ok"]) for item in checks)
