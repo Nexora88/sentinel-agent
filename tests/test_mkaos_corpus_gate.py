@@ -1,3 +1,4 @@
+"""Regression tests for the fail-closed MKAOS source-approval gate."""
 import unittest
 
 from core.mkaos_corpus_gate import validate_source_registry
@@ -23,6 +24,21 @@ def sample_registry():
 
 
 class MkaosCorpusGateTests(unittest.TestCase):
+    def test_project_owner_authorization_alone_does_not_open_gate(self):
+        # The owner's intent is recorded but no source-specific evidence exists.
+        registry = {
+            "model_training_allowed": False,
+            "current_approved_sources": [],
+            "project_owner_authorization": {
+                "status": "granted_by_project_owner_in_chat",
+                "training_gate_effect": "no_change_until_source_specific_evidence_is_recorded",
+            },
+            "sources": [],
+        }
+        messages = validate_source_registry(sample_manifest(), registry)
+        self.assertTrue(any("does not authorize model training" in e for e in messages))
+        self.assertTrue(any("no explicitly approved source IDs" in e for e in messages))
+
     def test_unapproved_source_blocks_training(self):
         registry = sample_registry()
         registry["current_approved_sources"] = []
@@ -48,6 +64,7 @@ class MkaosCorpusGateTests(unittest.TestCase):
         messages = validate_source_registry(sample_manifest(), sample_registry())
         self.assertEqual(len(messages), 1)
         self.assertTrue(messages[0].startswith("Source register checks passed"))
+        self.assertIn("does not replace independent legal", messages[0])
 
 
 if __name__ == "__main__":
