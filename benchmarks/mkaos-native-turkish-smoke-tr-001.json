@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "mkaos-native-turkish-smoke-tr-001",
+  "language": "tr",
+  "purpose": "Minimal inference plumbing and Turkish output smoke checks only; not a comprehensive capability benchmark.",
+  "training_use": false,
+  "cases": [
+    {"id": "tr-fact-capital-001", "prompt": "Türkiye'nin başkenti nedir? Kısa cevap ver.", "required_terms": ["ankara"]},
+    {"id": "tr-arithmetic-001", "prompt": "7 ile 8'in toplamı kaçtır? Yalnızca sonucu yaz.", "required_terms": ["15"]},
+    {"id": "tr-identity-001", "prompt": "Türkçe yanıt ver: Türkiye'nin resmî dili nedir?", "required_terms": ["türkçe"]},
+    {"id": "tr-explanation-001", "prompt": "Suyu deniz seviyesinde kaynatmak için yaklaşık kaç santigrat derece gerekir?", "required_terms": ["100"]}
+  ]
+}
