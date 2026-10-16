@@ -93,10 +93,16 @@ def validate_source_registry(manifest: Any, registry: Any) -> list[str]:
             "Source register checks passed for internal non-redistributable training only; "
             "checkpoint publication remains blocked until weight distribution is separately approved."
         ]
+    if scopes == {"redistributable"}:
+        return [
+            "Source register checks passed for redistributable training; every used source has an "
+            "explicitly approved weight-distribution review. This does not replace independent "
+            "legal, privacy, or quality review."
+        ]
     return [
-        "Source register checks passed; redistributable weights are permitted only for sources "
-        "whose weight_distribution_review is explicitly approved. This does not replace independent "
-        "legal, privacy, or quality review."
+        "Source register checks passed for training, but the dataset mixes internal-only and "
+        "redistributable scopes. Treat the resulting checkpoint as non-redistributable unless "
+        "every used source is separately approved for weight distribution."
     ]
 
 
