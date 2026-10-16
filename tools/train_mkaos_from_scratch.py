@@ -18,6 +18,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# Make repository modules importable when invoked as `python tools/train_mkaos_from_scratch.py`.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 MAGIC = b"MKAOSW1\0"
 VOCAB_SIZE = 257  # UTF-8 bytes 0..255 plus EOS=256
 
@@ -117,6 +120,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--corpus", required=True, type=Path, help="Approved local JSONL text corpus")
     parser.add_argument("--manifest", required=True, type=Path, help="Human-reviewed provenance manifest")
+    parser.add_argument("--source-register", type=Path, default=Path(__file__).resolve().parents[1] / "data" / "mkaos" / "source-register.json", help="Source register; every used source must be explicitly approved")
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=8)
@@ -148,6 +152,13 @@ def main() -> int:
         errors = [m for m in manifest_messages if not m.startswith("Metadata checks passed")]
         if errors:
             raise ValueError("Manifest validation failed:\n- " + "\n- ".join(errors))
+        source_registry = json.loads(args.source_register.read_text(encoding="utf-8"))
+        from core.mkaos_corpus_gate import validate_source_registry
+        source_messages = validate_source_registry(manifest, source_registry)
+        source_errors = [m for m in source_messages if not m.startswith("Source register checks passed")]
+        if source_errors:
+            raise ValueError("Source register validation failed:\n- " + "\n- ".join(source_errors))
+        print("Source gate: " + source_messages[0])
         corpus = read_corpus(args.corpus)
         splits = validate_corpus_against_manifest(corpus, manifest)
     except (OSError, json.JSONDecodeError, ValueError, ImportError) as exc:
