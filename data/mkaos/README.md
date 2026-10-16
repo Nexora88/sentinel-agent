@@ -119,3 +119,19 @@ Araç dosyaların gerçek baytlarını okur, SHA-256 ve boyutları kaydeder; dos
 - Gerçek eğitim ve checkpoint üretimi yapılmadı.
 - Rust motorunda gerçek checkpoint yüklemesi ve bağımsız görev testleri henüz doğrulanmadı.
 - Eğitim kapısı kapalı kalıyor.
+
+
+## Birleştirme öncesi kanıt kapısı
+
+Bu PR, aşağıdaki kanıtlar gerçek dosyalar ve gerçek yürütmelerle üretilmeden birleştirilmemelidir:
+
+- [ ] Yerel arşiv ve seçilen TSV için dosya boyutu + SHA-256 kaydı; kaynak sürümü ve edinim yolu doğrulandı.
+- [ ] Her üst kaynağın lisansı, kullanım şartları, atıf yükümlülükleri ve genel amaçlı model ağırlığı dağıtımına uygunluğu belgeli insan/hukuk incelemesinden geçti.
+- [ ] Kişisel veri, rıza/izin, kaynak karışımı, kopyalar ve belge düzeyinde train/validation/test sızıntısı incelendi.
+- [ ] Korpus manifesti yalnızca onaylanmış kaynakları içeriyor; kaynak siciliyle birebir eşleşiyor.
+- [ ] Rastgele başlangıçtan eğitim gerçek cihazda tamamlandı; eğitim günlüğü, ayarlar, veri/manifest hash'leri ve checkpoint hash'i özel kanıt kaydında saklandı.
+- [ ] Gerçek checkpoint Rust CLI'da yüklendi; aynı checkpoint hash'i ve decode parametreleriyle uçtan uca çıktı alındı.
+- [ ] Önceden dondurulmuş bağımsız Türkçe test kümesi değerlendirildi; en az iki bağımsız insan değerlendiricinin puanları ve hata analizi kaydedildi.
+- [ ] En güncel PR commit'i için zorunlu CI kontrolleri geçti.
+
+CI testi, yerel hash, metadata doğrulaması veya modelin dosya olarak yüklenebilmesi tek başına lisans onayı, Türkçe yetkinlik ya da insan değerlendirmesi kanıtı değildir. Bu listedeki tamamlanmamış maddeler açıkça `Bekliyor` kalmalıdır.
