@@ -167,8 +167,12 @@ def main() -> int:
 
     train_ids = encode_documents(splits["train"])
     val_ids = encode_documents(splits["validation"])
+    test_ids = encode_documents(splits["test"])
     if len(train_ids) < args.sequence_length + 1 or len(val_ids) < args.sequence_length + 1:
         print("ERROR: train and validation data each need at least sequence-length + 1 byte tokens", file=sys.stderr)
+        return 2
+    if len(test_ids) < args.sequence_length + 1:
+        print("ERROR: independent test data needs at least sequence-length + 1 byte tokens", file=sys.stderr)
         return 2
 
     try:
@@ -303,6 +307,18 @@ def main() -> int:
 
     assert best_state is not None
     model.load_state_dict(best_state)
+
+    # The held-out test split is evaluated exactly once, after checkpoint selection.
+    # It is never used for gradients, early stopping, or selecting the best checkpoint.
+    model.eval()
+    test_losses = []
+    with torch.no_grad():
+        for xx, yy in batches(test_ids, False):
+            test_losses.append(float(F.cross_entropy(model(xx).reshape(-1, VOCAB_SIZE), yy.reshape(-1)).cpu()))
+    if not test_losses:
+        raise RuntimeError("No independent-test batches; increase test corpus or reduce sequence length")
+    independent_test_loss = sum(test_losses) / len(test_losses)
+
     tensors: dict[str, Any] = {
         "token_embedding.weight": model.token_embedding.weight,
         "final_norm.weight": model.final_norm.unsqueeze(0),
@@ -337,9 +353,14 @@ def main() -> int:
         "manifest_sha256": sha256(args.manifest.read_bytes()),
         "seed": args.seed,
         "device": str(device),
+        "split_sample_counts": {name: len(values) for name, values in splits.items()},
+        "split_utf8_bytes": {name: sum(len(value.encode("utf-8")) for value in values) for name, values in splits.items()},
         "best_validation_loss": best_val,
+        "independent_test_loss": independent_test_loss,
+        "independent_test_evaluated_after_checkpoint_selection": True,
+        "test_used_for_training_or_model_selection": False,
         "history": history,
-        "warning": "Experimental from-scratch checkpoint. Training completion does not certify useful Turkish capability. The held-out test split was not used for optimization or model selection."
+        "warning": "Experimental from-scratch checkpoint. Test loss is a byte-level next-token metric, not proof of Turkish task competence. Training completion does not certify useful Turkish capability; independent human evaluation remains required."
     }
     report_path = args.output_dir / "training-report.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
