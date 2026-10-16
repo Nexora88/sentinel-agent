@@ -14,6 +14,34 @@ MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik t
 - Üçüncü taraf SmolLM2 uyumluluk servisi yalnızca açıkça seçilen legacy-third-party-chat Compose profili ile başlatılabilir.
 - RAG varsayılanı çevrimdışı yerel sözcük/karakter n-gram taban çizgisidir; eğitilmiş semantik embedding modeli değildir.
 
+### Hızlı kurulum (Docker)
+
+Linux/macOS için depo kökünde:
+
+```bash
+chmod +x scripts/bootstrap.sh
+./scripts/bootstrap.sh
+```
+
+Önceden kurulmuş imajlar ve bağımlılıklar ile internet olmadan başlatmak için:
+
+```bash
+./scripts/bootstrap.sh --offline
+```
+
+İlk kurulumda betik `.env` oluşturur, güçlü bir sahip parolası üretir ve yalnızca yerel terminalde bir kez gösterir. Parolayı kaydet; `.env` dosyasını paylaşma veya commit etme. Normal kurulum Docker imajını derler ve OS/Python/Rust bağımlılıkları için internet gerektirebilir; **model ağırlıkları indirmez**. `--offline` hiçbir imajı derlemez veya indirmez, dolayısıyla gerekli imajların önceden bulunması gerekir.
+
+Model readiness durumu: `GET /api/model/readiness`. Bu endpoint dosya yolu veya model hash'i döndürmez. Checkpoint yoksa sohbet arayüzü artık sahte yanıt ya da sessiz üçüncü taraf fallback üretmek yerine `setup_required` durumuyla anlaşılır kurulum mesajı gösterir. Bu, çalışan eğitilmiş model olduğu anlamına gelmez.
+
+İsteğe bağlı ses ve medya bağımlılıkları varsayılan Docker imajına kurulmaz. Bunları bilerek etkinleştirmek için:
+
+```bash
+docker build --build-arg INSTALL_OPTIONAL_VOICE=true -t mkaos:voice .
+docker build --build-arg INSTALL_OPTIONAL_MEDIA=true -t mkaos:media .
+```
+
+Ayrıntılı aşamalı plan: [MKAOS Refactoring Roadmap](docs/MKAOS_REFACTORING_ROADMAP.md).
+
 ### Başlatma
 
 1. .env.example dosyasını .env olarak kopyala.
