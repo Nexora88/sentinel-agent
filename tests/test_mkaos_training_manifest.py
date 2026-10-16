@@ -42,5 +42,26 @@ class TrainingManifestValidationTests(unittest.TestCase):
         self.assertTrue(any("HTTPS" in message for message in validate_manifest(value)))
 
 
+    def test_unreviewed_owner_local_manifest_is_allowed_only_in_explicit_experimental_mode(self):
+        value = good_manifest()
+        value["license_reviewed"] = False
+        value["data_rights_mode"] = "owner_supplied_local_nonredistributable"
+        value["source_kind"] = "owner_created_or_rights_cleared_local"
+        self.assertTrue(any("license_reviewed" in message for message in validate_manifest(value)))
+        messages = validate_manifest(value, experimental_local_only=True)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("Experimental local-only mode", messages[0])
+        self.assertIn("NOT legal clearance", messages[0])
+
+    def test_experimental_mode_does_not_skip_pii_or_human_review(self):
+        value = good_manifest()
+        value["license_reviewed"] = False
+        value["data_rights_mode"] = "owner_supplied_local_nonredistributable"
+        value["source_kind"] = "owner_created_or_rights_cleared_local"
+        value["records"][0]["pii_status"] = "unknown"
+        messages = validate_manifest(value, experimental_local_only=True)
+        self.assertTrue(any("pii_status" in message for message in messages))
+
+
 if __name__ == "__main__":
     unittest.main()
