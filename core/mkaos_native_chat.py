@@ -5,6 +5,7 @@ downloads weights or silently falls back to a third-party model.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import subprocess
 from pathlib import Path
@@ -37,6 +38,17 @@ def generate_native_reply(prompt: str, env: Mapping[str, str] | None = None) -> 
         raise NativeMkaosUnavailable("Configured native MKAOS checkpoint file is not available locally.")
     if len(expected_hash) != 64 or any(c not in "0123456789abcdef" for c in expected_hash):
         raise NativeMkaosUnavailable("MKAOS_NATIVE_SHA256 must be a 64-character hexadecimal SHA-256.")
+
+    # Verify integrity before spawning the native runtime; Rust independently checks it too.
+    digest = hashlib.sha256()
+    try:
+        with checkpoint.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        raise NativeMkaosUnavailable("Configured native MKAOS checkpoint could not be read.") from exc
+    if digest.hexdigest() != expected_hash:
+        raise NativeMkaosUnavailable("Configured native MKAOS checkpoint SHA-256 does not match.")
 
     generator = Path(settings.get("MKAOS_NATIVE_GENERATOR", "/usr/local/bin/mkaos-generate")).expanduser()
     if not generator.is_file():
