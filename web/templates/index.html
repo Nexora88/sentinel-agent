@@ -32,6 +32,7 @@
         <button class="nav-btn" data-panel="control">Egemenlik Kontrol Odası</button>
         <button class="nav-btn" data-panel="github">GitHub</button>
         <button class="nav-btn" data-panel="approvals">Onaylar</button>
+        <button class="nav-btn" data-panel="capabilities">Yetenekler</button>
         <button class="nav-btn" data-panel="status">Durum</button>
       </nav>
       <div class="sidebar-footer">
@@ -47,63 +48,8 @@
           <h1>Komut Köprüsü</h1>
           <p>MKAOS · İstikbal Siber Göklerdedir. Ağ durumu doğrulanmadan “tam egemen” sayılmaz.</p>
         </header>
-        <section class="command-dashboard" aria-label="Siber Karargah genel bakış">
-          <div class="command-topline">
-            <div><span class="eyebrow">MKAOS / KOMUTA MERKEZİ</span><h2>Operasyon görünümü</h2><p>Yerel sistemin durumu, bekleyen kararlar ve doğrulanmış telemetri tek ekranda.</p></div>
-            <div id="command-network" class="network-chip" data-state="unknown"><span class="network-light"></span><span id="command-network-label">Ağ durumu doğrulanıyor</span></div>
-          </div>
-          <div class="command-metrics">
-            <article class="metric-card"><span class="metric-icon">◈</span><span class="metric-label">Yerel model</span><strong id="dash-model">Denetleniyor</strong><small id="dash-model-note">Ollama bağlantısı kontrol ediliyor</small></article>
-            <article class="metric-card"><span class="metric-icon">⌘</span><span class="metric-label">Bekleyen onay</span><strong id="dash-approvals">—</strong><small>İşlem öncesi kullanıcı kararı</small></article>
-            <article class="metric-card"><span class="metric-icon">▤</span><span class="metric-label">Yerel bilgi parçaları</span><strong id="dash-memory">—</strong><small id="dash-memory-note">Bellek istatistiği bekleniyor</small></article>
-            <article class="metric-card"><span class="metric-icon">◎</span><span class="metric-label">Gece denetimi</span><strong id="dash-night">Kayıt bekleniyor</strong><small id="dash-night-note">Sonuç yoksa sayı gösterilmez</small></article>
-          </div>
-          <div class="command-columns">
-            <article class="command-panel command-activity">
-              <div class="section-heading"><div><span class="eyebrow">CANLI AKIŞ</span><h3>Operasyon günlüğü</h3></div><span class="live-indicator"><i></i> Durum güncelleniyor</span></div>
-              <div id="dash-activity" class="activity-list"><p class="empty-state">Sunucudan gerçek iş kayıtları bekleniyor…</p></div>
-              <div class="command-shortcuts"><button type="button" class="shortcut-btn" data-panel="approvals">Onay kuyruğunu aç ↗</button><button type="button" class="shortcut-btn" data-panel="control">Egemenlik denetimi ↗</button><button type="button" class="shortcut-btn" data-panel="image">Medya stüdyosu ↗</button></div>
-            </article>
-            <aside class="command-panel command-telemetry">
-              <div class="section-heading"><div><span class="eyebrow">SİSTEM TELEMETRİSİ</span><h3>Yerel çalışma</h3></div><span class="telemetry-mark">MKAOS</span></div>
-              <div class="telemetry-row"><span>API / panel</span><strong id="dash-api-state">Bekleniyor</strong></div>
-              <div class="telemetry-row"><span>Harici web araştırması</span><strong id="dash-web-state">Bilinmiyor</strong></div>
-              <div class="telemetry-row"><span>GPU doğrulaması</span><strong id="dash-gpu-state">Ölçülmedi</strong></div>
-              <div class="telemetry-row"><span>İmza anahtarı</span><strong id="dash-key-state">Sunucu durumu ayrıca kontrol edilmeli</strong></div>
-              <p class="telemetry-note">Yeşil gösterge tek başına air-gap kanıtı değildir. İşletim sistemi düzeyinde ağ çıkışı ölçülmeden “tam egemen” durumu ilan edilmez.</p>
-            </aside>
-          </div>
-          <div class="briefing-strip"><span class="briefing-icon">✦</span><div><strong>Sabah brifingi</strong><p id="dash-briefing">Henüz doğrulanmış gece denetimi raporu yok. Tamamlanmış kayıtlar geldiğinde burada özetlenecek.</p></div><button type="button" class="shortcut-btn" data-panel="night">Raporu aç ↗</button></div>
-        </section>
-        <div class="quick-grid">
-          <button class="qcard" data-cmd="expand">🌌 Bilgi genişlet</button>
-          <button class="qcard" data-cmd="curiosity">🔭 Merak turu</button>
-          <button class="qcard" data-cmd="night">🌙 Gece araştırması</button>
-          <button class="qcard" data-cmd="finance">💰 Paper döngü</button>
-          <button class="qcard" data-cmd="discover">🔌 Yerel keşif</button>
-          <button class="qcard" data-cmd="podcast">🎙 Podcast taslağı</button>
-          <button class="qcard" data-cmd="pack">📦 Bilgi paketi</button>
-          <button class="qcard" data-cmd="plan">🗺 Plan oluştur</button>
-        </div>
+        <p class="panel-lead">Operasyon panelleri sol menüde. Yetenekler sekmesinde matris ve yerel poster vardır.</p>
         <div id="chat-messages" class="chat-messages"></div>
-        <div class="voice-console">
-          <div class="voice-console-heading">
-            <div><strong>Türkçe ses stüdyosu</strong><p>Ses tanıma ve seslendirme yerel modellerle çalışır; tarayıcı bulut sesi kullanılmaz.</p></div>
-            <span id="voice-status" class="voice-status">Yerel ses denetleniyor…</span>
-          </div>
-          <div class="voice-controls">
-            <label for="voice-select">Ses karakteri</label>
-            <select id="voice-select">
-              <option value="male">Erkek · tok ve bilge</option>
-              <option value="female">Kadın · enerjik ve net</option>
-            </select>
-            <label for="voice-pace">Konuşma hızı <output id="voice-pace-value">1,00×</output></label>
-            <input id="voice-pace" type="range" min="0.85" max="1.15" step="0.05" value="1" aria-label="Konuşma hızı" />
-            <label class="cat-toggle"><input type="checkbox" id="cat-dub-toggle" /> 🐈 Kedi dublajı</label>
-            <button id="voice-test-btn" type="button">Sesi dene</button>
-            <button id="voice-stop-btn" type="button" class="voice-stop">Durdur</button>
-          </div>
-        </div>
         <div class="chat-input-area">
           <button id="voice-btn" title="Yerel Türkçe sesli komut" class="icon-btn">🎤</button>
           <textarea id="chat-input" placeholder="Emir veya hedef yaz... (plan için: planla: ...)" rows="2"></textarea>
@@ -114,7 +60,7 @@
       <section id="panel-pulse" class="panel">
         <header class="panel-header">
           <h1>MKAOS Nabız — İstikbal Siber Göklerdedir</h1>
-          <p>Bir sohbet kutusundan fazlası: plan motoru, yerel bellek ve insan onaylı araçlar. İstikbal Siber Göklerdedir.</p>
+          <p>Plan motoru, yerel bellek ve insan onaylı araçlar.</p>
         </header>
         <div id="manifesto-pillars" class="pillars"></div>
         <h3 class="section-h">Canlı İşler</h3>
@@ -124,23 +70,19 @@
       </section>
 
       <section id="panel-plan" class="panel">
-        <header class="panel-header">
-          <h1>Plan Motoru</h1>
-          <p>Tek hedeften çok adım. Riskli adımlar onay ister; güvenliler çalışır.</p>
-        </header>
+        <header class="panel-header"><h1>Plan Motoru</h1></header>
         <div class="universe-actions">
-          <input type="text" id="plan-goal" placeholder="Hedef: projeyi güvenli hale getir, kripto araştır..." />
+          <input type="text" id="plan-goal" placeholder="Hedef..." />
           <button id="plan-create-btn" class="primary">Plan Üret</button>
         </div>
         <div id="plan-view" class="approvals-list"></div>
-        <h3 class="section-h">Son Planlar</h3>
         <div id="plans-list" class="approvals-list"></div>
       </section>
 
       <section id="panel-universe" class="panel">
         <header class="panel-header">
           <h1>Bilgi Evreni</h1>
-          <p>Kara delik gibi büyür — sanitize + güven skoru.</p>
+          <p>Sanitize + güven skoru. Saatlik büyüme: SEKA_UNIVERSE_HOURLY + ALLOW_WEB_RESEARCH.</p>
         </header>
         <div class="universe-stats">
           <div class="stat-card"><span class="stat-value" id="u-pages">—</span><span class="stat-label">Toplam Bilgi</span></div>
@@ -154,147 +96,85 @@
           <button id="expand-btn" class="primary">Şimdi Genişlet</button>
           <button id="pack-btn">Paket Dışa Aktar</button>
         </div>
-        <div class="recent-topics">
-          <h3>Son Konular</h3>
-          <ul id="topic-list"></ul>
-        </div>
+        <ul id="topic-list"></ul>
         <pre id="pack-out" class="status-box" style="margin-top:12px;display:none"></pre>
       </section>
 
       <section id="panel-curiosity" class="panel">
-        <header class="panel-header">
-          <h1>Merak Motoru</h1>
-          <p>Boşta bilim, felsefe, kriptografi keşfeder.</p>
-        </header>
-        <div class="universe-stats">
-          <div class="stat-card"><span class="stat-value" id="c-count">—</span><span class="stat-label">Keşif</span></div>
-          <div class="stat-card"><span class="stat-value" id="c-last">—</span><span class="stat-label">Son Tur</span></div>
-        </div>
-        <div class="universe-actions">
-          <button id="curiosity-btn" class="primary">Merak Turu</button>
-        </div>
+        <header class="panel-header"><h1>Merak Motoru</h1></header>
+        <button id="curiosity-btn" class="primary">Merak Turu</button>
         <pre id="curiosity-out" class="status-box">—</pre>
       </section>
 
       <section id="panel-night" class="panel">
-        <header class="panel-header">
-          <h1>Gece + Podcast</h1>
-          <p>Yerel gece denetimi, güvenlik raporu ve podcast taslağı. Kod değişikliği ve push için onay gerekir.</p>
-        </header>
-        <div class="stat-card night-schedule-card">
-          <span class="stat-label">OTOMATİK GECE DENETİMİ</span>
-          <pre id="night-scheduler-status" class="status-box">Zamanlama durumu yükleniyor…</pre>
-        </div>
-        <div class="universe-actions">
-          <button id="night-btn" class="primary">Gece Döngüsü</button>
-          <button id="podcast-btn">Podcast Metni</button>
-        </div>
+        <header class="panel-header"><h1>Gece + Podcast</h1></header>
+        <pre id="night-scheduler-status" class="status-box">—</pre>
+        <button id="night-btn" class="primary">Gece Döngüsü</button>
+        <button id="podcast-btn">Podcast Metni</button>
         <pre id="night-out" class="status-box">—</pre>
       </section>
 
       <section id="panel-docs" class="panel">
-        <header class="panel-header">
-          <h1>Belge Merkezi</h1>
-          <p>PDF → RAG + tarih/tutar. Otomatik ödeme yok.</p>
-        </header>
-        <div class="universe-actions">
-          <input type="file" id="doc-file" accept=".pdf,.md,.txt,.csv" />
-          <button id="doc-upload-btn" class="primary">Yükle + Analiz</button>
-        </div>
+        <header class="panel-header"><h1>Belge Merkezi</h1></header>
+        <input type="file" id="doc-file" accept=".pdf,.md,.txt,.csv" />
+        <button id="doc-upload-btn" class="primary">Yükle + Analiz</button>
         <pre id="doc-out" class="status-box">—</pre>
       </section>
 
       <section id="panel-finance" class="panel">
-        <header class="panel-header">
-          <h1>Finans (Paper)</h1>
-          <p>Sanal portföy. Gerçek cüzdan kapalı.</p>
-        </header>
-        <div class="universe-stats">
-          <div class="stat-card"><span class="stat-value" id="f-equity">—</span><span class="stat-label">Portföy $</span></div>
-          <div class="stat-card"><span class="stat-value" id="f-pnl">—</span><span class="stat-label">PnL %</span></div>
-          <div class="stat-card"><span class="stat-value" id="f-cash">—</span><span class="stat-label">Nakit $</span></div>
-          <div class="stat-card"><span class="stat-value" id="f-open">—</span><span class="stat-label">Açık</span></div>
-        </div>
-        <div class="universe-actions">
-          <button id="fin-cycle-btn" class="primary">Döngü</button>
-          <button id="fin-refresh-btn">Yenile</button>
-          <span id="fin-mode" class="stat-label" style="align-self:center"></span>
-        </div>
-        <h3 class="section-h">Pozisyonlar</h3>
-        <div id="fin-positions" class="approvals-list"></div>
-        <h3 class="section-h">Düşünceler</h3>
-        <pre id="fin-thoughts" class="status-box" style="max-height:220px">—</pre>
-        <div class="finance-box" style="margin-top:16px">
-          <input type="text" id="finance-query" placeholder="Analiz sorusu..." />
-          <button id="finance-btn">Analiz</button>
-        </div>
-        <pre id="finance-result" class="status-box">—</pre>
+        <header class="panel-header"><h1>Finans (Paper)</h1></header>
+        <button id="fin-cycle-btn" class="primary">Döngü</button>
+        <button id="fin-refresh-btn">Yenile</button>
+        <pre id="fin-thoughts" class="status-box">—</pre>
       </section>
 
       <section id="panel-discover" class="panel">
-        <header class="panel-header">
-          <h1>Yerel Keşif</h1>
-          <p>Localhost port — cihaz kontrolü yok.</p>
-        </header>
-        <div class="universe-actions">
-          <button id="discover-btn" class="primary">Tara</button>
-        </div>
+        <header class="panel-header"><h1>Yerel Keşif</h1></header>
+        <button id="discover-btn" class="primary">Tara</button>
         <pre id="discover-out" class="status-box">—</pre>
       </section>
 
       <section id="panel-legacy" class="panel">
-        <header class="panel-header">
-          <h1>Legacy Yedek</h1>
-          <p>Şifreli yerel dosya. Blockchain değil.</p>
-        </header>
-        <div class="universe-actions">
-          <input type="password" id="legacy-pass" placeholder="En az 8 karakter" />
-          <button id="legacy-btn" class="primary">Yedekle</button>
-        </div>
+        <header class="panel-header"><h1>Legacy Yedek</h1></header>
+        <input type="password" id="legacy-pass" placeholder="En az 8 karakter" />
+        <button id="legacy-btn" class="primary">Yedekle</button>
         <pre id="legacy-out" class="status-box">—</pre>
       </section>
 
       <section id="panel-image" class="panel">
         <header class="panel-header">
           <h1>MKAOS Medya Stüdyosu</h1>
-          <p>Yerel görsel üretimi, düzenleme, arka plan ve çok sahneli storyboard videosu. Dış API yedeği yoktur.</p>
+          <p>SD yokken bile yerel poster. Dış API yedeği yok.</p>
         </header>
-        <div class="media-studio">
-          <div class="media-mode-row">
-            <label for="media-mode">İşlem</label>
-            <select id="media-mode">
-              <option value="generate">Metinden görsel üret</option>
-              <option value="edit">Görseli yapay zekâyla düzenle</option>
-              <option value="background">Arka planı değiştir</option>
-            </select>
-          </div>
-          <label for="media-file">Kaynak görsel (düzenleme / arka plan)</label>
-          <input id="media-file" type="file" accept="image/png,image/jpeg,image/webp" />
-          <label for="image-prompt">Görsel tarifi / düzenleme talimatı</label>
-          <textarea id="image-prompt" placeholder="Örn. sinematik, gerçekçi bir Kapadokya gün doğumu..." rows="3"></textarea>
-          <div class="media-mode-row">
-            <label for="background-color">Yeni arka plan rengi</label>
-            <input id="background-color" type="color" value="#172033" />
-          </div>
-          <div class="media-actions">
-            <button id="image-btn" class="primary">Yerel olarak işle</button>
-            <button id="video-btn" type="button">Son görselden kısa video</button>
-          </div>
-          <p class="media-note">Kısa video yerel ffmpeg ile hareket efekti verir. Storyboard modu 2-6 sahne için yerel SD modelinden anahtar kareler üretip MP4'e birleştirir; nöral text-to-video değildir.</p>
-          <label for="story-prompts">Storyboard sahneleri (her satıra bir sahne, 2-6 satır)</label>
-          <textarea id="story-prompts" rows="5" placeholder="1. Geniş açı: gün doğumunda dağlar\n2. Kamera vadiye yaklaşır\n3. Gece gökyüzünde yıldızlar"></textarea>
-          <div class="media-actions">
-            <button id="story-video-btn" type="button">Sahnelerden yerel video oluştur</button>
-          </div>
-          <div id="image-result" class="image-result" aria-live="polite"></div>
+        <textarea id="image-prompt" placeholder="Görsel tarifi..." rows="3"></textarea>
+        <div class="media-actions">
+          <button id="image-btn" class="primary">Yerel olarak işle</button>
+          <button id="poster-quick-btn" type="button">Hızlı poster (SD yok)</button>
+          <button id="video-btn" type="button">Kısa video</button>
         </div>
+        <div id="image-result" class="image-result"></div>
+      </section>
+
+      <section id="panel-capabilities" class="panel">
+        <header class="panel-header">
+          <h1>Yetenek Matrisi</h1>
+          <p>Dil · LLM · kod · medya · güvenlik — abartısız.</p>
+        </header>
+        <div class="universe-actions">
+          <button id="cap-refresh-btn" class="primary">Yenile</button>
+          <button id="poster-btn">Yerel Poster Üret</button>
+        </div>
+        <pre id="capabilities-box" class="status-box">—</pre>
+        <div id="poster-preview" class="media-preview"></div>
+      </section>
+
+      <section id="panel-control" class="panel">
+        <header class="panel-header"><h1>Egemenlik Kontrol Odası</h1></header>
+        <pre id="control-status" class="status-box">—</pre>
       </section>
 
       <section id="panel-github" class="panel">
-        <header class="panel-header">
-          <h1>GitHub</h1>
-          <p>Yazma/push onaylı.</p>
-        </header>
+        <header class="panel-header"><h1>GitHub</h1></header>
         <button id="gh-refresh" class="primary">Yenile</button>
         <div id="gh-repos" class="gh-repos"></div>
       </section>
@@ -302,71 +182,15 @@
       <section id="panel-approvals" class="panel">
         <header class="panel-header"><h1>Onaylar</h1></header>
         <div id="approvals-list" class="approvals-list"><p class="empty">Yok</p></div>
-        <h3 class="section-h">İşlem geçmişi</h3>
-        <div id="approval-history" class="approvals-list"><p class="empty">Geçmiş yükleniyor…</p></div>
-      </section>
-
-
-      <section id="panel-control" class="panel">
-        <header class="panel-header">
-          <h1>Egemenlik ve Plan Kontrol Odası</h1>
-          <p>Yerel-first denetim paneli · imzalı onay · medya görev kuyruğu · lisans hijyeni. Gösterilen durum kanıta dayanır.</p>
-        </header>
-        <div id="sovereignty-status-card" class="control-card">Egemenlik kanıtları denetleniyor…</div>
-        <div class="control-grid">
-          <div class="control-card">
-            <h3>Yerel model ve kaynaklar</h3>
-            <pre id="media-capabilities" class="status-box">Yükleniyor…</pre>
-            <div class="control-actions">
-              <input id="queue-media-prompt" type="text" placeholder="Kuyruğa görsel görevi ekle" />
-              <button id="queue-media-btn" class="primary">Kuyruğa ekle</button>
-              <button id="refresh-media-btn">Kuyruğu yenile</button>
-            </div>
-            <div id="media-jobs-list" class="approvals-list"></div>
-          </div>
-          <div class="control-card">
-            <h3>İmzalı insan onayı</h3>
-            <p>Ed25519 imzası doğrulanır ve audit kaydı yazılır. İmza tek başına push/merge yapmaz; açık anahtar sunucuda yapılandırılmalıdır.</p>
-            <label for="approval-payload">İmzalanmış JSON payload</label>
-            <textarea id="approval-payload" rows="4" placeholder='{"request_id":"...","action":"git_push"}'></textarea>
-            <label for="approval-signature">Ed25519 imzası (Base64)</label>
-            <input id="approval-signature" type="text" placeholder="İmza Base64" />
-            <div class="control-actions">
-              <button id="approval-keygen-btn" type="button">Tarayıcıda Ed25519 anahtarı üret</button>
-              <button id="approval-sign-btn" type="button" class="primary">Payload'ı imzala + doğrula</button>
-            </div>
-            <p>Özel anahtar yalnızca tarayıcıda üretilir ve indirilen dosyada saklanır; sunucuya gönderilmez. Açık anahtarı MKAOS_APPROVAL_ED25519_PUBLIC_KEY ortam değişkenine ekleyip servisi yeniden başlatmalısın.</p>
-            <pre id="approval-public-key" class="status-box">Henüz anahtar üretilmedi.</pre>
-            <button id="verify-approval-btn" class="primary">İmzayı doğrula</button>
-            <pre id="approval-verify-result" class="status-box">İşlem başlatılmaz; yalnızca imza doğrulanır.</pre>
-          </div>
-        </div>
-        <div class="control-card">
-          <h3>Yerel Hafıza Amnezisi</h3>
-          <p>Son X saat içindeki kişisel hafıza ve sohbet kayıtlarında tam ifade eşleşmelerini siler. Yedekleri veya SSD bloklarını güvenli biçimde imha ettiği anlamına gelmez.</p>
-          <label for="forget-topic">Silinecek ifade (en az 3 karakter)</label>
-          <input id="forget-topic" type="text" placeholder="Tam ifade veya konu"/>
-          <label for="forget-hours">Zaman aralığı (saat)</label>
-          <input id="forget-hours" type="number" min="1" max="8760" value="24"/>
-          <label for="forget-confirm">Onay metni: DELETE_MATCHING_MEMORY</label>
-          <input id="forget-confirm" type="text" placeholder="DELETE_MATCHING_MEMORY"/>
-          <button id="forget-memory-btn">Eşleşen yerel kayıtları sil</button>
-          <pre id="forget-memory-result" class="status-box">Açık onay verilmeden silme yapılmaz.</pre>
-        </div>
-        <div class="control-card">
-          <h3>Temiz kod / lisans uyarı taraması</h3>
-          <p>SPDX ve lisans bildirimi ipuçlarını yerelde arar. Semantik benzerlik ölçmez; yasal karar veya telif garantisi değildir.</p>
-          <button id="clean-room-audit-btn">Yerel lisans denetimini çalıştır</button>
-          <pre id="clean-room-audit-result" class="status-box">Denetim isteğe bağlıdır.</pre>
-        </div>
       </section>
 
       <section id="panel-status" class="panel">
-        <header class="panel-header"><h1>Sistem</h1></header>
+        <header class="panel-header"><h1>Durum</h1></header>
         <pre id="status-text" class="status-box">—</pre>
       </section>
     </main>
   </div>
   <script src="/static/app.js"></script>
+  <script src="/static/capabilities.js"></script>
 </body>
 </html>
