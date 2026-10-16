@@ -35,6 +35,17 @@ def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
+    """Hash the bytes actually persisted on disk using bounded memory."""
+    if chunk_size < 1:
+        raise ValueError("chunk_size must be positive")
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(chunk_size), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def read_corpus(path: Path) -> dict[str, str]:
     samples: dict[str, str] = {}
     with path.open("r", encoding="utf-8") as handle:
@@ -114,8 +125,12 @@ def write_mkaos_checkpoint(path: Path, tensors: dict[str, Any]) -> str:
         payload.extend(struct.pack("<II", rows, cols))
         payload.extend(matrix.numpy().astype("<f4", copy=False).tobytes(order="C"))
     path.parent.mkdir(parents=True, exist_ok=True)
+    expected_hash = sha256(payload)
     path.write_bytes(payload)
-    return sha256(bytes(payload))
+    actual_hash = sha256_file(path)
+    if actual_hash != expected_hash:
+        raise IOError(f"Checkpoint changed while being written: expected {expected_hash}, got {actual_hash}")
+    return actual_hash
 
 
 def learning_rate_for_step(
@@ -395,6 +410,9 @@ def main() -> int:
     tokenizer_bytes = (json.dumps(tokenizer_payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
     tokenizer_path = args.output_dir / "tokenizer.json"
     tokenizer_path.write_bytes(tokenizer_bytes)
+    tokenizer_disk_hash = sha256_file(tokenizer_path)
+    if tokenizer_disk_hash != sha256(tokenizer_bytes):
+        raise IOError("Tokenizer contract file SHA-256 mismatch after write")
     report = {
         "format_version": 1,
         "model_id": "MKAOS-TR-FromScratch-Experimental",
@@ -404,7 +422,7 @@ def main() -> int:
         "architecture": {"type": "MKAOS-GQA-SwiGLU", "vocab_size": VOCAB_SIZE, "hidden_size": d, "layers": args.layers, "query_heads": nh, "kv_heads": nkh, "intermediate_size": intermediate, "max_sequence_len": args.sequence_length},
         "tokenizer_contract_id": TOKENIZER_CONTRACT_ID,
         "tokenizer_contract_id": TOKENIZER_CONTRACT_ID,
-        "tokenizer_sha256": sha256(tokenizer_bytes),
+        "tokenizer_sha256": tokenizer_disk_hash,
         "checkpoint_file": checkpoint_path.name,
         "checkpoint_sha256": checkpoint_hash,
         "dataset_id": manifest.get("dataset_id"),
