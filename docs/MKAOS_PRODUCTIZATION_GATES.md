@@ -4,13 +4,13 @@ This document separates work that can be automated safely from claims that requi
 
 ## 1. One-command setup
 
-Use `scripts/mkaos_bootstrap.sh` on Linux/macOS with Python 3.11+, Docker Compose v2, and curl. It creates a private `.env`, generates a strong first-run `OWNER_PASSWORD` only when blank, validates Compose, builds the web image, starts the service, and checks health. It never prints a password already supplied by the operator.
+Use `bash scripts/mkaos_bootstrap.sh` on Linux/macOS with Python 3.11+, Docker Compose v2, and curl. It creates a private `.env`, generates a strong first-run `OWNER_PASSWORD` only when blank, validates Compose, builds the web image, starts the service, and checks health. It never prints a password already supplied by the operator.
 
 Optional model downloads require an interactive opt-in and `config/model-assets.lock`. Every entry must pin an HTTPS URL, SHA-256, and destination beneath `models/`; there are deliberately no fabricated/default model hashes. A matching digest proves bytes match the lock, not license rights, provenance, safety, or quality. Review the upstream license and distribution terms before creating a lock entry. Keep model files out of Git.
 
-- Preflight only: `scripts/mkaos_bootstrap.sh --no-start`
-- Start the app: `scripts/mkaos_bootstrap.sh`
-- Explicitly opt in to locked model downloads: `scripts/mkaos_bootstrap.sh --download-assets`
+- Preflight only: `bash scripts/mkaos_bootstrap.sh --no-start`
+- Start the app: `bash scripts/mkaos_bootstrap.sh`
+- Explicitly opt in to locked model downloads: `bash scripts/mkaos_bootstrap.sh --download-assets`
 
 Windows users should use WSL2 with Docker Desktop until a native PowerShell bootstrap receives equivalent tests.
 
