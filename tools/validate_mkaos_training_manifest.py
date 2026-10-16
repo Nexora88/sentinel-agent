@@ -58,8 +58,17 @@ def validate_manifest(manifest: Any, experimental_local_only: bool = False) -> l
                 errors.append(f"{where}.sha256 duplicates content; deduplicate before training.")
             seen_hashes.add(digest)
         uri = row.get("source_uri")
-        if isinstance(uri, str) and not uri.startswith("https://"):
-            errors.append(f"{where}.source_uri must be an HTTPS provenance URL.")
+        local_owner_source = (
+            experimental_local_only
+            and manifest.get("data_rights_mode") == "owner_supplied_local_nonredistributable"
+            and manifest.get("source_kind") == "owner_created_or_rights_cleared_local"
+        )
+        if isinstance(uri, str) and not (
+            uri.startswith("https://") or (local_owner_source and uri.startswith("local://"))
+        ):
+            errors.append(
+                f"{where}.source_uri must be HTTPS, or local:// in explicit owner-local experimental mode."
+            )
         if row.get("language") != "tr":
             errors.append(f"{where}.language must be 'tr' for the Turkish corpus.")
         if row.get("consent") not in ALLOWED_CONSENT:
