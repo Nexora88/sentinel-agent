@@ -6,23 +6,24 @@
   "sources": [
     {
       "source_id": "mozilla-common-voice-text",
-      "name": "Mozilla Common Voice sentence text",
-      "canonical_url": "https://github.com/common-voice/common-voice",
-      "license_claim": "Repository states most sentence text in server/data is CC0; release-specific scope must be verified.",
-      "status": "candidate_pending_release_review",
+      "name": "Mozilla Common Voice Scripted Speech 27.0 Turkish sentence text",
+      "canonical_url": "https://mozilladatacollective.com/datasets/cmu5wkah500c2o10719lem8m8",
+      "license_claim": "The exact MDC product page identifies cv-corpus-27.0-2026-09-11 Turkish (tr) as CC0-1.0 and forbids re-hosting/re-sharing the dataset. The datasheet says sentence sources are approximately 85.0% Turkish Wikipedia, 11.6% sentence-collector, 1.2% SETimes, and 2.2% Other. Underlying source rights, corpus provenance and resulting model-weight distribution still require review.",
+      "status": "candidate_pending_local_hash_source_rights_and_weight_review",
       "permitted_use_now": false,
       "review_required": [
-        "confirm the exact Turkish v27.0 product page and download record in Mozilla Data Collective",
-        "verify the exact Turkish text TSV is covered by CC0-1.0; do not infer from a generic repository statement",
-        "download only through the official authorized dataset flow; keep the archive and text TSV outside Git",
-        "record SHA-256 for the original archive and selected TSV locally",
-        "exclude audio and speaker/client identifiers from the training corpus",
-        "run local duplicate, PII/secrets, split-leakage, and human content review",
-        "document permission to train and redistribute resulting model weights"
+        "download only through the official authorized MDC flow and keep archive/text TSV outside Git",
+        "record SHA-256 for the original archive and exact selected validated_sentences.tsv file",
+        "review the datasheet's source breakdown and investigate upstream rights for Wikipedia, SETimes, sentence-collector and Other groups",
+        "confirm that the exact text file and intended generative-language-model training use are compatible with applicable dataset terms and upstream rights",
+        "document whether distribution of derived MKAOS model weights is permitted; dataset CC0 label alone is not recorded as legal advice",
+        "exclude audio, client_id, speaker demographics and other unnecessary metadata from the training corpus",
+        "run local duplicate, PII/secrets, source/document split-leakage, and human content review",
+        "obtain documented human/legal approval before changing source status or opening training gate"
       ],
-      "evidence_note": "The upstream cv-dataset metadata reports Scripted Speech v27.0 as the latest release in September 2026, but the exact Turkish product page, selected text file hash, and applicable weight-distribution conditions have not been verified here. Candidate only; not training approval.",
-      "candidate_release": "Common Voice Scripted Speech v27.0 — Turkish (tr), target release only; not approved",
-      "release_verification_status": "pending_exact_Turkish_product_page_and_local_file_hashes"
+      "evidence_note": "The exact Turkish v27.0 MDC product page is now identified (dataset ID cmu5wkah500c2o10719lem8m8; release date 2026-09-17; datasheet cv-corpus-27.0-2026-09-11). The page says CC0-1.0 and prohibits dataset re-hosting/re-sharing; its source table attributes about 85% of sentences to Turkish Wikipedia. Local archive/TSV hashes are not available in this repository environment, source-specific legal compatibility has not been decided, and weight-distribution approval is pending. Candidate only; not training approval.",
+      "candidate_release": "Common Voice Scripted Speech v27.0 — Turkish (tr), dataset ID cmu5wkah500c2o10719lem8m8; not approved",
+      "release_verification_status": "official_product_page_verified_local_archive_and_tsv_hashes_pending"
     },
     {
       "source_id": "wikimedia-turkish-wikipedia",
