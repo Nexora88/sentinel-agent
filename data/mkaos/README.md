@@ -83,7 +83,7 @@ python tools/train_mkaos_from_scratch.py \
 
 Bu model byte-token tabanlı küçük deneysel bir mimaridir; büyük model performansı beklenmemeli. Test kaybı checkpoint seçimi bittikten sonra bir kez ölçülür ve model seçimi için kullanılmaz.
 
-## Rust checkpoint doğrulaması ve bağımsız Türkçe görevler
+## Rust checkpoint doğrulaması ve bağımsız Türkçe görevler\n\nİnsan değerlendirme rubriği ve test tasarımı: `docs/MKAOS_HUMAN_EVALUATION_PROTOCOL.md`.
 
 Rust crate içindeki checkpoint loader, SHA-256, dosya yapısı, tensor boyutları ve sonlu ağırlıkları doğrulayabilir; bunun başarılı olması tek başına checkpoint'in model mimarisiyle uyumlu üretim çıkarımı yaptığı anlamına gelmez. Gerçek eğitim checkpoint'i yokken gerçek checkpoint yükleme testi raporlanamaz.
 
@@ -97,6 +97,19 @@ python tools/evaluate_mkaos_turkish_tasks.py \
 ```
 
 Her satır `case_id`, `task`, `prompt`, `reference`, `prediction`, `source_id`, `document_group`, `human_review=approved`, `split=test` ve mümkünse insan puanı (`human_score` 0-4) içermelidir. Bu araç değerlendirme verisini rapora yazmaz, yalnızca ölçüm özetini üretir. Exact-match tek başına açık uçlu Türkçe kalitesini ölçmez.
+
+## Hash kayıt aracını kullanma
+
+Arşiv ve TSV gerçekten yerel olarak edinildikten sonra hash'leri otomatik kaydetmek için:
+
+```bash
+python tools/record_mkaos_local_artifact_hashes.py \
+  --archive ./private-data/common-voice-tr-v27/<gercek-arsiv-dosyasi> \
+  --tsv ./private-data/common-voice-tr-v27/validated_sentences.tsv \
+  --output ./private-data/mkaos/local-artifact-hashes.json
+```
+
+Araç dosyaların gerçek baytlarını okur, SHA-256 ve boyutları kaydeder; dosyaları yüklemez ve mevcut raporun üzerine yazmaz. Hash kaydı lisans izni veya eğitim onayı değildir. Bu JSON yerel/özel tutulmalı; Git'e ham veri veya kişisel veri koyulmamalıdır.
 
 ## Gerçek durum
 
