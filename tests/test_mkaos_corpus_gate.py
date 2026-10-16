@@ -67,5 +67,45 @@ class MkaosCorpusGateTests(unittest.TestCase):
         self.assertIn("does not replace independent legal", messages[0])
 
 
+    def test_owner_authorized_local_experiment_is_explicit_and_nonredistributable(self):
+        from core.mkaos_corpus_gate import validate_experimental_local_manifest
+        manifest = {
+            "data_rights_mode": "owner_supplied_local_nonredistributable",
+            "source_kind": "owner_created_or_rights_cleared_local",
+            "records": [{"source_id": "my-local-notes"}],
+        }
+        registry = {
+            "project_owner_authorization": {"status": "granted_by_project_owner_in_chat"}
+        }
+        messages = validate_experimental_local_manifest(manifest, registry)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("does NOT clear third-party rights", messages[0])
+
+    def test_experimental_mode_rejects_third_party_candidate_sources(self):
+        from core.mkaos_corpus_gate import validate_experimental_local_manifest
+        manifest = {
+            "data_rights_mode": "owner_supplied_local_nonredistributable",
+            "source_kind": "third_party_dataset",
+            "records": [{"source_id": "common-voice"}],
+        }
+        registry = {
+            "project_owner_authorization": {"status": "granted_by_project_owner_in_chat"}
+        }
+        messages = validate_experimental_local_manifest(manifest, registry)
+        self.assertTrue(any("source_kind" in message for message in messages))
+
+    def test_experimental_mode_requires_explicit_data_rights_mode(self):
+        from core.mkaos_corpus_gate import validate_experimental_local_manifest
+        manifest = {
+            "source_kind": "owner_created_or_rights_cleared_local",
+            "records": [{"source_id": "my-local-notes"}],
+        }
+        registry = {
+            "project_owner_authorization": {"status": "granted_by_project_owner_in_chat"}
+        }
+        messages = validate_experimental_local_manifest(manifest, registry)
+        self.assertTrue(any("data_rights_mode" in message for message in messages))
+
+
 if __name__ == "__main__":
     unittest.main()
