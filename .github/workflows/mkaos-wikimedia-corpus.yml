@@ -11,6 +11,7 @@ on:
   push:
     branches:
       - mkaos-wikimedia-corpus-pipeline
+      - mkaos/turkish-1b-training-foundation
     paths:
       - ".github/workflows/mkaos-wikimedia-corpus.yml"
       - "scripts/mkaos/prepare_wikimedia_corpus.py"
