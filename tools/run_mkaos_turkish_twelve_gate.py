@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""MKAOS Türkçe 12-metin kapısı: doğrula → insan onayı → eğitim → gerçek SHA → Rust testi.
+"""MKAOS Türkçe seed kapısı: doğrula → insan onayı → eğitim → gerçek SHA → Rust testi.
 
 - content_sha256 ve checkpoint_sha256 dosya baytlarından hesaplanır.
 - Eğitim kapısı tüm kayıtlar approve olmadan açılmaz.
-- Bu küçük seed modeli genel Türkçe LLM iddiası taşımaz; boru hattı kanıtıdır.
+- Küçük seed modeli genel Türkçe LLM iddiası taşımaz; boru hattı kanıtıdır.
 """
 from __future__ import annotations
 
@@ -34,6 +34,19 @@ def sha256_file(path: Path) -> str:
 def run(cmd: list[str], *, cwd: Path = ROOT) -> subprocess.CompletedProcess:
     print("+", " ".join(cmd), flush=True)
     return subprocess.run(cmd, cwd=cwd, check=True, text=True)
+
+
+def assign_splits(n: int) -> list[str]:
+    """Kaynak düzeyinde train/val/test — hiçbir kaynak iki split'te olmaz."""
+    if n < 6:
+        raise ValueError("en az 6 kayıt gerekir (2+2+2)")
+    n_test = max(2, n // 6)
+    n_val = max(2, n // 6)
+    n_train = n - n_val - n_test
+    if n_train < 2:
+        raise ValueError("train split çok küçük")
+    labels = ["train"] * n_train + ["validation"] * n_val + ["test"] * n_test
+    return labels
 
 
 def build_manifest(records_path: Path, ledger_path: Path) -> dict:
@@ -70,38 +83,38 @@ def build_manifest(records_path: Path, ledger_path: Path) -> dict:
                 "personal_data": False,
                 "sensitive_data": False,
                 "content_sha256": digest,
-                "split": None,  # filled below
+                "language": obj.get("language", "tr"),
+                "split": None,
             }
         )
 
-    if len(records) != 12:
-        raise ValueError(f"expected 12 approved records, got {len(records)}")
+    if len(records) < 12:
+        raise ValueError(f"expected at least 12 approved records, got {len(records)}")
 
-    # Source-level split: 6 train / 3 validation / 3 test — no source crosses splits
-    for i, rec in enumerate(records):
-        if i < 6:
-            rec["split"] = "train"
-        elif i < 9:
-            rec["split"] = "validation"
-        else:
-            rec["split"] = "test"
+    labels = assign_splits(len(records))
+    for rec, lab in zip(records, labels):
+        rec["split"] = lab
+    counts = {
+        "train": sum(1 for r in records if r["split"] == "train"),
+        "validation": sum(1 for r in records if r["split"] == "validation"),
+        "test": sum(1 for r in records if r["split"] == "test"),
+    }
 
     body = json.dumps(records, ensure_ascii=False, sort_keys=True).encode("utf-8")
     return {
         "training_allowed": True,
         "language": "tr",
-        "purpose": "MKAOS Turkish seed-12 pipeline validation; not a quality benchmark",
+        "purpose": "MKAOS Turkish seed pipeline validation; not a quality benchmark",
         "summary": {
-            "record_count": 12,
+            "record_count": len(records),
             "content_sha256": hashlib.sha256(body).hexdigest(),
-            "splits": {"train": 6, "validation": 3, "test": 3},
+            "splits": counts,
         },
         "records": records,
     }
 
 
 def rust_generate_test(weights: Path, expected_sha: str, report_path: Path) -> dict:
-    """Load weights in Rust CLI if available; record latency / tokens / errors."""
     cargo = shutil.which("cargo")
     result = {
         "rust_available": bool(cargo),
@@ -117,11 +130,10 @@ def rust_generate_test(weights: Path, expected_sha: str, report_path: Path) -> d
 
     if not cargo:
         result["status"] = "skipped_no_cargo"
-        result["note"] = "cargo not installed; SHA verified from file bytes only"
+        result["note"] = "cargo yok; SHA dosya baytlarından doğrulandı"
         report_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         return result
 
-    # Prefer mkaos-generate binary if present after build; otherwise cargo run example
     prompt = "Merhaba"
     started = time.perf_counter()
     try:
@@ -134,30 +146,22 @@ def rust_generate_test(weights: Path, expected_sha: str, report_path: Path) -> d
             "--bin",
             "mkaos-generate",
             "--",
-            "--weights",
+            "--checkpoint",
             str(weights),
-            "--expected-sha256",
+            "--sha256",
             expected_sha,
             "--prompt",
             prompt,
             "--max-new-tokens",
             "16",
         ]
-        # CLI flags may differ; fall back to parity probe style if generate fails
-        proc = subprocess.run(
-            cmd,
-            cwd=ROOT,
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
+        proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=180)
         elapsed = time.perf_counter() - started
         result["elapsed_seconds"] = round(elapsed, 4)
         result["returncode"] = proc.returncode
         result["stdout_tail"] = (proc.stdout or "")[-2000:]
         result["stderr_tail"] = (proc.stderr or "")[-2000:]
         if proc.returncode != 0:
-            # Fallback: shape/load probe via example if bin args differ
             probe = subprocess.run(
                 [
                     "cargo",
@@ -188,16 +192,13 @@ def rust_generate_test(weights: Path, expected_sha: str, report_path: Path) -> d
             result["error"] = None if probe.returncode == 0 else "rust probe failed"
         else:
             result["status"] = "ok"
-            # Heuristic token rate if generation succeeded
             result["approx_tokens_per_second"] = round(16 / max(elapsed, 1e-6), 3)
     except (subprocess.TimeoutExpired, OSError) as exc:
         result["status"] = "error"
         result["error"] = str(exc)
 
-    # Optional RSS memory snapshot (Linux)
     try:
         if sys.platform.startswith("linux"):
-            # self process only — indicative
             status = Path("/proc/self/status").read_text(encoding="utf-8")
             for line in status.splitlines():
                 if line.startswith("VmRSS:"):
@@ -212,33 +213,40 @@ def rust_generate_test(weights: Path, expected_sha: str, report_path: Path) -> d
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path("data/mkaos-tr-seed-12"))
-    parser.add_argument("--work-dir", type=Path, default=Path("artifacts/mkaos-tr-seed-12-run"))
-    parser.add_argument("--steps", type=int, default=200)
+    parser.add_argument("--work-dir", type=Path, default=Path("artifacts/mkaos-tr-seed-run"))
+    parser.add_argument("--steps", type=int, default=300)
     parser.add_argument("--skip-train", action="store_true")
     parser.add_argument("--skip-rust", action="store_true")
-    parser.add_argument("--auto-approve", action="store_true", help="explicitly record approve-all before gate")
+    parser.add_argument("--auto-approve", action="store_true")
+    parser.add_argument("--merge-batches", action="store_true", default=True)
     args = parser.parse_args(argv)
 
-    records = args.root / "records.jsonl"
-    ledger = args.root / "approvals.jsonl"
     work = args.work_dir
     work.mkdir(parents=True, exist_ok=True)
+    ledger = args.root / "approvals.jsonl"
 
-    # 1) Verify twelve texts
-    inv = work / "twelve-inventory.json"
+    if args.merge_batches:
+        run([sys.executable, "tools/merge_mkaos_turkish_seeds.py", "--root", str(args.root)])
+
+    records = args.root / "records_all.jsonl"
+    if not records.exists():
+        records = args.root / "records.jsonl"
+
+    inv = work / "turkish-inventory.json"
     run(
         [
             sys.executable,
             "tools/verify_mkaos_twelve_texts.py",
             "--root",
             str(args.root),
+            "--records",
+            str(records),
             "--write-inventory",
             str(inv),
             "--force",
         ]
     )
 
-    # 2) Human approvals
     if args.auto_approve:
         run(
             [
@@ -267,10 +275,9 @@ def main(argv: list[str] | None = None) -> int:
         text=True,
     )
     if gate.returncode != 0:
-        print("TRAINING_BLOCKED: human approval incomplete", file=sys.stderr)
+        print("TRAINING_BLOCKED: insan onayı eksik", file=sys.stderr)
         return 2
 
-    # 3) Build approved manifest with splits
     try:
         manifest = build_manifest(records, ledger)
     except ValueError as exc:
@@ -283,6 +290,7 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "manifest_sha256": sha256_file(manifest_path),
                 "split_counts": manifest["summary"]["splits"],
+                "record_count": manifest["summary"]["record_count"],
             },
             ensure_ascii=False,
             indent=2,
@@ -293,7 +301,6 @@ def main(argv: list[str] | None = None) -> int:
         print("SKIP_TRAIN")
         return 0
 
-    # 4) Train from random init (Rust-compatible architecture)
     ckpt_dir = work / "checkpoint"
     if ckpt_dir.exists():
         shutil.rmtree(ckpt_dir)
@@ -338,16 +345,11 @@ def main(argv: list[str] | None = None) -> int:
     report = json.loads(report_path.read_text(encoding="utf-8"))
     pt_path = ckpt_dir / "mkaos-rust-compatible.pt"
     real_pt_sha = sha256_file(pt_path)
-    reported = report.get("checkpoint_sha256")
-    if reported != real_pt_sha:
-        print(
-            f"CHECKPOINT_HASH_MISMATCH reported={reported} actual={real_pt_sha}",
-            file=sys.stderr,
-        )
+    if report.get("checkpoint_sha256") != real_pt_sha:
+        print("CHECKPOINT_HASH_MISMATCH", file=sys.stderr)
         return 2
     print(json.dumps({"checkpoint_sha256_verified_from_file": real_pt_sha}, indent=2))
 
-    # 5) Export to MKAOSW for Rust
     export_dir = work / "export"
     if export_dir.exists():
         shutil.rmtree(export_dir)
@@ -370,17 +372,13 @@ def main(argv: list[str] | None = None) -> int:
         print("EXPORT_HASH_MISMATCH", file=sys.stderr)
         return 2
 
-    # 6) Rust engine test
     rust_report_path = work / "rust-engine-test.json"
-    if args.skip_rust:
-        rust_result = {"status": "skipped"}
-    else:
-        rust_result = rust_generate_test(weights, real_w_sha, rust_report_path)
+    rust_result = {"status": "skipped"} if args.skip_rust else rust_generate_test(weights, real_w_sha, rust_report_path)
 
     summary = {
         "status": "pipeline_complete",
         "language": "tr",
-        "records": 12,
+        "records": manifest["summary"]["record_count"],
         "splits": manifest["summary"]["splits"],
         "manifest_sha256": sha256_file(manifest_path),
         "pytorch_checkpoint_sha256": real_pt_sha,
@@ -397,11 +395,11 @@ def main(argv: list[str] | None = None) -> int:
         "rust_test": rust_result,
         "production_ready": False,
         "note": (
-            "Gerçek dosya SHA-256 doğrulandı. Bu seed modeli genel amaçlı Türkçe LLM değildir; "
-            "onaylı korpus + ölçekli eğitim + kalite kapıları gerekir."
+            "Gerçek dosya SHA-256 doğrulandı. Seed modeli genel Türkçe LLM değildir; "
+            "ölçekli onaylı korpus ve kalite kapıları gerekir."
         ),
     }
-    (work / "twelve-gate-summary.json").write_text(
+    (work / "turkish-gate-summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
