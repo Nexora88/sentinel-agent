@@ -16,7 +16,7 @@ This mode is accepted only when the manifest contains:
 
 - `data_rights_mode: "owner_supplied_local_nonredistributable"`
 - `source_kind: "owner_created_or_rights_cleared_local"`
-- non-empty `records` with source IDs, sample IDs, exact text SHA-256 hashes, and train/validation/test splits.
+- non-empty `records` with source IDs, sample IDs, exact text SHA-256 hashes, and train/validation/test splits; `local://...` provenance URIs are accepted only in this explicit mode.
 
 The manifest validator and corpus hash checks still run. The explicit flag does not certify that a source is lawful, does not approve third-party datasets, and does not clear personal data. The output report marks the run as experimental and not approved for redistribution. Keep the corpus, manifest, checkpoint, and report local until source rights, privacy, and weight-distribution review are completed. Do not use this mode to re-label Common Voice, Wikipedia, Tatoeba, HPLT, or another third-party corpus as owner-created.
 
