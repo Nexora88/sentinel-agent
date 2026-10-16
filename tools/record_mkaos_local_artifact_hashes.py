@@ -32,6 +32,8 @@ def main() -> int:
     parser.add_argument("--output", required=True, type=Path, help="New local JSON record; will not overwrite")
     args = parser.parse_args()
     try:
+        if args.archive.is_symlink() or args.tsv.is_symlink():
+            raise ValueError("Archive and TSV must be regular files, not symlinks")
         archive = args.archive.resolve(strict=True)
         tsv = args.tsv.resolve(strict=True)
         output = args.output.resolve()
