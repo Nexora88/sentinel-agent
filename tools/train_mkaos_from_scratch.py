@@ -22,7 +22,13 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 MAGIC = b"MKAOSW1\0"
-VOCAB_SIZE = 257  # UTF-8 bytes 0..255 plus EOS=256
+from core.mkaos_tokenizer_contract import (
+    CONTRACT as TOKENIZER_CONTRACT,
+    CONTRACT_ID as TOKENIZER_CONTRACT_ID,
+    EOS_ID,
+    VOCAB_SIZE,
+    encode_documents as encode_contract_documents,
+)
 
 
 def sha256(data: bytes) -> str:
@@ -384,7 +390,8 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path = args.output_dir / "mkaos-owned.mkaosw"
     checkpoint_hash = write_mkaos_checkpoint(checkpoint_path, tensors)
-    tokenizer_payload = {"format": "mkaos-byte-v1", "vocab_size": VOCAB_SIZE, "eos_id": 256, "mapping": "UTF-8 byte value -> same token ID; 256 is EOS"}
+    tokenizer_payload = dict(TOKENIZER_CONTRACT)
+    tokenizer_payload["contract_id"] = TOKENIZER_CONTRACT_ID
     tokenizer_bytes = (json.dumps(tokenizer_payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
     tokenizer_path = args.output_dir / "tokenizer.json"
     tokenizer_path.write_bytes(tokenizer_bytes)
@@ -395,6 +402,7 @@ def main() -> int:
         "pretrained_model_used": None,
         "external_model_weights_used": False,
         "architecture": {"type": "MKAOS-GQA-SwiGLU", "vocab_size": VOCAB_SIZE, "hidden_size": d, "layers": args.layers, "query_heads": nh, "kv_heads": nkh, "intermediate_size": intermediate, "max_sequence_len": args.sequence_length},
+        "tokenizer_contract_id": TOKENIZER_CONTRACT_ID,
         "tokenizer_contract_id": TOKENIZER_CONTRACT_ID,
         "tokenizer_sha256": sha256(tokenizer_bytes),
         "checkpoint_file": checkpoint_path.name,
