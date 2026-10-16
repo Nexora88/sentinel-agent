@@ -41,6 +41,7 @@ Do not run the example with placeholders. The source register remains unapproved
 
 - mkaos-native is a deterministic local word/character n-gram hashing baseline. It is offline and dependency-light, but is not a trained semantic model.
 - local-semantic loads a Sentence-Transformers model from an existing local directory with local_files_only=True and trust_remote_code=False. It never downloads weights. Install a model only after separately reviewing its source license, privacy implications, exact files, and SHA-256 inventory.
+- To inventory an already-installed model without copying or downloading it, run tools/hash_local_embedding_model.py --model-dir <local-model-dir> --output <inventory.json>; later verify with --verify <inventory.json>. This proves file identity only, not legal clearance or semantic quality.
 - SEKA_REQUIRE_SEMANTIC_EMBEDDINGS=true can fail closed when the local semantic model is missing; do not silently claim semantic quality while running the hash baseline.
 - Different embedding providers use different collection suffixes to prevent vectors from incompatible embedding spaces being mixed. Tenant-scoped retrieval remains required.
 - The synthetic retrieval benchmark is a smoke test only. Compare providers against the same fixed corpus and reviewed relevance labels; record Recall@k, MRR, nDCG, latency, memory, offline behavior, restart persistence, and tenant isolation.
