@@ -2,6 +2,8 @@
 
 **Current state (2026-10-16): BLOCKED — no source is approved for training.** The source register deliberately has an empty `current_approved_sources` list and sets both `corpus_ready` and `model_training_allowed` to false. Do not change these flags merely to make CI green. The existing Turkish Wikipedia dump preparation workflow verifies/downloads a source and produces a sample-review sheet; it does not grant training rights or complete the review.
 
+Model-size rationale and the required empirical comparison plan are documented in [MKAOS_MODEL_SIZE_SELECTION.md](MKAOS_MODEL_SIZE_SELECTION.md). The current 133M profile is a pilot target, not a proven optimum.
+
 ## 1. Evidence needed before approval
 
 For every exact source and release, a qualified human reviewer must complete and attach evidence for:
