@@ -59,6 +59,11 @@ jobs:
         run: cargo test --manifest-path engine/mkaos-inference/Cargo.toml --all-targets
       - name: Validate source register fail-closed policy
         run: python tools/validate_mkaos_source_register.py
+      - name: Test MKAOS tokenizer contract and artifact hash verification
+        run: |
+          python -m unittest discover -s tests -p 'test_mkaos_tokenizer_contract.py' -v
+          python -m unittest discover -s tests -p 'test_verify_mkaos_training_artifacts.py' -v
+          python -m unittest discover -s tests -p 'test_mkaos_training_manifest.py' -v
       - name: Check frontend JavaScript syntax
         run: node --check web/static/app.js
       - name: Validate Docker Compose profiles
