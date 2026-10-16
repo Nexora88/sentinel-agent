@@ -35,6 +35,14 @@ Bellek varsayılan olarak çalıştırılan dizinde `mkaos-memory.tsv` dosyasın
 - Bu modülde HTTP istemcisi, model indirme veya telemetri yoktur. Ancak makinenin diğer süreçlerini kontrol etmez; tam cihaz çevrimdışılığı için işletim sistemi ağ politikası gerekir.
 - Kaynak kodun bu projede yazılması tek başına tüm derleme zincirinin, işletim sisteminin veya donanımın yerli olduğu anlamına gelmez.
 
+## Eğitilmiş checkpoint'i Rust'ta çalıştırma
+
+`mkaos-run`, gerçek `MKAOSW1` dosyasını beklenen SHA-256 ile doğrular, yalnızca bu Rust decoder mimarisiyle şekil olarak uyumluysa yükler ve yerel KV-cache üretimi yapar:
+
+    cargo run --release --manifest-path engine/mkaos-inference/Cargo.toml --bin mkaos-run -- --checkpoint ./private-data/mkaos/run-001/model.mkaosw --sha256 <gercek-64-haneli-sha256> --prompt "Merhaba" --heads 4 --kv-heads 2 --max-new-tokens 64
+
+Gerçek dosya yolu ve hash, eğitim raporundan alınmalıdır; örnek değer uydurma hash değildir. CLI çıktı metnini stdout'a, checkpoint hash'ini, üretilen token sayısını, süreyi ve yaklaşık token/saniyeyi stderr'e yazar. Hatalı hash, bozuk dosya veya uyumsuz tensor şekilleri reddedilir. Bu CLI'ın derlenmesi, gerçek eğitim checkpoint'inin mevcut olduğu anlamına gelmez; şu an repo içinde gerçek eğitim checkpoint'i yok ve kaynak onay kapısı kapalıdır.
+
 ## Sıfırdan nöral modelin durumu
 
 Eğitim aracı rastgele başlangıç ağırlıklarıyla model oluşturmak üzere tasarlanmıştır; fakat kaynak sicilinde şu an ağırlık dağıtımına kadar doğrulanıp onaylanmış bir veri kaynağı yoktur. Kaynak izinleri, kişisel veri taraması, tam veri dosyalarının hash'leri ve ağırlık dağıtım koşulları doğrulanmadan gerçek eğitim başlatılmamalıdır. Sentetik test checkpoint'i gerçek eğitim sonucu değildir.
