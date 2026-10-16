@@ -81,7 +81,7 @@ def evaluate(rows: list[dict[str, Any]], *, checkpoint_sha256: str) -> dict[str,
     if any(len(splits) > 1 for splits in group_splits.values()):
         errors.append("a document group appears in multiple splits")
     if errors:
-        raise ValueError("\\n".join(errors[:100]))
+        raise ValueError("\n".join(errors[:100]))
     task_summary = {}
     for task, values in sorted(per_task.items()):
         scores = [v["human_score"] for v in values if "human_score" in v]
