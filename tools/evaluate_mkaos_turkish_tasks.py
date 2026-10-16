@@ -26,7 +26,7 @@ ALLOWED_TASKS = {"instruction_following", "reading_comprehension", "summarizatio
 def norm(value: str) -> str:
     # Preserve Turkish dotted/dotless-I distinctions; casefold alone is deliberate.
     value = unicodedata.normalize("NFKC", value).casefold()
-    return " ".join(re.findall(r"\\w+", value, flags=re.UNICODE))
+    return " ".join(re.findall(r"\w+", value, flags=re.UNICODE))
 
 
 def sha256(data: bytes) -> str:
