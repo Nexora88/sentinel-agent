@@ -1,0 +1,10 @@
+{
+  "format": "mkaos-byte-v1",
+  "vocab_size": 257,
+  "eos_id": 256,
+  "mapping": "UTF-8 byte value -> same token ID; 256 is EOS",
+  "normalization": "none",
+  "unicode_policy": "encode UTF-8 bytes without Unicode normalization; decode accumulated bytes as UTF-8 with replacement for invalid sequences",
+  "document_boundary": "append EOS=256 after each document during training; prompt encoding does not append EOS automatically",
+  "contract_version": 1
+}
