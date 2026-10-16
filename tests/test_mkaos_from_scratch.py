@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import unittest
+import tempfile
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "train_mkaos_from_scratch.py"
@@ -58,6 +59,13 @@ class CorpusIntegrityTests(unittest.TestCase):
         manifest = {"records": self.manifest["records"] + [self.manifest["records"][0]]}
         with self.assertRaisesRegex(ValueError, "duplicate manifest sample_id"):
             TRAINER.validate_corpus_against_manifest(self.corpus, manifest)
+
+    def test_sha256_file_hashes_persisted_bytes_in_chunks(self) -> None:
+        payload = "Türkçe MKAOS 🔐".encode("utf-8")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sample.bin"
+            path.write_bytes(payload)
+            self.assertEqual(TRAINER.sha256_file(path, chunk_size=3), hashlib.sha256(payload).hexdigest())
 
 
 if __name__ == "__main__":
