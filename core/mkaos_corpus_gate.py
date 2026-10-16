@@ -32,6 +32,8 @@ def validate_source_registry(manifest: Any, registry: Any) -> list[str]:
         source_id = item["source_id"]
         if source_id in by_id:
             errors.append(f"Source register has duplicate source_id {source_id!r}; refusing ambiguous approval.")
+            errors.append(f"Source {source_id!r} is not explicitly approved because duplicate source IDs make approval ambiguous.")
+            by_id.pop(source_id, None)
             continue
         by_id[source_id] = item
     records = manifest.get("records")
