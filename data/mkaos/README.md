@@ -1,32 +1,56 @@
 # MKAOS Türkçe korpus çalışma alanı
 
-Bu dizin, lisans/izin incelemesinden geçmiş veri sürümleri için yer tutucudur. Ham korpus, kişisel veri içerebilecek dosyalar ve büyük veri arşivleri Git'e yüklenmemelidir; yerel, erişimi kısıtlı bir çalışma alanında tutulmalıdır.
+Ham veri, kişisel veri içerebilecek dosyalar ve büyük arşivler Git'e yüklenmemelidir; yerel ve erişimi kısıtlı bir çalışma alanında tutulmalıdır. Bu depoda şu an gerçek yerel arşiv/TSV, gerçek korpus hash'i veya eğitim checkpoint'i bulunmuyor.
 
-## Common Voice Türkçe — küçük, sürümlü ilk aday
+## Sabitlenen ilk aday: Common Voice Scripted Speech 27.0 Turkish
 
-İlk aday **Common Voice Scripted Speech v27.0 — Turkish (tr)**. Mozilla Data Collective kataloğunda bu ürün CC0-1.0 olarak listeleniyor; ancak ürün kaydı veri kümesini yeniden barındırma/paylaşma yasağı da bildiriyor. Bu nedenle CC0 etiketi tek başına MKAOS model ağırlıklarını dağıtma iznini kanıtlamaz. Tam Türkçe ürün sayfası, indirme dosyası, seçilen TSV kapsamı ve ağırlık dağıtım şartları belgelenene kadar kaynak sicili kapalı kalır. [Resmî MDC kataloğu](https://mozilladatacollective.com/organization/cmfh0j9o10006ns07jq45h7xk) · [Common Voice sürüm kataloğu](https://github.com/common-voice/cv-dataset).
+- Resmî ürün kaydı: https://mozilladatacollective.com/datasets/cmu5wkah500c2o10719lem8m8
+- Dataset ID: `cmu5wkah500c2o10719lem8m8`
+- Sürüm: `cv-corpus-27.0-2026-09-11`; ürün sayfası yayın tarihi 17 Eylül 2026.
+- Ürün sayfası lisansı: CC0-1.0; sayfa ayrıca veri kümesini yeniden barındırmayı/paylaşmayı yasaklıyor.
+- Datasheet kaynak dökümü: yaklaşık %85.0 Türkçe Wikipedia, %11.6 sentence-collector, %1.2 SETimes, %2.2 Other.
+- Yalnızca metin denemesi için seçilecek dosya: `validated_sentences.tsv`; ses ve konuşmacı alanları kullanılmamalı.
 
-1. Mozilla Data Collective üzerinden tam Türkçe v27.0 ürün kaydını ve koşullarını insan gözüyle doğrula. Giriş/erişim gerekirse yalnızca resmî, izinli akışı kullan.
-2. Ham arşivi ve çıkarılan TSV'yi yalnızca yerel, erişimi kısıtlı dizine koy; Git'e yükleme. Ses dosyalarını bu metin-only denemeye alma.
-3. Arşiv ve seçilen TSV'nin SHA-256 değerlerini yerelde kaydet; TSV'nin lisans kapsamını ve ağırlık dağıtımı koşullarını belgelemeyi tamamlamadan onay verme.
-4. TSV'de `sentence` sütunu bulunan metin dosyasını seç ve ön adayları çıkar:
+**Lisans kapısı hâlâ kapalı.** Ürün sayfasının CC0 bildirimi önemli bir kanıttır, ancak kaynak dökümündeki Wikipedia/SETimes/diğer kökenler ve MKAOS gibi genel amaçlı üretken dil modeli ağırlıklarının dağıtımı için kaynak kapsamı ayrıca incelenmelidir. Kaynak sicilinde Common Voice hâlâ onaysızdır. Dosya SHA-256 değerleri yerel dosya edinilmeden üretilemez ve uydurulamaz. Mozilla ayrıca dataset'i yeniden barındırmamayı istiyor; ham arşivi veya metin dosyasını GitHub'a, issue'lara, loglara ya da bu raporlara koymayın.
+
+1. Mozilla Data Collective üzerinde tam ürün kaydını açıp izin verilen erişim akışıyla indirme yap. Erişim gereksinimlerini aşmaya çalışma.
+2. İndirilen arşivi ve seçilen TSV'yi yerel, erişimi kısıtlı klasörde tut. Sadece bu iki dosyanın SHA-256 değerlerini özel yerel kayda yaz.
+3. Arşivde `validated_sentences.tsv` varsa yalnızca o dosyayı seç. TSV'de `sentence` ve `source` sütunlarının ikisi de bulunmalıdır.
+4. Kaynak etiketlerini ve olası üst kaynak lisanslarını insan incelemesine gönder; otomatik script bu kararı veremez.
+5. Aday metni çıkar:
 
 ```bash
 python tools/extract_common_voice_text.py \
-  --input-tsv ./private-data/common-voice-tr-v27/validated.tsv \
-  --release "Common Voice Scripted Speech v27.0 Turkish (tr)" \
-  --source-uri "https://mozilladatacollective.com/organization/cmfh0j9o10006ns07jq45h7xk" \
+  --input-tsv ./private-data/common-voice-tr-v27/validated_sentences.tsv \
+  --release "Common Voice Scripted Speech 27.0 Turkish; cv-corpus-27.0-2026-09-11" \
+  --source-uri "https://mozilladatacollective.com/datasets/cmu5wkah500c2o10719lem8m8" \
   --output-jsonl ./private-data/mkaos/cv-tr-candidates.jsonl \
   --report-json ./private-data/mkaos/cv-tr-extraction-report.json
 ```
 
-Araç çevrimdışıdır; dosyanın hash'ini alır, metinleri normalize ederek yinelenenleri ayıklar, cümle gruplarını deterministik biçimde geçici train/validation/test bölmelerine ayırır ve `client_id` gibi TSV alanlarını çıktıya taşımaz. Çıktıdaki `human_review: pending`, `pii_status: unknown` ve `training_allowed: false` kasıtlıdır. Bu araç hukuki/lisans onayı veya eğitim izni vermez.
+Çıkarıcı çevrimdışıdır. Dosyanın gerçek hash'ini raporlar, normalize edilmiş kopyaları ayıklar, kaynak etiketlerini saklar ve kaynak etiketine göre deterministik bölme yapar. `license_id: unreviewed`, `human_review: pending`, `pii_status: unknown` ve `training_allowed: false` bilerek kullanılır. Kaynak etiketleri lisans değildir. Bir metin birden fazla kaynakta görünüyorsa bu satır manuel incelenmelidir. Kaynak düzeyinde ayırma üç bölmeyi doldurmazsa bölmeleri rastgele karıştırmayın; bağımsız, izinli kaynak ekleyin.
 
-**Önemli sınırlama:** Tek bir Common Voice kaynağından gelen cümleler kaynak-bazında birbirinden ayrılamaz. Bu ön bölme yalnızca yinelenen cümle gruplarını ayırır; gerçek kaynak-disjoint değerlendirme için daha sonra bağımsız, onaylı kaynaklar ve ayrı bir Türkçe görev benchmark'ı gerekir. PII taraması da insan incelemesinin yerini tutmaz.
+## Yerel hash'leri doğrulama
 
-## İncelenmiş JSONL'den gerçek eğitim manifestine
+Linux/macOS:
 
-Ön adayları otomatik olarak onaylamayın. Yetkili insan incelemesi tamamlandıktan sonra yerel bir JSONL hazırlayın; her satır şu alanları taşımalı: `sample_id`, `text`, `source_id`, `source_uri`, `document_group`, `license_id`, `consent`, `language` (`tr`), `topic`, `split`, `human_review` (`approved`) ve `pii_status` (`cleared`). `consent`, `public_domain`, `open_license` veya `not_required` değerlerinden biri olmalı. Kaynak/belge grubu bölme sızıntısı, kopyalar ve PII sinyalleri ayrıca incelenmelidir.
+```bash
+sha256sum ./private-data/common-voice-tr-v27/common-voice-scripted-speech-27-0-turkis-b14760fe.tar.gz
+sha256sum ./private-data/common-voice-tr-v27/validated_sentences.tsv
+```
+
+Windows PowerShell:
+
+```powershell
+Get-FileHash .\private-data\common-voice-tr-v27\common-voice-scripted-speech-27-0-turkis-b14760fe.tar.gz -Algorithm SHA256
+Get-FileHash .\private-data\common-voice-tr-v27\validated_sentences.tsv -Algorithm SHA256
+```
+
+Dosya adını indirdiğin gerçek dosyaya göre düzelt. Hash'leri herkese açık PR'a yazmak zorunlu değildir; yerel audit manifestinde ve kaynak onay kaydında saklanabilir. Bu araç ortamında arşiv/TSV olmadığı için gerçek hash değerleri üretilmedi.
+
+## Kişisel veri, kopya ve bölme denetimi
+
+Ham TSV'den çıkan kayıtlar doğrudan eğitime verilemez. Her kayıt için doğru kaynak kimliği, kaynak URI, lisans/izin, belge grubu, konu, `human_review=approved` ve `pii_status=cleared` alanları insan incelemesiyle doldurulmalıdır. Kaynaklar ve belge grupları farklı bölmelere sızmamalı; çok kaynaklı kopyalar karara bağlanmalıdır.
 
 ```bash
 python tools/audit_mkaos_local_corpus.py \
@@ -39,26 +63,46 @@ python tools/build_mkaos_training_manifest.py \
   --manifest-output ./private-data/mkaos/training-manifest.json \
   --report-output ./private-data/mkaos/manifest-report.json \
   --dataset-id "mkaos-tr-reviewed" \
-  --revision "Common Voice Scripted Speech v27.0 Turkish; local TSV SHA256: <actual-hash>" \
+  --revision "cv-corpus-27.0-2026-09-11; TSV SHA256 recorded in local audit" \
   --curator "<reviewing-person>"
 ```
 
-`--confirm-human-license-review` yalnızca tam sürüm/dosya lisansı ve model ağırlığı dağıtım koşulları gerçekten insan tarafından incelenip belgelendiyse eklenmelidir. Bu işaret, kaynak sicili onayının yerine geçmez. Çıktılar yalnızca yeni yerel dosyalar oluşturur; mevcut dosyaların üzerine yazmaz. Gerçek SHA-256 değerini komut satırına eklemeden önce yerel rapordaki değerle karşılaştırın.
+`--confirm-human-license-review` yalnızca tam sürüm, seçilen dosya, köken kaynakları ve model ağırlığı dağıtımı gerçekten insan/hukuk incelemesinden geçip kanıtı kaydedildiyse eklenmelidir. Bu seçenek bile kaynak sicilinin yerini tutmaz. Çıktılar mevcut dosyaların üzerine yazmaz.
 
-**Eğitim güvenlik kapısı:** `tools/train_mkaos_from_scratch.py` kaynak sicilini kontrol eder. Kaynak `current_approved_sources` listesinde değilse, `status: approved`, `permitted_use_now: true`, sabitlenmiş `approved_revision`, `approval_evidence` ve `weight_distribution_review: approved` alanları yoksa eğitim başlamaz. Metadata doğrulaması tek başına hukuk onayı değildir.
+## Rastgele başlangıçtan eğitim
 
-**Mevcut durum:** Bu depoda gerçek/onaylı Türkçe korpus bulunmuyor. Araçların varlığı veya sentetik CI verisi gerçek eğitim verisi değildir. Yerel TSV dosyası ve gerçek SHA-256 değerleri bu çalışma ortamında mevcut olmadığı için burada gerçek korpus hazırlanmış, model eğitilmiş veya checkpoint üretilmiş olarak raporlanamaz.
-
-## Yerel ön tarama (çevrimdışı)
-
-Ham veri yalnızca yerel ve erişimi kısıtlı bir dizinde tutulmalıdır. Kaynağın sürüm/lisans ve ağırlık dağıtım incelemesi tamamlanmadan eğitim yapmayın.
+Eğitim kapısı şu an kapalıdır. Kaynak sicilinde `current_approved_sources` boş ve `model_training_allowed: false`. Lisans/köken/ağırlık dağıtımı kanıtları ve yerel hash'ler olmadan bunları değiştirmeyin. Kapı onaylandıktan sonra, eğitim cihazında PyTorch kurulu olmak üzere:
 
 ```bash
-python tools/audit_mkaos_local_corpus.py \
-  --input ./private-data/mkaos/reviewed-tr.jsonl \
-  --report ./private-data/mkaos/local-audit.json
+python tools/validate_mkaos_training_manifest.py ./private-data/mkaos/training-manifest.json
+python tools/train_mkaos_from_scratch.py \
+  --corpus ./private-data/mkaos/trainer-corpus.jsonl \
+  --manifest ./private-data/mkaos/training-manifest.json \
+  --output-dir ./private-data/mkaos/run-001
 ```
 
-Girdi JSONL satırları en az `sample_id`, `text`, `source_id`, `source_uri`, `document_group`, `license_id`, `split`, `human_review` ve `pii_status` alanlarını içermelidir. Bu komut ağ kullanmaz; kaynak dosyanın ve her metnin hash'ini, yinelenen metinleri, yaygın PII/gizli bilgi göstergelerini ve belge grubu bölme sızıntısını raporlar. Rapor ham metinleri içermez. Bir göstergenin çıkması insan incelemesi gerektirir; hiç gösterge çıkmaması da verinin temiz olduğunu kanıtlamaz.
+Bu model byte-token tabanlı küçük deneysel bir mimaridir; büyük model performansı beklenmemeli. Test kaybı checkpoint seçimi bittikten sonra bir kez ölçülür ve model seçimi için kullanılmaz.
 
-**Bağımsız test:** Eğitim aracı checkpoint seçimi tamamlandıktan sonra test bölümündeki byte-level kaybı bir kez ölçüp `training-report.json` içine yazar. Test kaybı checkpoint seçimi veya eğitim için kullanılmaz. Bu metrik tek başına Türkçe görev başarısı değildir; ayrıca bağımsız görev testleri ve insan değerlendirmesi gerekir.
+## Rust checkpoint doğrulaması ve bağımsız Türkçe görevler
+
+Rust crate içindeki checkpoint loader, SHA-256, dosya yapısı, tensor boyutları ve sonlu ağırlıkları doğrulayabilir; bunun başarılı olması tek başına checkpoint'in model mimarisiyle uyumlu üretim çıkarımı yaptığı anlamına gelmez. Gerçek eğitim checkpoint'i yokken gerçek checkpoint yükleme testi raporlanamaz.
+
+Bağımsız Türkçe görev değerlendirmesi için izinli, insan tarafından gözden geçirilmiş ve eğitim/validasyon kaynaklarından ayrı test soruları hazırlanmalıdır. Test cevapları model seçimi sırasında gösterilmemelidir. Rust motorunun tam olarak hangi checkpoint hash'ini ve hangi decode ayarlarını kullandığı kaydedilmelidir. Tahminleri aldıktan sonra:
+
+```bash
+python tools/evaluate_mkaos_turkish_tasks.py \
+  --input ./private-data/mkaos/independent-test-predictions.jsonl \
+  --checkpoint-sha256 "<actual-checkpoint-sha256>" \
+  --output ./private-data/mkaos/independent-test-report.json
+```
+
+Her satır `case_id`, `task`, `prompt`, `reference`, `prediction`, `source_id`, `document_group`, `human_review=approved`, `split=test` ve mümkünse insan puanı (`human_score` 0-4) içermelidir. Bu araç değerlendirme verisini rapora yazmaz, yalnızca ölçüm özetini üretir. Exact-match tek başına açık uçlu Türkçe kalitesini ölçmez.
+
+## Gerçek durum
+
+- Resmî Common Voice Türkçe v27.0 ürün sayfası ve dataset ID sabitlendi.
+- Yerel arşiv ve TSV bu çalışma ortamında mevcut değil; gerçek dosya hash'leri yok.
+- Kaynak/lisans/mahremiyet/ağırlık dağıtımı onayı verilmedi.
+- Gerçek eğitim ve checkpoint üretimi yapılmadı.
+- Rust motorunda gerçek checkpoint yüklemesi ve bağımsız görev testleri henüz doğrulanmadı.
+- Eğitim kapısı kapalı kalıyor.
