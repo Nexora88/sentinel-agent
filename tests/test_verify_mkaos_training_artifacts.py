@@ -8,7 +8,7 @@ from pathlib import Path
 
 from tools.verify_mkaos_training_artifacts import verify
 
-MAGIC = b"MKAOSW1\\0"
+MAGIC = bytes([77, 75, 65, 79, 83, 87, 49, 0])
 
 
 def checkpoint_bytes(name="token_embedding.weight", values=(0.25,), rows=1, cols=1, trailing=b""):
@@ -65,7 +65,7 @@ class VerifyMkaosArtifactsTests(unittest.TestCase):
 
     def test_rejects_magic_only_or_truncated_checkpoint(self):
         with tempfile.TemporaryDirectory() as temp:
-            report = self.write_fixture(Path(temp), MAGIC + b"\\x00")
+            report = self.write_fixture(Path(temp), MAGIC + bytes([0]))
             self.assertTrue(any("truncated" in item.lower() for item in verify(report)))
 
     def test_rejects_non_finite_weight(self):
