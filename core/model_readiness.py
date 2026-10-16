@@ -17,14 +17,13 @@ def native_model_readiness(env=None) -> dict[str, str | bool]:
 
     if not checkpoint_value:
         return {"ready": False, "status": "checkpoint_not_configured", "message": "Yerel MKAOS modeli yapılandırılmamış."}
+    checkpoint = Path(checkpoint_value).expanduser()
+    if not checkpoint.is_file():
+        return {"ready": False, "status": "checkpoint_missing", "message": "Onaylı yerel model dosyası bulunamadı."}
     if not expected_hash:
         return {"ready": False, "status": "checkpoint_hash_not_pinned", "message": "Model SHA-256 doğrulaması yapılandırılmamış."}
     if len(expected_hash) != 64 or any(ch not in "0123456789abcdef" for ch in expected_hash):
         return {"ready": False, "status": "invalid_checkpoint_hash", "message": "Model SHA-256 değeri geçersiz."}
-
-    checkpoint = Path(checkpoint_value).expanduser()
-    if not checkpoint.is_file():
-        return {"ready": False, "status": "checkpoint_missing", "message": "Onaylı yerel model dosyası bulunamadı."}
 
     generator = Path(generator_value).expanduser()
     if not generator.is_file():
