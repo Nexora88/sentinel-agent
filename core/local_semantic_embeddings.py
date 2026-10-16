@@ -1,11 +1,12 @@
 """Offline-only adapter for a pre-trained semantic embedding model.
 
 The model must already exist on disk. This module never downloads weights and
-never enables remote custom code. It improves semantic retrieval only when a
-compatible local model has been installed and evaluated for the target corpus.
+never enables remote custom code. It can require a SHA-256 inventory before
+loading; a digest proves file identity, not license clearance or model quality.
 """
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -24,6 +25,29 @@ class LocalSemanticEmbeddings(Embeddings):
         path = Path(raw_path).expanduser().resolve()
         if not path.is_dir():
             raise ValueError(f"Local embedding model directory does not exist: {path}")
+
+        require_manifest = os.getenv(
+            "SEKA_REQUIRE_SEMANTIC_EMBEDDINGS", "false"
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        raw_manifest = os.getenv("SEKA_LOCAL_EMBEDDING_MANIFEST", "").strip()
+        if require_manifest and not raw_manifest:
+            raise ValueError(
+                "SEKA_REQUIRE_SEMANTIC_EMBEDDINGS requires SEKA_LOCAL_EMBEDDING_MANIFEST "
+                "to pin the exact installed model files."
+            )
+        if raw_manifest:
+            manifest_path = Path(raw_manifest).expanduser().resolve()
+            if not manifest_path.is_file():
+                raise ValueError(f"Local embedding inventory manifest does not exist: {manifest_path}")
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ValueError("Local embedding inventory manifest is unreadable or invalid JSON.") from exc
+            from tools.hash_local_embedding_model import verify_inventory
+            errors = verify_inventory(path, manifest)
+            if errors:
+                raise ValueError("Local embedding model inventory verification failed: " + "; ".join(errors[:5]))
+
         try:
             from sentence_transformers import SentenceTransformer
         except ImportError as exc:
