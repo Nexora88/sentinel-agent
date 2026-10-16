@@ -15,7 +15,7 @@ from typing import Sequence
 
 from langchain_core.documents import Document
 
-_TOKEN_RE = re.compile(r"[^\\W_]+", re.UNICODE)
+_TOKEN_RE = re.compile(r"[^\W_]+", re.UNICODE)
 
 
 def _tokens(text: str) -> list[str]:
