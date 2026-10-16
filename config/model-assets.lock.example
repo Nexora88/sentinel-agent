@@ -1,0 +1,5 @@
+# MKAOS optional model asset lock (tab-separated; one entry per line)
+# FORMAT: asset_id<TAB>https_url<TAB>sha256_hex_64<TAB>models/relative/destination
+# This template intentionally contains no model URL or digest. Do not invent hashes.
+# Add only assets whose official source, exact version, license, and SHA-256 have been reviewed.
+# Keep this local lock out of Git if it contains private or organization-specific download URLs.
