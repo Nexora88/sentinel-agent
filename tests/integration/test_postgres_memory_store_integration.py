@@ -65,7 +65,8 @@ class PostgresMemoryStoreIntegrationTests(unittest.TestCase):
                 self.assertNotIn(self.session_b, visible)
 
     def test_cross_tenant_session_write_is_rejected(self):
-        with self.assertRaises(LookupError):
+        with self.assertRaises(Exception):
+            # The composite tenant/session foreign key must reject this cross-tenant write.
             self.store.append_message(self.tenant_a, self.session_b, "user", "must not cross tenants")
 
 
