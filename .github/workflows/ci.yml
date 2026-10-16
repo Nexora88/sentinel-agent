@@ -105,3 +105,22 @@ jobs:
               raise SystemExit("Potential hardcoded credentials found.")
           print("No likely hardcoded credentials found.")
           PY
+
+  portable-arm64:
+    name: Portable unit tests (Ubuntu ARM64, Python 3.12)
+    # GitHub-hosted ARM64 runners are available for public repositories.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify real ARM64 host and run portability/data-gate tests
+        run: |
+          python -c "import platform; print('machine=' + platform.machine()); assert platform.machine().lower() in ('aarch64', 'arm64'), platform.machine()"
+          python -m unittest discover -s tests -p test_platform_profile.py -v
+          python -m unittest discover -s tests -p test_validate_mkaos_source_register.py -v
+          python tools/validate_mkaos_source_register.py
