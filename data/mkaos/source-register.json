@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "reviewed_at": "2026-10-16",
+  "scope": "Turkish text for MKAOS training, validation, independent testing, and potential model-weight redistribution",
+  "policy": "A candidate is not approved until exact release, files, hashes, license scope, attribution, privacy and model-training/weight-distribution terms receive documented human review.",
+  "sources": [
+    {
+      "source_id": "mozilla-common-voice-text",
+      "name": "Mozilla Common Voice sentence text",
+      "canonical_url": "https://github.com/common-voice/common-voice",
+      "license_claim": "Repository states most sentence text in server/data is CC0; release-specific scope must be verified.",
+      "status": "candidate_pending_release_review",
+      "permitted_use_now": false,
+      "review_required": [
+        "pin exact dataset release and Turkish subset",
+        "verify license covers exact text files",
+        "record SHA-256 for each source archive/file",
+        "exclude audio unless separately licensed and reviewed",
+        "human review of content and privacy"
+      ],
+      "evidence_note": "Repository-level description is not proof of the terms for every released Turkish file or any audio/derived model weights."
+    },
+    {
+      "source_id": "wikimedia-turkish-wikipedia",
+      "name": "Turkish Wikipedia / Wikimedia text",
+      "canonical_url": "https://foundation.wikimedia.org/wiki/Terms_of_Use",
+      "license_claim": "Wikimedia text commonly carries CC BY-SA 4.0 and/or GFDL obligations, with source/page exceptions.",
+      "status": "blocked_pending_legal_compatibility_review",
+      "permitted_use_now": false,
+      "review_required": [
+        "review exact dump and imported-content exceptions",
+        "assess training and model-weight distribution obligations",
+        "preserve attribution and modification notices",
+        "obtain written legal compatibility decision"
+      ]
+    },
+    {
+      "source_id": "tatoeba-turkish-text",
+      "name": "Tatoeba Turkish text sentences",
+      "canonical_url": "https://tatoeba.org/en/downloads",
+      "license_claim": "Text generally CC BY 2.0 FR with attribution; sentence-level exceptions and audio terms differ.",
+      "status": "blocked_pending_attribution_and_legal_review",
+      "permitted_use_now": false,
+      "review_required": [
+        "pin exact export and Turkish rows",
+        "retain sentence-author attribution for every record",
+        "verify training and weight-distribution compatibility",
+        "exclude audio unless separately licensed",
+        "obtain written legal compatibility decision"
+      ],
+      "evidence_note": "Do not assume the CC0 language subset includes Turkish."
+    }
+  ],
+  "current_approved_sources": [],
+  "corpus_ready": false,
+  "model_training_allowed": false
+}
