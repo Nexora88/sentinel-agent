@@ -21,16 +21,9 @@ class WebDegradationTests(unittest.TestCase):
             old_history = web_app.chat_history
             web_app.chat_history = {}
             try:
-                with patch.object(web_app, "CHAT_HISTORY_FILE", Path(directory) / "history.json"), \\
-                     patch.object(web_app, "get_user", return_value={"username": "owner"}), \\
-                     patch.object(web_app, "generate_native_reply", side_effect=web_app.NativeMkaosUnavailable("checkpoint missing")):
+                with patch.object(web_app, "CHAT_HISTORY_FILE", Path(directory) / "history.json"), patch.object(web_app, "get_user", return_value={"username": "owner"}), patch.object(web_app, "generate_native_reply", side_effect=web_app.NativeMkaosUnavailable("checkpoint missing")):
                     with self.assertRaises(HTTPException) as raised:
-                        asyncio.run(
-                            web_app.api_chat(
-                                web_app.ChatRequest(message="Merhaba"),
-                                authorization="Bearer test",
-                            )
-                        )
+                        asyncio.run(web_app.api_chat(web_app.ChatRequest(message="Merhaba"), authorization="Bearer test"))
                 self.assertEqual(raised.exception.status_code, 503)
                 self.assertIn("checkpoint", str(raised.exception.detail).lower())
                 self.assertFalse((Path(directory) / "history.json").exists())
