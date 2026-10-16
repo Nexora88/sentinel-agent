@@ -28,9 +28,9 @@ To use a trained embedding model that is already present on disk:
 
 1. Install the optional adapter dependency: `pip install -r requirements-semantic.txt`.
 2. Place a compatible Sentence-Transformers model in a local directory using a separately reviewed, permitted acquisition process.
-3. Set `SEKA_EMBEDDINGS_PROVIDER=local-semantic`.
-4. Set `SEKA_LOCAL_EMBEDDING_MODEL_PATH=/absolute/path/to/local/model`.
-5. Start the application with network access disabled for the embedding model process and evaluate retrieval against a held-out Turkish query/document set.
+3. Set `SEKA_EMBEDDINGS_PROVIDER=local-semantic` and `SEKA_LOCAL_EMBEDDING_MODEL_PATH=/absolute/path/to/local/model`.
+4. To make semantic embeddings mandatory and forbid silent fallback to lexical hashing, set `SEKA_REQUIRE_SEMANTIC_EMBEDDINGS=true`. Startup will fail clearly if the local model is missing or another provider is selected.
+5. Start the application with network access disabled for the embedding model process and evaluate retrieval against a held-out Turkish query/document set. If a local model path exists, it is selected automatically unless another provider is explicitly configured.
 
 The adapter requires an existing local directory, uses `local_files_only=True`, and sets `trust_remote_code=False`. It does not download weights. The semantic provider has a separate Chroma collection suffix so vectors from different embedding spaces are not mixed. Switching providers does not migrate or re-embed old records; re-ingest the source documents into the new collection.
 
