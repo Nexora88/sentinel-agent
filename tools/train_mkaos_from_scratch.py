@@ -411,7 +411,7 @@ def main() -> int:
         "format_version": 1,
         "model_id": "MKAOS-TR-FromScratch-Experimental",
         "training_mode": "experimental_local_only" if args.experimental_local_only else "source_approved",
-        "redistribution_allowed": False if args.experimental_local_only else "review_required",
+        "redistribution_allowed": not args.experimental_local_only,
         "trained_from_random_initialization": True,
         "pretrained_model_used": None,
         "external_model_weights_used": False,
