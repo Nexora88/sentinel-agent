@@ -65,3 +65,48 @@ Uzun vadeli hedef, MKAOS'un kendi model dosya biçimi, tokenizer'ı, CPU çıkar
 - Model/tokenizer dosyalarının SHA-256 değerleri CI indirmesinde ölçüldü ve model kilit dosyasına yazıldı.
 - Bu kanıtlar **test edilen forward-pass uyumluluğunu** gösterir; Türkçe genel kalite, hız, bellek, uzun süreli kararlılık, eğitimle kendi ağırlıklarını üretme veya üretim güvenliği kanıtı değildir.
 - Ollama ile aynı cihaz karşılaştırması ve ağsız konteyner testi ayrı kabul kapılarıdır; tamamlanana kadar Ollama'yı kaldırmayın.
+
+
+## 2026-10-16 veri ve değerlendirme kapısı
+- [x] Türkçe model eğitimi için kaynak/lisans/izin/PII/split kurallarını tanımlayan bağımsız değerlendirme protokolü eklendi.
+- [x] Örnek başına menşe, içerik SHA-256, insan incelemesi ve train/validation/test ayrımı denetleyen metadata doğrulayıcısı eklendi: `tools/validate_mkaos_training_manifest.py`.
+- [ ] Yetkili kişilerce onaylanmış gerçek veri manifesti henüz sağlanmadı; gerçek eğitim checkpoint'i üretilmedi.
+- [ ] Ayrı tutulmuş, insan tarafından puanlanmış Türkçe held-out test sonuçları henüz yok.
+- [ ] Fiziksel GPU/HPU cihaz testleri, ortak kalıcı dağıtık durum katmanı ve canlı mTLS peer taşıması ayrı kabul kapıları olarak açık kalıyor.
+
+Doğrulayıcı yalnızca metadata tutarlılığı kontrol eder; lisans iznini, kaynağın doğruluğunu veya modelin niteliğini sertifikalandırmaz.
+
+
+## 2026-10-16 — sıfırdan yerel model eğitim hattı
+- [x] Önceden eğitilmiş model ağırlığı indirmeyen, rastgele başlatılmış MKAOS GQA/SwiGLU decoder'ı için PyTorch eğitim betiği eklendi: `tools/train_mkaos_from_scratch.py`.
+- [x] UTF-8 byte tokenizer sözleşmesi ve Rust `MKAOSW1` checkpoint biçimine aktarım eklendi; Rust motoruyla aynı split-half RoPE konvansiyonu kullanılır.
+- [x] Korpus içeriği SHA-256/manifest eşleştirmesi, manifest dışı örnek engeli ve boş test split'i reddi için testler eklendi.
+- [ ] Eğitim için yetkili gerçek Türkçe korpus henüz sağlanmadı; eğitilmiş MKAOS checkpoint'i veya kullanılabilir Türkçe kalite sonucu henüz üretilmedi.
+- [ ] Eğitilen checkpoint'in Rust decoder ile uçtan uca yükleme/üretim testi ve bağımsız Türkçe held-out değerlendirmesi henüz geçmedi.
+- [x] HTTP sohbet yolu yerel Rust CLI'a bağlandı ve varsayılanı native-rust oldu; onaylı checkpoint henüz olmadığı için uçtan uca kullanılabilirlik kanıtlanmadı.
+- [ ] CUDA/ROCm/Metal/Gaudi fiziksel cihaz testi, yatay Kubernetes ve paylaşılan kalıcı durum, canlı mTLS mesh/sertifika iptali ve çok düğümlü güvenlik testleri açık kabul kapıları olarak kalıyor.
+
+Bu adım bir **eğitim altyapısı** ekler; eğitimin gerçekten çalıştırıldığı, modelin iyi Türkçe bildiği veya yüzde yüz yerli üretim sistemine ulaşıldığı iddiası değildir.
+
+- [x] Özel checkpoint hash doğrulamasından sonra `GqaDecoder` ile greedy token üretimi yapan yerel Rust CLI eklendi: `engine/mkaos-inference/src/bin/mkaos-generate.rs`.
+- [x] CI, yeni Python bütünlük testleri ve Rust crate'in tüm hedeflerini derleyip test edecek şekilde genişletildi; yeni CI sonucu henüz gözlenmedi.
+
+
+## 2026-10-16 — menşe ve egemenlik güvence programı
+- [x] Veri, tokenizer, model ağırlıkları, kaynak kod, transitif bağımlılıklar, derleme, dağıtım, donanım ve dağıtık güvenlik katmanları için kanıt tabanlı kabul kapıları belgelendi: docs/MKAOS_SOVEREIGNTY_ASSURANCE_PROGRAM.md.
+- [x] Ağ kullanmadan yerel dosya envanteri, SHA-256, bağımlılık manifestleri, model dosyaları ve üçüncü taraf model/runtime referanslarını raporlayan denetim aracı eklendi: tools/audit_mkaos_provenance.py.
+- [x] Denetim aracı için testler ve CI adımı eklendi; bu testler aracın davranışını doğrular, bağımsızlık iddiasını doğrulamaz.
+- [ ] Rapor gerçek bir sürüm üzerinde çalıştırılıp her bilinmeyen için insan onaylı kanıt eklenmedi.
+- [ ] Transitif lisans/SBOM, imzalı artefakt, ağsız tekrarlanabilir build ve çalışma zamanı ağ çıkışı ölçümü tamamlanmadı.
+- [ ] Gerçek Türkçe korpus/checkpoint, bağımsız kalite, fiziksel hızlandırıcı, Kubernetes kalıcı durum, canlı mTLS/iptal ve çok düğümlü güvenlik kapıları hâlâ açık.
+
+**Önemli:** Statik tarama dosya hash'lerini ve şüpheli referansları envanterler; yazar menşeini, lisans iznini, fiziksel donanımın ülke menşeini veya ağ çıkışının imkânsızlığını kanıtlamaz.
+
+## 2026-10-16 — HTTP sohbet yolu yerel Rust motoruna bağlandı
+- [x] core/mkaos_native_chat.py: yalnızca yerel Rust CLI çağıran, SHA-256 doğrulamasını CLI'a zorunlu kılan, zaman aşımı ve boyut sınırları olan fail-closed HTTP adaptörü eklendi.
+- [x] POST /api/chat varsayılanı MKAOS_CHAT_BACKEND=native-rust oldu; checkpoint yoksa 503 döndürür, SmolLM2'ye sessiz geri dönüş yapmaz.
+- [x] Docker imajı Rust CLI'ı çok aşamalı derlemeyle paketler; Compose'taki üçüncü taraf SmolLM2 servisi yalnızca legacy-third-party-chat profiliyle açılır.
+- [x] Yerel adaptör için çevrimdışı testler eklendi.
+- [ ] Bu değişiklik bir çalışma zamanı geçiş kapısıdır, kullanılabilir model teslimi değildir: onaylı korpus, eğitilmiş checkpoint, gerçek Türkçe kalite kanıtı ve checkpoint'in gerçek CLI/HTTP uçtan uca testi hâlâ yoktur.
+- [ ] Varsayılan native sohbet, checkpoint sağlanana kadar 503 verir. Bu kasıtlı fail-closed davranıştır; üçüncü taraf modele sessiz geçiş yapılmaz.
+- [ ] CI, Docker derlemesi ve uçtan uca testler bu commit için yeniden doğrulanmalıdır.

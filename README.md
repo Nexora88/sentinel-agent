@@ -1,49 +1,34 @@
 # MKAOS v6.5 — Mustafa Kemal Atatürk Operating System
 
-**Yerel Türkçe ajan işletim sistemi altyapısı.** Uzun vadeli hedef; kendi model biçimi, tokenizer'ı ve çıkarım motoruyla harici çalışma zamanı bağımlılığını kaldırmaktır. Rust CPU çıkarım çekirdeği ve MKAOS uyumlu HTTP sunucusu geliştirilmektedir; ancak mevcut HTTP sunucusunun aday ağırlıkları hâlâ üçüncü taraf SmolLM2-135M-Instruct'tır. Sentetik CI eğitimi mimari/aktarım testidir; gerçek Türkçe yetenek kanıtı değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
+**Yerel Türkçe ajan işletim sistemi altyapısı.** HTTP sohbet yolu artık varsayılan olarak yerel Rust `mkaos-generate` CLI'ına gider ve onaylı yerel checkpoint yoksa açıkça `503` döndürür; üçüncü taraf SmolLM2'ye sessiz geri dönüş yapılmaz. Ancak henüz onaylı Türkçe korpus, eğitilmiş kullanılabilir MKAOS checkpoint'i veya bağımsız Türkçe kalite kanıtı yoktur. Sentetik CI eğitimi mimari/aktarım testidir; gerçek Türkçe yetenek kanıtı değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
-MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. Sohbet üretimi yalnızca MKAOS servisine gider; `MKAOS_ENABLED` sağlayıcı değiştirmez ve MKAOS erişilemiyorsa hata görünür kalır. RAG varsayılanı çevrimdışı `mkaos-native` sözcük/karakter n-gram taban çizgisidir. Bu eğitilmiş semantik embedding modeli değildir; eski Ollama embedding sağlayıcısı yalnızca açık opt-in ile kullanılabilir.
+MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. POST /api/chat varsayılan olarak yerel Rust CLI yolunu kullanır ve model dosyası yoksa hata görünür kalır. RAG varsayılanı çevrimdışı mkaos-native sözcük/karakter n-gram taban çizgisidir. Bu eğitilmiş semantik embedding modeli değildir; eski Ollama embedding sağlayıcısı yalnızca açık opt-in ile kullanılabilir.
 
 ## Bağımsız çıkarım motoru — aşamalı geçiş
 
-- Çekirdek: [`engine/mkaos-inference/`](engine/mkaos-inference/) — Rust CPU tensör işlemleri, Transformer decoder ve KV cache.
-- HF uyumluluk katmanı: [`engine/mkaos-hf-adapter/`](engine/mkaos-hf-adapter/).
-- Yerleşik servis: `mkaos_server` model ağırlıklarını/tokenizer'ı başlangıçta bir kez yükler ve yerel HTTP API'si sağlar. Aynı sistem istemi için sınırlı KV önek önbelleği kullanır.
-- Sohbet üretimi yalnızca MKAOS'a yönlendirilir; `MKAOS_ENABLED=false` Ollama sohbet yolunu açmaz. RAG varsayılanı `mkaos-native` olup Ollama embedding'i açık opt-in'dir.
-- Sunucu varsayılan olarak loopback'e bağlanır. Docker Compose dağıtımı, portu host'a yayınlamadan yalnızca dahili ağa bağlar; container arayüzüne bağlanmak için açık bir ayar gerekir.
-- Şimdiki aday ağırlıklar üçüncü taraf SmolLM2-135M-Instruct'tır. Motorun bağımsız kodu geliştirilse de model ağırlıkları henüz MKAOS tarafından eğitilmiş değildir. Türkçe anlamsal kalite ve hedef cihaz performansı geçiş kapılarıdır.
+- Çekirdek: [engine/mkaos-inference/](engine/mkaos-inference/) — Rust CPU tensör işlemleri, Transformer decoder ve KV cache.
+- Eğitim: tools/train_mkaos_from_scratch.py rastgele başlatılmış ağırlıklarla eğitim altyapısı sağlar; yalnızca onaylı yerel korpus ve manifest kabul edilir.
+- HTTP sohbet adaptörü: core/mkaos_native_chat.py yerel mkaos-generate ikilisini shell kullanmadan çalıştırır; hash, boyut, zaman aşımı ve çıktı sınırlarını denetler.
+- Docker imajı Rust CLI'ı çok aşamalı derlemeyle paketler. Model ağırlıkları otomatik indirilmez ve depoya dahil edilmez.
+- Şimdilik onaylı Türkçe korpus veya eğitilmiş kullanılabilir checkpoint yoktur. Bu nedenle varsayılan sohbet, checkpoint yapılandırılana kadar açık HTTP 503 döndürür; üçüncü taraf modele sessiz geri dönüş yoktur.
+- Üçüncü taraf SmolLM2 uyumluluk servisi yalnızca açıkça seçilen legacy-third-party-chat Compose profili ile başlatılabilir.
+- RAG varsayılanı çevrimdışı yerel sözcük/karakter n-gram taban çizgisidir; eğitilmiş semantik embedding modeli değildir.
 
-### İsteğe bağlı Docker Compose kurulumu
+### Başlatma
 
-1. Sabitlenmiş model dosyalarını indirin ve hash raporunu oluşturun:
+1. .env.example dosyasını .env olarak kopyala.
+2. Onaylı korpusla eğitim ve bağımsız inceleme tamamlandıktan sonra checkpoint'i models/mkaos/model.mkaosw içine yerleştir; eğitim raporundaki SHA-256 değerini MKAOS_NATIVE_SHA256 olarak ayarla. Heads/KV-heads/sequence ayarları checkpoint mimarisiyle eşleşmelidir.
+3. docker compose up --build komutuyla başlat. Checkpoint yokken chat'in 503 dönmesi beklenen fail-closed davranışıdır.
 
-   `python tools/fetch_model.py --output-dir models/smollm2-135m-instruct`
+Yol haritası: [docs/MKAOS_INDEPENDENCE_MILESTONES.md](docs/MKAOS_INDEPENDENCE_MILESTONES.md).
 
-2. `.env.example` dosyasını `.env` olarak kopyalayın. Sohbet için MKAOS zorunludur; RAG varsayılan olarak çevrimdışı yerel n-gram embedding kullanır.
-3. Servisi dahili Docker ağı üzerinde başlatın:
+## Native Rust chat integration status
 
-   `docker compose --profile mkaos up --build`
-
-4. Sağlık uç noktasını kontrol edin:
-
-   `docker compose exec sentinel python -c "import urllib.request; print(urllib.request.urlopen('http://mkaos:11435/health').read().decode())"`
-
-Ollama sohbetine geri dönüş yolu kaldırılmıştır. MKAOS hizmeti kapalıysa sohbet isteği açık hata verir; önce MKAOS servisini düzeltin. İlk model yüklemesi birkaç saniye veya daha uzun sürebilir; sonraki isteklerde süreç yeniden başlatılmadıkça ağırlıklar bellekte kalır. `stream: true` ile NDJSON token akışı desteklenir. İstekler sınırlı worker havuzuyla eşzamanlı işlenir; varsayılan sınır 4 olup `MKAOS_MAX_CONCURRENT_REQUESTS` ile 1–64 aralığında ayarlanır. Kapasite dolduğunda sınırsız kuyruk yerine `503 Service Unavailable` döner.
-
-**Hedef cihazda kalite ve sürekli-istek ölçümü (TTFT testi bu aşamada çalıştırılmaz):**
-
-```bash
-# Yalnızca yerel test için MKAOS ve Ollama portlarını host loopback'ine açar.
-docker compose -f docker-compose.yml -f docker-compose.mkaos-local-test.yml --profile mkaos up --build -d
-docker compose exec ollama ollama pull smollm2:135m-instruct-fp16
-python tools/evaluate_mkaos_quality.py --server-url http://127.0.0.1:11435 --output memory/benchmarks/mkaos-quality.json
-python tools/benchmark_mkaos_vs_ollama.py --mkaos-url http://127.0.0.1:11435 --ollama-url http://127.0.0.1:11434 --ollama-model smollm2:135m-instruct-fp16 --runs 2 --max-new-tokens 32
-```
-
-Bu test overlay'i yalnızca güvenilir, yerel geliştirme cihazında kullan; üretimde port yayınlamayan varsayılan Compose dosyasını kullan. Raporlar yanıt doğruluğu, istek süresi, token/s, istem önbelleği ve örneklenmiş bellek ölçümlerini içerir. Bunlar anlamsal uzman değerlendirmesi veya TTFT ölçümü değildir.
-
-- Yol haritası: [`docs/MKAOS_INDEPENDENCE_MILESTONES.md`](docs/MKAOS_INDEPENDENCE_MILESTONES.md).
-- Türkçe/tarihî veri menşei ve eğitim politikası: [`docs/MKAOS_TURKISH_DATA_GOVERNANCE.md`](docs/MKAOS_TURKISH_DATA_GOVERNANCE.md).
+- `POST /api/chat` defaults to `MKAOS_CHAT_BACKEND=native-rust` and invokes the locally packaged Rust CLI without a shell.
+- The checkpoint must be supplied locally at `models/mkaos/model.mkaosw` and its SHA-256 set through `MKAOS_NATIVE_SHA256`; the repository intentionally does not bundle model weights.
+- Until an approved corpus produces a real checkpoint, chat returns HTTP 503. It does not silently use third-party weights.
+- The third-party SmolLM2 compatibility service is gated behind the explicit `legacy-third-party-chat` Compose profile.
+- This wiring is not proof of useful Turkish quality, production performance, full supply-chain independence, or completed hardware/distributed validation.
 
 ## Marka ve tasarım ilkesi
 
@@ -51,7 +36,7 @@ MKAOS, *Mustafa Kemal Atatürk Operating System* anlamıyla yerel egemenlik, bil
 
 ## Gizlilik modeli ve sınırlar
 
-- **Yerel çıkarım:** Ollama istemcisi yalnızca loopback veya yerel Docker uç noktasını kabul eder; uzak model/API uç noktaları reddedilir. Varsayılan sohbet modeli `qwen2.5:7b`; kod/derin analiz modeli `qwen2.5-coder:7b`; embedding modeli `nomic-embed-text`.
+- **Yerel çıkarım:** Varsayılan sohbet motoru yerel Rust CLI'dır; ancak onaylı/eğitilmiş checkpoint henüz sağlanmadığı için chat varsayılan kurulumda 503 verir. Eski Ollama/üçüncü taraf model kullanımı yalnızca açıkça seçilen uyumluluk yollarıyla yapılmalıdır. RAG'in yerel n-gram baseline'ı eğitilmiş semantik model değildir.
 - **Yerel saklama:** kullanıcıya göre ayrılmış sohbet geçmişi ve onay günlüğü atomik dosya yazımıyla yerel `memory/` içinde tutulur; bozuk veri sessizce sıfırlanmaz. Bellek ve vektör deposu da yerel proje/volume içindedir. Bu dizini şifreli disk üzerinde tut ve yedekle.
 - **Web araştırması kapalı başlar:** `ALLOW_WEB_RESEARCH=false` iken bilgi genişletme arama sorgusu göndermez. Bilerek açarsan arama sorguları ve sayfa istekleri internete çıkar. `ALLOW_EXTERNAL_FINANCE_DATA=false` canlı hisse/kripto fiyatlarını ve paper motorunun fiyat isteklerini de kapatır; `ALLOW_SITE_SCANNING=false` site taramasını kapatır. Bunları açmak ilgili sorgu/hedef bilgilerini dış servislere gönderir. GitHub token'ı GitHub'a istek gönderir. Üçüncü taraf bildirimleri `ALLOW_EXTERNAL_NOTIFICATIONS=true` ile açıkça etkinleştirilmedikçe kapalıdır. Tam çevrimdışı kullanım için bu özellikleri çalıştırma, kimlik bilgilerini tanımlama ve ağ çıkışını işletim sistemi/firewall seviyesinde kısıtla.
 - **Onay varsayılanı açık:** GitHub yazma, commit, push ve dosya değişiklikleri otomatik yapılmamalıdır. Her onay kararlı bir istek kimliğine bağlıdır.
@@ -246,9 +231,28 @@ Bu özellik deneysel durumdadır. Mevcut aday ağırlıklar üçüncü taraf Smo
 python tools/evaluate_mkaos_quality.py --model-dir models/smollm2-135m-instruct\n# Sunucu çalışırken tekrar yükleme maliyeti olmadan ölçüm:\npython tools/evaluate_mkaos_quality.py --server-url http://127.0.0.1:11435 --output artifacts/mkaos-resident-quality.json
 ```
 
+
+## Türkçe eğitim verisi ve bağımsız kalite kapısı
+
+Eğitim verisi menşei ve izin politikası için [Türkçe veri yönetişimi](docs/MKAOS_TURKISH_DATA_GOVERNANCE.md), bağımsız değerlendirme süreci için [Türkçe değerlendirme protokolü](docs/MKAOS_TURKISH_EVALUATION_PROTOCOL.md) belgelerine bak. Mevcut kalite kümesi yalnızca küçük bir regresyon testidir; MKAOS tarafından eğitilmiş ağırlık veya Türkçe yeterlilik sertifikası değildir. Gerçek eğitim, izinleri gözden geçirilmiş veri kümesi, ayrılmış test bölümü, hesaplama kaynağı ve bağımsız değerlendirme gerektirir.
+
+
+## MKAOS ağırlıklarını sıfırdan eğitme (deneysel)
+
+`tools/train_mkaos_from_scratch.py`, başka bir modelin ağırlıklarını indirmeden rastgele başlatılmış MKAOS GQA/SwiGLU decoder'ını eğitir ve Rust motorunun `MKAOSW1` checkpoint biçimine aktarır. Bu yol, önceden eğitilmiş bir LLM'yi yeniden adlandırmaz veya onun ağırlıklarını kullanmaz. Eğitim için ayrıca yerel, insan/hukuk incelemesinden geçmiş Türkçe veri gerekir; repoda hazır/onaylı bir eğitim korpusu bulunması anlamına gelmez.
+
+- JSONL satırları: `{"sample_id":"...","text":"..."}`; her metnin SHA-256 değeri manifestteki örnekle eşleşmelidir.
+- Manifest kapısı: `tools/validate_mkaos_training_manifest.py` içindeki tüm kaynak/lisans/izin/PII/split kontrolleri geçmelidir.
+- Eğitim komutu: `python tools/train_mkaos_from_scratch.py --corpus ./approved-tr.jsonl --manifest ./approved-manifest.json --output-dir ./artifacts/mkaos-tr`
+- Eğitim gereksinimi: yerel kurulumda PyTorch; hiçbir model deposuna veya indirme API'sine başvurulmaz.
+- Çıktılar: `mkaos-owned.mkaosw`, `tokenizer.json` ve hash/seed/cihaz/kayıp bilgilerini içeren `training-report.json`.
+- Yerel Rust CLI ile üretim: `cargo run --release --manifest-path engine/mkaos-inference/Cargo.toml --bin mkaos-generate -- --checkpoint ./artifacts/mkaos-tr/mkaos-owned.mkaosw --sha256 <checkpoint_sha256> --heads 4 --kv-heads 2 --max-seq 128 --max-new-tokens 32 --prompt "Merhaba"` (baş/katman boyutlarını eğitim raporundan kullanın).
+- Test bölümü optimizasyon ve model seçimi için kullanılmaz. Çalıştırma raporu Türkçe yetenek sertifikası değildir; bağımsız held-out değerlendirme ve Rust motorunda checkpoint yükleme/yanıt testi hâlâ gerekir.
+
+Bu küçük byte-tokenizer modeli başlangıç araştırma hattıdır; üretim kalitesinde Türkçe asistan, GPU hızlandırması, dağıtık durum veya canlı mesh tamamlanmış sayılmaz.
+
 ## Open source worldwide
 
 MKAOS is developed in public under the repository's MIT license. No institutional endorsement or certification is claimed. MIT applies to this repository's covered source; third-party model weights, datasets, voices, and assets may have separate terms. Public availability alone does not grant training or redistribution permission.
 
 Read the current evidence and contribution policy in [MKAOS Open-Source Readiness](docs/MKAOS_OPEN_SOURCE_READINESS.md). The current source register contains **zero approved training sources**, so a real owned-model training run is not yet cleared to start. Host-metadata CI and ARM64 tests do not certify native inference on every platform. We will publish stronger claims only alongside reproducible evidence.
-

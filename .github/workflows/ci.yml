@@ -55,6 +55,8 @@ jobs:
           pip install -r requirements.txt
       - name: Compile Python modules
         run: python -m compileall -q agents core scripts tools web
+      - name: Test native MKAOS Rust inference engine and CLI
+        run: cargo test --manifest-path engine/mkaos-inference/Cargo.toml --all-targets
       - name: Validate source register fail-closed policy
         run: python tools/validate_mkaos_source_register.py
       - name: Check frontend JavaScript syntax
@@ -88,12 +90,18 @@ jobs:
           token="$(curl --fail --silent -X POST http://127.0.0.1:18000/api/login -H 'Content-Type: application/json' -d "{\"username\":\"owner\",\"password\":\"$bootstrap_secret\"}" | python -c 'import json,sys; print(json.load(sys.stdin)["token"])')"
           status="$(curl --fail --silent -H "Authorization: Bearer $token" http://127.0.0.1:18000/api/status)"
           printf '%s' "$status" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["status"] == "ok", d; assert d["ollama"]["status"] == "unavailable", d.get("ollama"); assert "rag" in d, d; print("Pipeline initializes; panel stays healthy and reports Ollama outage gracefully.")'
+      - name: Test fail-closed native Rust chat adapter
+        run: python -m unittest discover -s tests -p test_mkaos_native_chat.py -v
       - name: Run security regression tests
         run: python -m unittest discover -s tests -v
       - name: Benchmark native Turkish retrieval smoke set
         env:
           SEKA_EMBEDDINGS_PROVIDER: mkaos-native
         run: python -m scripts.benchmark_mkaos_retrieval
+      - name: Test offline provenance audit
+        run: |
+          python -m unittest discover -s tests -p test_mkaos_provenance_audit.py -v
+          python tools/audit_mkaos_provenance.py --root . --output artifacts/mkaos-provenance-audit.json
       - name: Scan repository for likely hardcoded secrets
         run: |
           python - <<'PY'
@@ -106,6 +114,39 @@ jobs:
           print("No likely hardcoded credentials found.")
           PY
 
+  supply-chain-sbom:
+    # Do not mint attestations from unmerged pull-request code.
+    if: github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Generate local CycloneDX SBOM
+        run: python tools/generate_mkaos_sbom.py --requirements requirements.txt --output artifacts/mkaos-sbom.cdx.json
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkaos-sbom-cyclonedx
+          path: artifacts/mkaos-sbom.cdx.json
+          if-no-files-found: error
+      - name: Attest SBOM provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: artifacts/mkaos-sbom.cdx.json
   portable-arm64:
     name: Portable unit tests (Ubuntu ARM64, Python 3.12)
     # GitHub-hosted ARM64 runners are available for public repositories.
@@ -125,3 +166,4 @@ jobs:
           python -c "import platform; print('machine=' + platform.machine()); assert platform.machine().lower() in ('aarch64', 'arm64'), platform.machine()"
           python -m pytest -q tests/test_platform_profile.py tests/test_validate_mkaos_source_register.py
           python tools/validate_mkaos_source_register.py
+

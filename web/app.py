@@ -33,6 +33,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from core.pipeline import SentinelPipeline
+from core.mkaos_native_chat import NativeMkaosUnavailable, generate_native_reply
 from core.tenant_storage import tenant_root, tenant_storage_id
 from core.auth import AuthManager
 from core.webauthn_auth import WebAuthnManager, WebAuthnError
@@ -523,18 +524,29 @@ async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)
     message = req.message.strip()
     if not message:
         return {"reply": "Boş mesaj."}
+    backend = os.getenv("MKAOS_CHAT_BACKEND", "native-rust").strip().lower()
     try:
-        p = get_pipeline(user["username"])
         if message.lower() in ("/status", "durum", "status"):
-            reply = p.status()
+            reply = get_pipeline(user["username"]).status()
+        elif backend == "native-rust":
+            # No implicit model-provider fallback: an absent/unapproved native checkpoint
+            # returns an actionable 503 rather than silently calling third-party weights.
+            reply = generate_native_reply(message)
+        elif backend == "legacy-smollm":
+            # Explicit compatibility escape hatch; enable only when deliberately accepted.
+            reply = get_pipeline(user["username"]).chat(message)
         else:
-            reply = p.chat(message)
+            raise HTTPException(503, "Bilinmeyen MKAOS_CHAT_BACKEND; native-rust veya legacy-smollm seç.")
+    except HTTPException:
+        raise
+    except NativeMkaosUnavailable as exc:
+        logger.warning("Native MKAOS sohbeti hazır değil (%s).", type(exc).__name__)
+        raise HTTPException(503, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
     except Exception as exc:
-        # Keep FastAPI alive and never return raw exception/traceback to the browser.
-        logger.warning("Yerel yanıt üretilemedi (%s).", type(exc).__name__)
-        reply = ("MKAOS paneli çalışıyor ancak yerel Ollama/model bağlantısı hazır değil. "
-                 "Ollama hizmetinin açık olduğunu, OLLAMA_BASE_URL değerini ve OLLAMA_MODEL "
-                 "modelinin yerel olarak yüklü olduğunu kontrol et. Yerel verilerin silinmedi.")
+        logger.warning("Sohbet yanıtı üretilemedi (%s).", type(exc).__name__)
+        raise HTTPException(503, "Seçili sohbet motoru şu anda yanıt üretemiyor; yerel yapılandırmayı ve günlükleri kontrol et.") from exc
     history = chat_history.setdefault(user["username"], [])
     from datetime import datetime
     history.extend([

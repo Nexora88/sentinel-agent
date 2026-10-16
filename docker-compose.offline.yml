@@ -28,7 +28,7 @@ services:
     restart: unless-stopped
 
   # Keep the optional MKAOS service on the same isolated offline-only network
-  # as the app when this overlay is used with --profile mkaos.
+  # as the app when this overlay is used with --profile legacy-third-party-chat.
   mkaos:
     networks:
       - offline_internal
