@@ -59,10 +59,12 @@ class MediaEngine:
             return {"free_ram_mb": None, "ram_known": False, "cpu_count": os.cpu_count() or 1, "gpu_available": False}
 
     def submit(self, operation: str, payload: dict) -> dict:
-        allowed = {"generate", "edit", "background", "video", "story_video", "report_infographic"}
+        allowed = {
+            "generate", "edit", "background", "video", "story_video", "report_infographic",
+            "poster", "code_card", "slideshow",
+        }
         if operation not in allowed: raise MediaEngineError("Desteklenmeyen medya işlemi.")
         safe_payload = dict(payload)
-        # Avoid storing binary upload data or arbitrary large request bodies in queue files.
         if any(isinstance(v, (bytes, bytearray)) for v in safe_payload.values()):
             raise MediaEngineError("Dosya baytları kuyruğa yazılmaz; yerel geçici dosya tanımlayıcısı gerekir.")
         if len(json.dumps(safe_payload, ensure_ascii=False)) > 8000:
@@ -104,31 +106,12 @@ class MediaEngine:
             self._write(jobs)
             return {k:v for k,v in current.items() if k != "payload"}
 
-
     def render_report_infographic(self, report_text: str) -> dict:
-        """Render a lightweight report card locally; no image model or network required."""
         try:
-            from PIL import Image, ImageDraw, ImageFont
-            import textwrap
-            output_dir = (self.state_path.parent / "generated_images").resolve()
-            output_dir.mkdir(parents=True, exist_ok=True)
-            image = Image.new("RGB", (1200, 675), (8, 17, 33))
-            draw = ImageDraw.Draw(image)
-            draw.rectangle((0, 0, 1200, 12), fill=(20, 184, 166))
-            font = ImageFont.load_default()
-            draw.text((52, 42), "MKAOS / NIGHT WATCH REPORT", fill=(94, 234, 212), font=font)
-            draw.text((52, 88), datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z"), fill=(148, 163, 184), font=font)
-            lines = []
-            for paragraph in str(report_text or "Denetim tamamlandı.").splitlines():
-                lines.extend(textwrap.wrap(paragraph, width=105) or [""])
-            y = 140
-            for line in lines[:22]:
-                draw.text((52, y), line[:150], fill=(226, 232, 240), font=font)
-                y += 22
-            draw.text((52, 620), "LOCAL RENDER / SUMMARY ONLY / REVIEW BEFORE ACTION", fill=(251, 191, 36), font=font)
-            name = f"night_report_{uuid.uuid4().hex[:12]}.png"
-            image.save(output_dir / name, format="PNG", optimize=True)
-            return {"success": True, "filename": name, "source": "local_pillow_infographic"}
+            from core.media.local_canvas import LocalCanvas
+            return LocalCanvas(self.state_path.parent / "generated_images").poster(
+                "MKAOS / NIGHT WATCH REPORT", str(report_text or "Denetim tamamlandı.")
+            )
         except Exception as exc:
             return {"success": False, "error": "Yerel rapor infografiği oluşturulamadı: " + type(exc).__name__}
 
