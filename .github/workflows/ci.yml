@@ -152,6 +152,111 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: artifacts/mkaos-sbom.cdx.json
+  experimental-owned-model-smoke:
+    name: Owner-approved local-only MKAOS training + Rust smoke
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'mkaos-owner-approved-local-training'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install CPU-only PyTorch
+        run: python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: Train tiny MKAOS model from random initialization
+        run: |
+          set -eu
+          mkdir -p artifacts/mkaos-local-experiment
+          python tools/train_mkaos_from_scratch.py \
+            --corpus data/mkaos/first-party-smoke-v1.jsonl \
+            --manifest data/mkaos/first-party-smoke-v1.manifest.json \
+            --source-register data/mkaos/source-register.json \
+            --output-dir artifacts/mkaos-local-experiment \
+            --experimental-local-only \
+            --epochs 3 --batch-size 2 --sequence-length 64 \
+            --hidden-size 32 --layers 1 --heads 4 --kv-heads 2 \
+            --intermediate-size 64 --seed 20261016
+          python tools/verify_mkaos_training_artifacts.py artifacts/mkaos-local-experiment/training-report.json
+      - name: Build owned Rust inference CLI
+        run: cargo build --manifest-path engine/mkaos-inference/Cargo.toml --bin mkaos-run
+      - name: Load exact checkpoint in Rust and record first-token, throughput, and RSS
+        run: |
+          set -eu
+          OUT=artifacts/mkaos-local-experiment
+          HASH="$(python -c 'import json; print(json.load(open("artifacts/mkaos-local-experiment/training-report.json"))["checkpoint_sha256"])')"
+          /usr/bin/time -v target/debug/mkaos-run \
+            --checkpoint "$OUT/mkaos-owned.mkaosw" --sha256 "$HASH" \
+            --heads 4 --kv-heads 2 --max-seq-len 64 --max-new-tokens 1 \
+            --prompt "MKAOS" --raw-token-ids > "$OUT/rust-first-token.txt" 2> "$OUT/rust-first-token-metrics.txt"
+          /usr/bin/time -v target/debug/mkaos-run \
+            --checkpoint "$OUT/mkaos-owned.mkaosw" --sha256 "$HASH" \
+            --heads 4 --kv-heads 2 --max-seq-len 64 --max-new-tokens 8 \
+            --prompt "MKAOS" --raw-token-ids > "$OUT/rust-throughput.txt" 2> "$OUT/rust-throughput-metrics.txt"
+          python - <<'PY'
+          import hashlib, json, re
+          from pathlib import Path
+          out = Path("artifacts/mkaos-local-experiment")
+          training = json.loads((out / "training-report.json").read_text(encoding="utf-8"))
+          first = (out / "rust-first-token-metrics.txt").read_text(encoding="utf-8")
+          throughput = (out / "rust-throughput-metrics.txt").read_text(encoding="utf-8")
+          def metric(text, key, cast=float):
+              match = re.search(r"^" + re.escape(key) + r"=([0-9.]+)$", text, re.M)
+              if not match:
+                  raise SystemExit("Missing Rust metric: " + key)
+              return cast(match.group(1))
+          def rss(text):
+              match = re.search(r"Maximum resident set size \(kbytes\): (\d+)", text)
+              if not match:
+                  raise SystemExit("Missing /usr/bin/time maximum RSS")
+              return int(match.group(1))
+          digest = hashlib.sha256((out / "mkaos-owned.mkaosw").read_bytes()).hexdigest()
+          rust_digest = metric(throughput, "checkpoint_sha256", str)
+          if digest != training["checkpoint_sha256"] or digest != rust_digest:
+              raise SystemExit("Checkpoint SHA-256 mismatch across trainer, persisted file, and Rust loader")
+          report = {
+              "experiment": "MKAOS-TR-FromScratch-Experimental",
+              "dataset_id": training["dataset_id"],
+              "dataset_revision": training["dataset_revision"],
+              "manifest_sha256": training["manifest_sha256"],
+              "checkpoint_sha256": digest,
+              "trained_from_random_initialization": training["trained_from_random_initialization"],
+              "external_model_weights_used": training["external_model_weights_used"],
+              "training_mode": training["training_mode"],
+              "redistribution_allowed": training["redistribution_allowed"],
+              "train_samples": training["split_sample_counts"]["train"],
+              "validation_samples": training["split_sample_counts"]["validation"],
+              "independent_test_samples": training["split_sample_counts"]["test"],
+              "best_validation_loss": training["best_validation_loss"],
+              "independent_test_loss": training["independent_test_loss"],
+              "rust_loader_hash_matches": True,
+              "rust_first_token_latency_ms": metric(first, "elapsed_ms", int),
+              "rust_first_token_max_rss_kb": rss(first),
+              "rust_8_token_elapsed_ms": metric(throughput, "elapsed_ms", int),
+              "rust_8_token_tokens_per_second": metric(throughput, "tokens_per_second", float),
+              "rust_8_token_max_rss_kb": rss(throughput),
+              "quality_status": "not_established; 12 short diagnostic records are insufficient for general-purpose Turkish claims",
+              "checkpoint_policy": "ephemeral in CI; weights are not uploaded or distributed",
+              "legal_status": "local-only owner-authorized experiment; license_reviewed remains false; no redistribution rights asserted"
+          }
+          (out / "rust-smoke-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          PY
+      - name: Remove non-redistributable checkpoint before artifact publication
+        run: rm -f artifacts/mkaos-local-experiment/mkaos-owned.mkaosw artifacts/mkaos-local-experiment/tokenizer.json
+      - name: Publish metrics only (never model weights)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkaos-local-only-training-report
+          path: |
+            artifacts/mkaos-local-experiment/training-report.json
+            artifacts/mkaos-local-experiment/rust-smoke-report.json
+          if-no-files-found: error
+
   portable-arm64:
     name: Portable unit tests (Ubuntu ARM64, Python 3.12)
     # GitHub-hosted ARM64 runners are available for public repositories.
