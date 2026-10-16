@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from tools.extract_common_voice_text import extract
-from tools.evaluate_mkaos_turkish_tasks import evaluate
+from tools.evaluate_mkaos_turkish_tasks import evaluate, norm
 
 
 class CommonVoiceExtractionTests(unittest.TestCase):
@@ -53,6 +53,10 @@ class TurkishTaskEvaluationTests(unittest.TestCase):
         self.assertEqual(result["human_score_mean_0_to_4"], 4.0)
         self.assertNotIn("prompt", result)
         self.assertFalse(result["used_for_training_or_checkpoint_selection"])
+
+    def test_normalization_preserves_turkish_dotless_i(self):
+        self.assertNotEqual(norm("I"), norm("ı"))
+        self.assertEqual(norm("İ"), norm("i̇"))
 
     def test_rejects_source_leakage(self):
         with self.assertRaisesRegex(ValueError, "source appears in multiple splits"):
