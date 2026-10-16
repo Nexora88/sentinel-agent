@@ -1,5 +1,5 @@
-//! Dependency-free UTF-8 byte tokenizer for tiny byte-level models and loader tests.
-//! This is NOT compatible with SentencePiece/BPE tokenizers used by most pretrained LLMs.
+//! MKAOS byte-v1 tokenizer shared with the Python from-scratch trainer.
+//! Contract: data/mkaos/tokenizer-contract.json; golden vectors are shared across Rust/Python.
 use crate::KernelError;
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -35,4 +35,32 @@ mod tests {
         assert_eq!(t.decode(&ids).unwrap(), text);
     }
     #[test] fn rejects_unknown_ids() { assert!(ByteTokenizer.decode(&[257]).is_err()); }
+
+    #[test]
+    fn shared_golden_vectors_match_python_contract() {
+        let vectors = include_str!("../../../data/mkaos/tokenizer-golden-vectors.tsv");
+        for (line_number, line) in vectors.lines().enumerate() {
+            let mut parts = line.splitn(3, '\t');
+            let name = parts.next().expect("vector name");
+            let text = parts.next().expect("vector text");
+            let encoded = parts.next().expect("vector token ids");
+            let expected: Vec<usize> = if encoded.is_empty() {
+                Vec::new()
+            } else {
+                encoded.split(',').map(|item| item.parse().expect("integer token id")).collect()
+            };
+            assert_eq!(ByteTokenizer.encode(text), expected, "vector {name} at line {}", line_number + 1);
+            assert_eq!(ByteTokenizer.decode(&expected).unwrap(), text, "decode vector {name}");
+        }
+    }
+
+    #[test]
+    fn constants_match_shared_contract_metadata() {
+        let contract = include_str!("../../../data/mkaos/tokenizer-contract.json");
+        assert!(contract.contains("\"contract_id\": \"mkaos-byte-v1\""));
+        assert!(contract.contains("\"vocab_size\": 257"));
+        assert!(contract.contains("\"eos_id\": 256"));
+        assert_eq!(ByteTokenizer::VOCAB_SIZE, 257);
+        assert_eq!(ByteTokenizer::EOS_ID, 256);
+    }
 }

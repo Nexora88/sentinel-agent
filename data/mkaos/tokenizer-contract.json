@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "contract_id": "mkaos-byte-v1",
+  "encoding": "UTF-8",
+  "normalization": "none",
+  "token_mapping": "each UTF-8 byte maps to the same integer 0..255",
+  "vocab_size": 257,
+  "eos_id": 256,
+  "encode_text_appends_eos": false,
+  "decode_eos_behavior": "skip EOS tokens",
+  "document_boundary": "append one EOS token after each training document",
+  "checkpoint_format": "MKAOSW1",
+  "note": "Shared Rust/Python contract. Golden vectors are in tokenizer-golden-vectors.tsv."
+}

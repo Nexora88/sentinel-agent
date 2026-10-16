@@ -5,6 +5,29 @@
   "policy": "A candidate is not approved until exact release, files, hashes, license scope, attribution, privacy and model-training/weight-distribution terms receive documented human review.",
   "sources": [
     {
+      "source_id": "mkaos-original-seed-v1",
+      "name": "MKAOS first-party authored Turkish seed texts",
+      "canonical_url": "https://github.com/Nexora88/sentinel-agent/tree/main/data/mkaos/owned-seed",
+      "license_claim": "Intended CC0-1.0 dedication for original text authored specifically for this repository; this is a proposed license designation, not completed human/legal approval.",
+      "status": "candidate_pending_human_content_privacy_and_license_review",
+      "permitted_use_now": false,
+      "approved_revision": "",
+      "approval_evidence": "",
+      "weight_distribution_review": "pending",
+      "candidate_revision": "seed-v1",
+      "candidate_manifest": "data/mkaos/owned-seed/seed-manifest.json",
+      "candidate_corpus": "data/mkaos/owned-seed/seed-corpus.jsonl",
+      "review_required": [
+        "human review each text for factual quality, accidental similarity, and unsuitable content",
+        "confirm repository maintainer authority to publish these original texts under CC0-1.0",
+        "review PII status and record explicit cleared result per sample",
+        "confirm intended training use and distribution of derived model weights",
+        "run exact duplicate and near-duplicate checks across train/validation/test",
+        "only after approval, set source status approved, permitted_use_now true, approved_revision seed-v1, approval_evidence to a real review record, weight_distribution_review approved, and add source_id to current_approved_sources"
+      ],
+      "evidence_note": "Nine original Turkish seed paragraphs are included solely to exercise the pipeline. Their content hashes and split assignments are recorded. The dataset is intentionally small and cannot establish Turkish assistant capability. Training is blocked pending real maintainer review."
+    },
+    {
       "source_id": "mozilla-common-voice-text",
       "name": "Mozilla Common Voice Scripted Speech 27.0 Turkish sentence text",
       "canonical_url": "https://mozilladatacollective.com/datasets/cmu5wkah500c2o10719lem8m8",
