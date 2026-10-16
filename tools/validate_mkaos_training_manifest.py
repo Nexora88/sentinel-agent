@@ -13,7 +13,7 @@ ALLOWED_SPLITS = {"train", "validation", "test"}
 ALLOWED_CONSENT = {"granted", "public_domain", "open_license", "not_required"}
 
 
-def validate_manifest(manifest: Any) -> list[str]:
+def validate_manifest(manifest: Any, experimental_local_only: bool = False) -> list[str]:
     errors: list[str] = []
     if not isinstance(manifest, dict):
         return ["Manifest root must be a JSON object."]
@@ -23,7 +23,12 @@ def validate_manifest(manifest: Any) -> list[str]:
         if not isinstance(manifest.get(key), str) or not manifest[key].strip():
             errors.append(f"{key} must be a non-empty string.")
     if manifest.get("license_reviewed") is not True:
-        errors.append("license_reviewed must be true after documented human/legal review.")
+        if not (
+            experimental_local_only
+            and manifest.get("data_rights_mode") == "owner_supplied_local_nonredistributable"
+            and manifest.get("source_kind") == "owner_created_or_rights_cleared_local"
+        ):
+            errors.append("license_reviewed must be true after documented human/legal review.")
     records = manifest.get("records")
     if not isinstance(records, list) or not records:
         return errors + ["records must be a non-empty array of sample provenance records."]
@@ -72,7 +77,11 @@ def validate_manifest(manifest: Any) -> list[str]:
     missing = [split for split, count in counts.items() if count == 0]
     if missing:
         errors.append("Corpus needs non-empty train/validation/test splits; missing: " + ", ".join(missing) + ".")
-    return errors or ["Metadata checks passed. This is NOT legal clearance, dataset quality approval, or model-quality evidence."]
+    if errors:
+        return errors
+    if experimental_local_only:
+        return ["Metadata checks passed. Experimental local-only mode is NOT legal clearance, dataset quality approval, or model-quality evidence; do not distribute the checkpoint."]
+    return ["Metadata checks passed. This is NOT legal clearance, dataset quality approval, or model-quality evidence."]
 
 
 def main() -> int:
