@@ -111,6 +111,25 @@ docker compose -f docker-compose.bootstrap.yml exec ollama-bootstrap ollama pull
 
 `internal: true` ağı, uygulama konteynerlerinin normal internet çıkışını engeller; ana bilgisayarın veya başka uygulamaların ağ erişimini kendiliğinden sınırlandırmaz. En yüksek güvence için ana bilgisayarın güvenlik duvarı kurallarını da denetle. Çevrimdışı mod, internete bağlanma kabiliyetini azaltır; ama tek başına ana bilgisayardaki her sürecin veri göndermesini engellemez.
 
+## Çevrimdışı kurulum denetimi (ağ erişimi yapmaz)
+
+İlk çalıştırmadan önce depo kökünde şu salt-okunur denetimi çalıştır:
+
+```bash
+python tools/mkaos_offline_doctor.py
+python tools/mkaos_offline_doctor.py --include-media
+```
+
+Araç model indirmez, ağ isteği yapmaz ve sır değerlerini yazdırmaz. Yerel Rust üreticisini, checkpoint dosyasını ve checkpoint SHA-256 pinini denetler. `present_hash_not_pinned` veya `missing` sonucu varsa yerel sohbetin hazır olduğu varsayılmamalıdır. Ses/Whisper dosyaları isteğe bağlıdır; `--include-media` bu varlıkları da zorunlu denetler.
+
+İlk sahip parolasını `.env` içindeki `OWNER_PASSWORD` ile kendin belirlemen önerilir. Değeri sağlamadıysan ilk çalıştırmada oluşturulan parolayı yalnızca yerel Docker terminalinde görüntüle:
+
+```bash
+docker compose exec sentinel cat /app/memory/first-run-password.txt
+```
+
+Bu parolayı sohbet mesajına, issue'ya, commit'e veya log paylaşımına yapıştırma. Kurulum denetimi parolayı okumaz veya yazdırmaz.
+
 ## Docker ilk açılış ve RAG sınırları
 
 `docker compose up --build -d` web panelini ve yerel Ollama hizmetini başlatır. `OWNER_PASSWORD` ayarlamadıysan ilk çalıştırmada rastgele parola `/app/memory/first-run-password.txt` içine yerel olarak yazılır; görmek için `docker compose exec sentinel cat /app/memory/first-run-password.txt` çalıştır. Parola uygulama günlüğüne yazılmaz. Panel sağlık denetimi Ollama modelinin hazır olmasına bağlı değildir; `/health` web sürecini, `Durum` paneli ise yerel Ollama bağlantısını ayrıca raporlar. Varsayılan `seka_isolated` ağı çalışma sırasında internet çıkışını engeller; bu yüzden model dosyaları önceden hazırlanmalıdır. Model ilk kurulumda otomatik indirilmez.
