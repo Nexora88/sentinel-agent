@@ -85,6 +85,16 @@ pub fn reason(input: &str) -> Result<ReasoningResult, ReasoningError> {
         trace: vec!["Eşleşen kural veya desteklenen aritmetik ifade yok.".into()],
     })
 }
+/// Runs the local rule engine with facts loaded from the caller's local memory.
+pub fn reason_with_memory(input: &str, memory: &crate::memory::FactMemory) -> Result<ReasoningResult, ReasoningError> {
+    let mut combined = input.trim().to_string();
+    for statement in memory.as_statements() {
+        if !combined.is_empty() { combined.push_str(". "); }
+        combined.push_str(&statement);
+    }
+    reason(&combined)
+}
+
 fn normalize_statement(s: &str) -> String {
     s.trim().trim_end_matches(&['.', ',', '?', '!', ':'][..]).trim()
         .replace('İ', "i").replace('I', "ı").to_lowercase()
@@ -118,6 +128,12 @@ mod tests {
         assert_eq!(r.answer, "Çıkarım: yol ıslaktır."); assert_eq!(r.trace.len(), 1);
     }
     #[test] fn computes_arithmetic() { assert_eq!(reason("12 * 3").unwrap().answer, "Sonuç: 36"); }
+    #[test] fn uses_local_memory_as_a_fact() {
+        let mut memory = crate::memory::FactMemory::new();
+        memory.remember("yağmur", "var").unwrap();
+        let result = reason_with_memory("yağmur var ise yol ıslak", &memory).unwrap();
+        assert_eq!(result.answer, "Çıkarım: yol ıslak.");
+    }
     #[test] fn chains_multiple_rules_and_stops_cycles() {
         let r = reason("yağmur var ise yol ıslak. yol ıslak ise trafik yavaş. yağmur var").unwrap();
         assert_eq!(r.answer, "Çıkarım: yol ıslak; trafik yavaş.");
