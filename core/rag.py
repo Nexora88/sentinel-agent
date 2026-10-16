@@ -20,6 +20,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from core.ollama_client import OllamaClient
+from core.hybrid_retrieval import rerank_local_candidates
 
 logger = logging.getLogger("seka.rag")
 
@@ -180,7 +181,15 @@ class MemoryStore:
             return []
         safe_k = max(1, min(int(k), 20))
         try:
-            return self.vectorstore.similarity_search(query.strip()[:4000], k=safe_k, **({"filter": {"tenant_id": getattr(self, "tenant_id", None)}} if getattr(self, "tenant_id", None) else {}))
+            # Retrieve a bounded candidate pool, then fuse local vector rank with
+            # lexical evidence. This remains fully offline and adds no model weights.
+            candidate_k = min(50, max(safe_k, safe_k * 4))
+            candidates = self.vectorstore.similarity_search(
+                query.strip()[:4000],
+                k=candidate_k,
+                **({"filter": {"tenant_id": getattr(self, "tenant_id", None)}} if getattr(self, "tenant_id", None) else {}),
+            )
+            return rerank_local_candidates(query.strip()[:4000], candidates, safe_k)
         except Exception as exc:
             # Retrieval failure must not take down the chat panel.
             logger.warning("Yerel RAG araması kullanılamıyor (%s).", type(exc).__name__)
