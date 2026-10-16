@@ -1,22 +1,19 @@
 #!/usr/bin/env python3
-"""Score a separately curated Turkish task benchmark without changing the model.
+"""Score an independently curated Turkish task benchmark without changing the model.
 
-Input JSONL is kept local and must contain reviewed, permitted test cases. Each
-row: case_id, task, prompt, reference, prediction, source_id, document_group,
-human_review, split="test", human_score (0..4). The prediction must come from
-the exact Rust-loaded checkpoint under evaluation. This script never trains,
-selects checkpoints, or uploads prompt/answer text.
+Input JSONL stays local and must contain reviewed, permitted test cases. The
+prediction must come from the exact Rust-loaded checkpoint under evaluation.
+This script never trains, selects checkpoints, or uploads prompt/answer text.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import math
 import re
 import sys
 import unicodedata
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -27,9 +24,9 @@ ALLOWED_TASKS = {"instruction_following", "reading_comprehension", "summarizatio
 
 
 def norm(value: str) -> str:
+    # Preserve Turkish dotted/dotless-I distinctions; casefold alone is deliberate.
     value = unicodedata.normalize("NFKC", value).casefold()
-    value = value.replace("ı", "i")
-    return " ".join(re.findall(r"\w+", value, flags=re.UNICODE))
+    return " ".join(re.findall(r"\\w+", value, flags=re.UNICODE))
 
 
 def sha256(data: bytes) -> str:
@@ -42,8 +39,7 @@ def evaluate(rows: list[dict[str, Any]], *, checkpoint_sha256: str) -> dict[str,
     source_splits: dict[str, set[str]] = defaultdict(set)
     group_splits: dict[str, set[str]] = defaultdict(set)
     per_task: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    exact = 0
-    nonempty = 0
+    exact = nonempty = 0
     human_scores: list[int] = []
     output_hashes: list[str] = []
     for i, row in enumerate(rows, 1):
@@ -51,10 +47,9 @@ def evaluate(rows: list[dict[str, Any]], *, checkpoint_sha256: str) -> dict[str,
         if missing:
             errors.append(f"row {i}: missing fields {','.join(missing)}")
             continue
-        case_id = row["case_id"]
-        if case_id in seen:
+        if row["case_id"] in seen:
             errors.append(f"row {i}: duplicate case_id")
-        seen.add(case_id)
+        seen.add(row["case_id"])
         if row["split"] != "test":
             errors.append(f"row {i}: independent evaluation accepts test rows only")
         if row["human_review"] != "approved":
@@ -72,7 +67,7 @@ def evaluate(rows: list[dict[str, Any]], *, checkpoint_sha256: str) -> dict[str,
         item: dict[str, Any] = {"exact_match": is_exact, "prediction_nonempty": bool(pred)}
         score = row.get("human_score")
         if score is not None:
-            if not isinstance(score, int) or isinstance(score, bool) or score < 0 or score > 4:
+            if not isinstance(score, int) or isinstance(score, bool) or not 0 <= score <= 4:
                 errors.append(f"row {i}: human_score must be an integer from 0 to 4")
             else:
                 human_scores.append(score)
@@ -86,7 +81,7 @@ def evaluate(rows: list[dict[str, Any]], *, checkpoint_sha256: str) -> dict[str,
     if any(len(splits) > 1 for splits in group_splits.values()):
         errors.append("a document group appears in multiple splits")
     if errors:
-        raise ValueError("\n".join(errors[:100]))
+        raise ValueError("\\n".join(errors[:100]))
     task_summary = {}
     for task, values in sorted(per_task.items()):
         scores = [v["human_score"] for v in values if "human_score" in v]
@@ -111,7 +106,7 @@ def evaluate(rows: list[dict[str, Any]], *, checkpoint_sha256: str) -> dict[str,
         "used_for_training_or_checkpoint_selection": False,
         "limitations": [
             "Exact match is unsuitable as a sole measure for open-ended generation.",
-            "Human scores are meaningful only if recorded by qualified reviewers using a published rubric.",
+            "Human scores require independent reviewers and the published rubric in docs/MKAOS_HUMAN_EVALUATION_PROTOCOL.md.",
             "This script validates supplied labels and split metadata; it cannot establish that a checkpoint actually produced predictions.",
             "Record Rust runtime version, checkpoint SHA-256, decoding parameters and evaluator identity alongside this report.",
         ],
@@ -121,7 +116,7 @@ def evaluate(rows: list[dict[str, Any]], *, checkpoint_sha256: str) -> dict[str,
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path, help="Local reviewed benchmark predictions JSONL")
-    parser.add_argument("--checkpoint-sha256", required=True, help="SHA-256 of the exact checkpoint tested by Rust")
+    parser.add_argument("--checkpoint-sha256", required=True, help="SHA-256 of exact checkpoint tested by Rust")
     parser.add_argument("--output", required=True, type=Path, help="New local report path; will not overwrite")
     args = parser.parse_args()
     if not re.fullmatch(r"[0-9a-fA-F]{64}", args.checkpoint_sha256):
@@ -146,7 +141,7 @@ def main() -> int:
         print(f"Evaluation blocked: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    print("Scoring completed. This is not proof of Turkish quality unless the benchmark, checkpoint identity and human review are independently validated.")
+    print("Scoring completed; this does not by itself prove Turkish quality or checkpoint provenance.")
     return 0
 
 
