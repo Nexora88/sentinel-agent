@@ -328,7 +328,14 @@ def main() -> int:
                 import psutil
                 available_memory_bytes = int(psutil.virtual_memory().available)
             except ImportError:
-                available_memory_bytes = 0
+                try:
+                    available_memory_bytes = int(
+                        os.sysconf("SC_AVPHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")
+                    )
+                except (AttributeError, OSError, ValueError):
+                    # If the OS cannot expose available RAM, report the limitation;
+                    # never pretend an unknown budget is a measured value.
+                    available_memory_bytes = 0
     except Exception as exc:
         print(f"ERROR: could not safely determine available memory: {type(exc).__name__}", file=sys.stderr)
         return 2
