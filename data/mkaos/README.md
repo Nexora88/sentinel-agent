@@ -23,4 +23,6 @@ python -m tools.prepare_mkaos_training_dataset \
 
 Komut ağ kullanmaz ve ağırlık eğitmez. Kaynak grubu bazlı bölme nedeniyle az sayıda kaynağın bulunduğu küçük veri kümesi bölme eşiğini geçemeyebilir; bu durumda kaynakları satır bazında karıştırarak sızıntı yaratma. Daha fazla bağımsız, onaylı kaynak ekle.
 
+**Eğitim güvenlik kapısı:** `tools/train_mkaos_from_scratch.py` artık `data/mkaos/source-register.json` dosyasını da kontrol eder. Kaynak `current_approved_sources` listesinde değilse, `status: approved`, `permitted_use_now: true`, sabitlenmiş `approved_revision`, `approval_evidence` ve `weight_distribution_review: approved` alanları yoksa eğitim başlamaz. Metadata doğrulaması tek başına hukuk onayı değildir.
+
 **Mevcut durum:** Bu depoda gerçek/onaylı Türkçe korpus bulunmuyor. Yer tutucu README, örnek kayıt veya CI testi gerçek eğitim verisi değildir.
