@@ -189,40 +189,40 @@ jobs:
       - name: Load exact checkpoint in Rust and record first-token, throughput, and RSS
         run: |
           set -eu
-          OUT=artifacts/mkaos-local-experiment
-          HASH="$(python -c 'import json; print(json.load(open("artifacts/mkaos-local-experiment/training-report.json"))["checkpoint_sha256"])')"
-          /usr/bin/time -v target/debug/mkaos-run \
-            --checkpoint "$OUT/mkaos-owned.mkaosw" --sha256 "$HASH" \
-            --heads 4 --kv-heads 2 --max-seq-len 64 --max-new-tokens 1 \
-            --prompt "MKAOS" --raw-token-ids > "$OUT/rust-first-token.txt" 2> "$OUT/rust-first-token-metrics.txt"
-          /usr/bin/time -v target/debug/mkaos-run \
-            --checkpoint "$OUT/mkaos-owned.mkaosw" --sha256 "$HASH" \
-            --heads 4 --kv-heads 2 --max-seq-len 64 --max-new-tokens 8 \
-            --prompt "MKAOS" --raw-token-ids > "$OUT/rust-throughput.txt" 2> "$OUT/rust-throughput-metrics.txt"
           python - <<'PY'
-          import hashlib, json, re
+          import hashlib, json, re, resource, subprocess, time
           from pathlib import Path
           out = Path("artifacts/mkaos-local-experiment")
           training = json.loads((out / "training-report.json").read_text(encoding="utf-8"))
-          first = (out / "rust-first-token-metrics.txt").read_text(encoding="utf-8")
-          throughput = (out / "rust-throughput-metrics.txt").read_text(encoding="utf-8")
-          def metric(text, key, cast=float):
-              match = re.search(r"^" + re.escape(key) + r"=([0-9.]+)$", text, re.M)
-              if not match:
-                  raise SystemExit("Missing Rust metric: " + key)
-              return cast(match.group(1))
-          def rss(text):
-              match = re.search(r"Maximum resident set size \(kbytes\): (\d+)", text)
-              if not match:
-                  raise SystemExit("Missing /usr/bin/time maximum RSS")
-              return int(match.group(1))
-          digest = hashlib.sha256((out / "mkaos-owned.mkaosw").read_bytes()).hexdigest()
-          hash_match = re.search(r"^checkpoint_sha256=([0-9a-f]{64})$", throughput, re.M)
-          if not hash_match:
-              raise SystemExit("Missing Rust checkpoint SHA-256 confirmation")
-          rust_digest = hash_match.group(1)
-          if digest != training["checkpoint_sha256"] or digest != rust_digest:
-              raise SystemExit("Checkpoint SHA-256 mismatch across trainer, persisted file, and Rust loader")
+          checkpoint = out / "mkaos-owned.mkaosw"
+          digest = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+          if digest != training["checkpoint_sha256"]:
+              raise SystemExit("Persisted checkpoint SHA-256 differs from training report")
+          def run_model(new_tokens):
+              command = [
+                  "target/debug/mkaos-run",
+                  "--checkpoint", str(checkpoint),
+                  "--sha256", digest,
+                  "--heads", "4", "--kv-heads", "2",
+                  "--max-seq-len", "64", "--max-new-tokens", str(new_tokens),
+                  "--prompt", "MKAOS", "--raw-token-ids"
+              ]
+              started = time.perf_counter()
+              result = subprocess.run(command, text=True, capture_output=True)
+              wall_ms = (time.perf_counter() - started) * 1000
+              if result.returncode != 0:
+                  raise SystemExit("Rust inference failed: " + result.stderr[-3000:])
+              values = {}
+              for key in ("checkpoint_sha256", "elapsed_ms", "generated_tokens", "tokens_per_second"):
+                  match = re.search(r"^" + re.escape(key) + r"=([^\\r\\n]+)$", result.stderr, re.M)
+                  if match:
+                      values[key] = match.group(1)
+              if values.get("checkpoint_sha256") != digest:
+                  raise SystemExit("Rust loader did not report the same checkpoint hash")
+              return {"wall_clock_ms_including_process_and_load": round(wall_ms, 3), **values}
+          first = run_model(1)
+          throughput = run_model(8)
+          peak_rss_kb = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
           report = {
               "experiment": "MKAOS-TR-FromScratch-Experimental",
               "dataset_id": training["dataset_id"],
@@ -239,16 +239,16 @@ jobs:
               "best_validation_loss": training["best_validation_loss"],
               "independent_test_loss": training["independent_test_loss"],
               "rust_loader_hash_matches": True,
-              "rust_first_token_latency_ms": metric(first, "elapsed_ms", int),
-              "rust_first_token_max_rss_kb": rss(first),
-              "rust_8_token_elapsed_ms": metric(throughput, "elapsed_ms", int),
-              "rust_8_token_tokens_per_second": metric(throughput, "tokens_per_second", float),
-              "rust_8_token_max_rss_kb": rss(throughput),
+              "rust_first_token_wall_latency_ms": first["wall_clock_ms_including_process_and_load"],
+              "rust_first_token_generation_ms": int(first["elapsed_ms"]),
+              "rust_8_token_wall_elapsed_ms": throughput["wall_clock_ms_including_process_and_load"],
+              "rust_8_token_generation_tokens_per_second": float(throughput["tokens_per_second"]),
+              "experiment_peak_child_rss_kb": peak_rss_kb,
               "quality_status": "not_established; 12 short diagnostic records are insufficient for general-purpose Turkish claims",
               "checkpoint_policy": "ephemeral in CI; weights are not uploaded or distributed",
               "legal_status": "local-only owner-authorized experiment; license_reviewed remains false; no redistribution rights asserted"
           }
-          (out / "rust-smoke-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          (out / "rust-smoke-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
           print(json.dumps(report, ensure_ascii=False, indent=2))
           PY
       - name: Remove non-redistributable checkpoint before artifact publication
