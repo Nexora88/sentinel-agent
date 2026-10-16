@@ -145,7 +145,6 @@ def encode_documents(texts: list[str]) -> array:
     # gigabytes for a large byte-level corpus. EOS=256 fits in array('H').
     ids = array("H")
     for text in texts:
-        ids.frombytes(b"")  # keep array construction explicit and portable
         ids.extend(text.encode("utf-8"))
         ids.append(256)
     return ids
