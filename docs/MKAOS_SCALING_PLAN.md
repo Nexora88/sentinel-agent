@@ -22,7 +22,7 @@ Indicative configurations for the current byte-token decoder (actual counts are 
 | Target scale | Example architecture | Parameter-memory floor | Practical planning |
 |---|---|---:|---|
 | ~1B | hidden 2048, 24 layers, 16 query heads, 4 KV heads, intermediate 5504 | ~16 GiB for FP32 parameters + gradients + AdamW states | Start with a verified 32 GiB+ GPU/accelerator, micro-batch 1, short sequence; profile before increasing |
-| ~3B | hidden 2048, 48 layers, 16 query heads, 4 KV heads, intermediate 8192 | ~48 GiB for FP32 parameters + gradients + AdamW states | Plan for 64 GiB+ accelerator memory or implement and validate distributed/sharded training first |
+| ~3B | hidden 2048, 48 layers, 16 query heads, 4 KV heads, intermediate 8192 | ~45 GiB for FP32 parameters + gradients + AdamW states | Plan for 64 GiB+ accelerator memory or implement and validate distributed/sharded training first |
 
 These are planning examples, not trained checkpoints or guaranteed hardware minima. The current script does not implement distributed training, optimizer-state sharding, activation checkpointing, or 8-bit optimizers. Do not try a 1B–3B run on a 4 GiB RAM laptop. Parameter count alone also does not make the byte-token model linguistically competent; byte-level tokenization is data-inefficient for natural-language pretraining.
 
