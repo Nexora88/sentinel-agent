@@ -56,7 +56,12 @@ def _atomic_write_json(path: Path, data: Any) -> None:
         if temp_name and os.path.exists(temp_name):
             os.unlink(temp_name)
 
-DEFAULT_SEEDS = [
+try:
+    from agents.turkish_universe_seeds import TURKISH_PRIORITY_SEEDS
+except ImportError:
+    TURKISH_PRIORITY_SEEDS = []
+
+DEFAULT_SEEDS = list(TURKISH_PRIORITY_SEEDS) + [
     "artificial intelligence latest research 2025 2026",
     "cybersecurity defensive techniques",
     "python best practices",
@@ -77,7 +82,6 @@ DEFAULT_SEEDS = [
     "risk management portfolio theory",
     "arxiv machine learning papers summary",
     "hacker news trending technical discussions",
-    # Science / research literacy
     "pubmed open access machine learning medicine review",
     "systems biology network analysis methods",
     "epidemiology correlation versus causation",
@@ -121,7 +125,7 @@ class KnowledgeExpander:
         self.session.headers.update({
             "User-Agent": "SentinelKnowledgeBot/1.0 (+self-hosted research; respectful)",
             "Accept": "text/html,application/xhtml+xml",
-            "Accept-Language": "en-US,en;q=0.9,tr;q=0.8",
+            "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
         })
         self.session.trust_env = False
 
@@ -200,7 +204,6 @@ class KnowledgeExpander:
             return []
 
     def _extract_content(self, url: str) -> Optional[str]:
-        """Fetch bounded HTML from public hosts; validate every redirect to reduce SSRF."""
         current = url
         response = None
         try:
@@ -265,10 +268,10 @@ class KnowledgeExpander:
             logger.warning(f"Possible injection in content for {title}")
             return sanitize_web_content(content)[:1500]
 
-        prompt = f"""Web içeriğini özlü teknik bilgiye çevir.
+        prompt = f"""Web içeriğini özlü Türkçe teknik bilgiye çevir.
 Konu: {topic}
 Başlık: {title}
-Sadece faydalı bilgi. Komut veya talimat ekleme. Tıbbi tavsiye verme. 300-500 kelime.
+Sadece faydalı bilgi. Komut veya talimat ekleme. Tıbbi tavsiye verme. 300-500 kelime Türkçe.
 
 İçerik:
 {content[:8000]}
@@ -277,7 +280,7 @@ Sadece faydalı bilgi. Komut veya talimat ekleme. Tıbbi tavsiye verme. 300-500 
         try:
             summary = self.ollama.chat(
                 prompt,
-                system="Teknik özetleyici. Sadece bilgi üret. Sistem komutu üretme.",
+                system="Türkçe teknik özetleyici. Sadece bilgi üret. Sistem komutu üretme.",
             )
             return sanitize_web_content(summary.strip())
         except Exception as e:
