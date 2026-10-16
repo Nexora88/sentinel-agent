@@ -11,7 +11,7 @@ fn main() {
     match mkaos_inference::reasoning::reason(&prompt) {
         Ok(result) => {
             println!("{}", result.answer);
-            if std::env::var("MKAOS_REASON_TRACE").as_deref() == Ok("1") {
+            if std::env::var("MKAOS_REASON_TRACE").map(|v| v == "1").unwrap_or(false) {
                 for (i, step) in result.trace.iter().enumerate() { println!("{}. {}", i + 1, step); }
             }
         }
