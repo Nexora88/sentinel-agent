@@ -198,12 +198,34 @@ class MemoryStore:
             collection.delete(ids=delete_ids)
             logger.info("RAG sınırı için %s eski bilgi parçası temizlendi.", len(delete_ids))
 
+    def _search_filter(self) -> dict:
+        # The same tenant constraint is applied before reranking; reranking cannot
+        # introduce documents outside the caller's authorized candidate set.
+        return {"filter": {"tenant_id": self.tenant_id}} if self.tenant_id else {}
+
+    @staticmethod
+    def _hybrid_enabled() -> bool:
+        return os.getenv("SEKA_RAG_HYBRID_RERANK", "true").strip().lower() not in {
+            "0", "false", "no", "off"
+        }
+
+    def _rerank(self, query: str, documents: list[Document], limit: int) -> list[Document]:
+        if not self._hybrid_enabled() or len(documents) < 2:
+            return documents[:limit]
+        from core.hybrid_rag import hybrid_rerank
+        return hybrid_rerank(query, documents, limit=limit)
+
     def search(self, query: str, k: int = 6) -> List[Document]:
         if not isinstance(query, str) or not query.strip():
             return []
         safe_k = max(1, min(int(k), 20))
+        # Over-retrieve a small bounded candidate pool before hybrid reranking.
+        candidate_k = min(100, max(safe_k, safe_k * 4))
         try:
-            return self.vectorstore.similarity_search(query.strip()[:4000], k=safe_k, **({"filter": {"tenant_id": getattr(self, "tenant_id", None)}} if getattr(self, "tenant_id", None) else {}))
+            candidates = self.vectorstore.similarity_search(
+                query.strip()[:4000], k=candidate_k, **self._search_filter()
+            )
+            return self._rerank(query.strip()[:4000], candidates, safe_k)
         except Exception as exc:
             # Retrieval failure must not take down the chat panel.
             logger.warning("Yerel RAG araması kullanılamıyor (%s).", type(exc).__name__)
@@ -212,8 +234,15 @@ class MemoryStore:
     def search_with_score(self, query: str, k: int = 6):
         if not isinstance(query, str) or not query.strip():
             return []
+        safe_k = max(1, min(int(k), 20))
+        candidate_k = min(100, max(safe_k, safe_k * 4))
         try:
-            return self.vectorstore.similarity_search_with_score(query.strip()[:4000], k=max(1, min(int(k), 20)), **({"filter": {"tenant_id": self.tenant_id}} if self.tenant_id else {}))
+            pairs = self.vectorstore.similarity_search_with_score(
+                query.strip()[:4000], k=candidate_k, **self._search_filter()
+            )
+            ranked_docs = self._rerank(query.strip()[:4000], [doc for doc, _ in pairs], safe_k)
+            score_by_identity = {id(doc): score for doc, score in pairs}
+            return [(doc, score_by_identity[id(doc)]) for doc in ranked_docs]
         except Exception as exc:
             logger.warning("Yerel RAG puanlı araması kullanılamıyor (%s).", type(exc).__name__)
             return []
