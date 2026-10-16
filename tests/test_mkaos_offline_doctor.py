@@ -16,6 +16,8 @@ class OfflineDoctorTests(unittest.TestCase):
             path.write_bytes(b"local checkpoint")
             digest = hashlib.sha256(b"local checkpoint").hexdigest()
             self.assertTrue(inspect_file("checkpoint", path, digest)["ok"])
+            self.assertFalse(inspect_file("checkpoint", path)["ok"])
+            self.assertEqual(inspect_file("checkpoint", path)["status"], "present_hash_not_pinned")
             self.assertEqual(inspect_file("checkpoint", path, "0" * 64)["status"], "sha256_mismatch")
 
     def test_missing_checkpoint_is_not_claimed_ready(self):
