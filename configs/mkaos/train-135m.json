@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "profile_id": "mkaos-mini-tr-133m-from-scratch-v1",
+  "purpose": "First 100M-500M milestone; exact architecture target for an owner-run, rights-cleared pilot. Planning profile only until the gated training command completes.",
+  "tokenizer": {
+    "contract": "spec/mkaos-tokenizer-v1.json",
+    "format": "mkaos-byte-v1",
+    "vocab_size": 257,
+    "status": "temporary pilot tokenizer",
+    "limitation": "Byte-level tokens waste context on Turkish UTF-8. Do not promote this profile to a quality claim or production default; a reviewed subword tokenizer and matching Rust runtime are required for the next quality stage."
+  },
+  "model": {
+    "hidden_size": 1024,
+    "layers": 11,
+    "heads": 16,
+    "kv_heads": 4,
+    "intermediate_size": 3072
+  },
+  "expected_parameter_count": 133194752,
+  "training": {
+    "epochs": 1,
+    "batch_size": 1,
+    "sequence_length": 256,
+    "gradient_accumulation_steps": 32,
+    "learning_rate": 0.0002,
+    "warmup_steps": 200,
+    "min_learning_rate_ratio": 0.1,
+    "precision": "auto",
+    "seed": 20261016,
+    "optimizer": "AdamW",
+    "gradient_checkpointing": true
+  },
+  "governance": {
+    "source_register": "data/mkaos/source-register.json",
+    "legal_review_required": true,
+    "human_review_required": true,
+    "pii_clearance_required": true,
+    "independent_test_required": true,
+    "default_training_enabled": false,
+    "checkpoint_distribution_allowed": false
+  },
+  "hardware": {
+    "system_ram_gib_minimum_planning": 8,
+    "system_ram_gib_recommended": 16,
+    "gpu_vram_gib_recommended": 16,
+    "local_ssd_free_gib_recommended": 10,
+    "note": "These are conservative planning targets, not a guarantee. The trainer estimates memory and blocks before allocation if estimated use exceeds 80% of detected available memory. CPU training may be very slow."
+  },
+  "caveats": [
+    "Exact parameter count is computed from the current trainer architecture; CI checks the declared count.",
+    "FP32 inference weights alone are about 533 MB (507.9 MiB), before runtime overhead; training needs much more memory for gradients, optimizer state and activations.",
+    "The current local machine's previously reported 3.9 GiB total RAM is not a reliable place to start this profile without a fresh availability check; use the preflight and do not bypass it.",
+    "The training corpus must be locally supplied and pass the existing source-register, provenance, split, hash, human-review and privacy gates.",
+    "A training run has not been performed by committing this profile."
+  ]
+}
