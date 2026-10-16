@@ -49,6 +49,22 @@
         "obtain written legal compatibility decision"
       ],
       "evidence_note": "Do not assume the CC0 language subset includes Turkish."
+    },
+    {
+      "source_id": "hplt-v2-turkish-cleaned",
+      "name": "HPLT v2.0 cleaned Turkish (tur-Latn)",
+      "canonical_url": "https://hplt-project.org/datasets/v2.0",
+      "license_claim": "HPLT states the packaging is CC0; it does not own the underlying extracted texts and requires users to comply with applicable law. Official page lists a 426.16 GB cleaned Turkish package.",
+      "status": "candidate_pending_content_rights_privacy_review",
+      "permitted_use_now": false,
+      "review_required": [
+        "pin exact release, download URL, archive size and SHA-256",
+        "confirm each underlying source's rights and any source-specific restrictions; CC0 for packaging is not a blanket licence for underlying text",
+        "run privacy/PII, secrets, malware and quality screening before retaining any content",
+        "define an auditable filtered subset and preserve source/document IDs",
+        "obtain written human/legal approval for training and model-weight distribution"
+      ],
+      "evidence_note": "Candidate only. Do not download the full 426.16 GB package into Git or treat its packaging licence as clearance for all underlying content."
     }
   ],
   "current_approved_sources": [],
