@@ -20,13 +20,30 @@ class CommonVoiceTextExtractorTests(unittest.TestCase):
 
     def test_extracts_text_only_deduplicates_and_keeps_review_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
-            path = Path(temp) / "validated.tsv"
+            # Common Voice sentence metadata, not the clips/validated.tsv participant table.
+            path = Path(temp) / "sentences.tsv"
             with path.open("w", encoding="utf-8", newline="") as handle:
-                writer = csv.DictWriter(handle, fieldnames=["sentence", "client_id"], delimiter="\t")
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=["sentence", "source", "client_id"],
+                    delimiter="\t",
+                )
                 writer.writeheader()
-                writer.writerow({"sentence": "Merhaba dünya.", "client_id": "must-not-leak"})
-                writer.writerow({"sentence": "  MERHABA   DÜNYA. ", "client_id": "must-not-leak-either"})
-                writer.writerow({"sentence": "Bugün hava güzel.", "client_id": "not-retained"})
+                writer.writerow({
+                    "sentence": "Merhaba dünya.",
+                    "source": "review-pending-source-A",
+                    "client_id": "must-not-leak",
+                })
+                writer.writerow({
+                    "sentence": "  MERHABA   DÜNYA. ",
+                    "source": "review-pending-source-B",
+                    "client_id": "must-not-leak-either",
+                })
+                writer.writerow({
+                    "sentence": "Bugün hava güzel.",
+                    "source": "review-pending-source-A",
+                    "client_id": "not-retained",
+                })
             rows, report = extract(
                 path,
                 release="Scripted Speech v27.0 Turkish",
@@ -41,6 +58,14 @@ class CommonVoiceTextExtractorTests(unittest.TestCase):
             self.assertNotIn("client_id", repr(rows))
             self.assertFalse(report["training_allowed"])
             self.assertFalse(report["audio_read_or_copied"])
+            # Duplicate normalized text retains every source label rather than silently losing provenance.
+            duplicate = next(row for row in rows if row["text_hash"] == __import__("hashlib").sha256(
+                normalize("Merhaba dünya.").encode("utf-8")
+            ).hexdigest())
+            self.assertEqual(
+                duplicate["all_observed_source_labels"],
+                ["review-pending-source-A", "review-pending-source-B"],
+            )
 
 
 if __name__ == "__main__":
