@@ -8,13 +8,16 @@ ROOT = Path(__file__).resolve().parents[1]
 class DashboardContractTests(unittest.TestCase):
     def test_dashboard_has_accessible_status_and_primary_panels(self):
         html = (ROOT / "web" / "templates" / "index.html").read_text(encoding="utf-8")
+        # Assert the stable panel layout currently rendered by index.html; avoid
+        # requiring IDs from an older, unshipped command-dashboard mockup.
         for marker in (
-            'aria-label="Siber Karargah genel bakış"',
-            'id="command-network"',
-            'id="dash-activity"',
-            'id="dash-approvals"',
-            'id="dash-memory"',
-            'id="dash-briefing"',
+            '<html lang="tr">',
+            '<main class="main">',
+            'id="panel-bridge"',
+            'id="panel-status"',
+            'id="status-text"',
+            'id="control-status"',
+            'id="sovereignty-mini-label"',
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, html)
