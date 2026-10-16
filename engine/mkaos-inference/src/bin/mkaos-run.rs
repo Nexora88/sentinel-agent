@@ -66,8 +66,14 @@ fn run(args: &[String]) -> Result<(), String> {
         &[],
     ).map_err(|e| e.to_string())?;
     let elapsed = started.elapsed();
-    let text = tokenizer.decode(&result.generated_tokens).map_err(|e| e.to_string())?;
-    println!("{text}");
+    if args.iter().any(|arg| arg == "--raw-token-ids") {
+        // Diagnostic mode for arbitrary byte-token checkpoints: verify inference without
+        // treating an untrained model's arbitrary bytes as valid UTF-8 text.
+        println!("generated_token_ids={:?}", result.generated_tokens);
+    } else {
+        let text = tokenizer.decode(&result.generated_tokens).map_err(|e| e.to_string())?;
+        println!("{text}");
+    }
     eprintln!("checkpoint_sha256={}", checkpoint.sha256);
     eprintln!("prompt_byte_tokens={}", result.prompt_tokens.len());
     eprintln!("generated_tokens={}", result.generated_tokens.len());
