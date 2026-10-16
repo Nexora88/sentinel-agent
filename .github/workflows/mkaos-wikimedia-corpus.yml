@@ -50,7 +50,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          release="20261001"
+          release="20260901"
           base="https://dumps.wikimedia.org/trwiki/${release}"
           mkdir -p data/wikimedia/raw data/wikimedia/prepared
           curl --fail --location --retry 5 --retry-all-errors --connect-timeout 30 \
@@ -66,8 +66,8 @@ jobs:
       - name: Verify official checksum and prepare dataset
         run: |
           python scripts/mkaos/prepare_wikimedia_corpus.py \
-            --archive "data/wikimedia/raw/trwiki-20261001-pages-articles-multistream.xml.bz2" \
-            --upstream-md5-file "data/wikimedia/raw/trwiki-20261001-md5sums.txt" \
+            --archive "data/wikimedia/raw/trwiki-20260901-pages-articles-multistream.xml.bz2" \
+            --upstream-md5-file "data/wikimedia/raw/trwiki-20260901-md5sums.txt" \
             --output-dir "data/wikimedia/prepared"
 
       - name: Copy machine-readable run report
@@ -81,8 +81,8 @@ jobs:
           {
             echo "# MKAOS Wikimedia corpus workflow"
             echo
-            echo '- Pinned release: `20261001`'
-            echo '- Source archive: `trwiki-20261001-pages-articles-multistream.xml.bz2`'
+            echo '- Pinned release: `20260901`'
+            echo '- Source archive: `trwiki-20260901-pages-articles-multistream.xml.bz2`'
             echo "- This workflow does not train a model or approve the source."
             echo "- Full corpus retention is disabled by default because this is a public repository and source-specific rights/privacy review is pending."
           } > data/wikimedia/report/README.md
@@ -101,7 +101,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.retain_corpus_artifact == true }}
         uses: actions/upload-artifact@v4
         with:
-          name: mkaos-trwiki-20261001-prepared-corpus
+          name: mkaos-trwiki-20260901-prepared-corpus
           path: |
             data/wikimedia/prepared/train.jsonl
             data/wikimedia/prepared/validation.jsonl
