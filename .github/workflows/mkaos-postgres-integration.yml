@@ -72,6 +72,6 @@ jobs:
           GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO mkaos_app;
           SQL
       - name: Run crypto contract tests
-        run: python -m unittest tests.test_postgres_memory_store -v
+        run: python -m unittest discover -s tests -p "test_postgres_memory_store.py" -v
       - name: Run live PostgreSQL tenant-isolation and persistence tests
         run: python -m unittest discover -s tests/integration -p "test_postgres_memory_store_integration.py" -v
