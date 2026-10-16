@@ -18,11 +18,16 @@ class CorpusPreparationTests(unittest.TestCase):
         self.assertEqual(first, MODULE.document_split("123456"))
         self.assertIn(first, {"train", "validation", "test"})
 
-    def test_document_split_uses_page_id_not_text_chunk(self):
-        self.assertEqual(MODULE.document_split("9001"), MODULE.document_split("9001"))
-        self.assertNotEqual(MODULE.document_split("9001"), MODULE.document_split("9002")) if (
-            MODULE.document_split("9001") != MODULE.document_split("9002")
-        ) else None
+    def test_document_split_is_approximately_90_5_5_on_many_documents(self):
+        counts = {"train": 0, "validation": 0, "test": 0}
+        for page_id in range(10_000):
+            counts[MODULE.document_split(str(page_id))] += 1
+        self.assertGreater(counts["train"], 8_700)
+        self.assertLess(counts["train"], 9_300)
+        self.assertGreater(counts["validation"], 400)
+        self.assertLess(counts["validation"], 600)
+        self.assertGreater(counts["test"], 400)
+        self.assertLess(counts["test"], 600)
 
     def test_exact_duplicate_digest_ignores_whitespace_and_case(self):
         self.assertEqual(
