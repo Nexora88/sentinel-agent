@@ -140,6 +140,25 @@ def validate_corpus_against_manifest(corpus: dict[str, str], manifest: Any) -> d
     return split_texts
 
 
+def estimate_host_corpus_memory_bytes(corpus_file_size: int) -> int:
+    """Conservative host-RAM allowance for JSON objects plus compact uint16 tokens."""
+    if corpus_file_size < 1:
+        raise ValueError("corpus_file_size must be positive")
+    return corpus_file_size * 7 // 2 + 512 * 1024 * 1024
+
+
+def available_host_memory_bytes() -> int:
+    """Return detected available host RAM, or zero if it cannot be measured safely."""
+    try:
+        import psutil
+        return int(psutil.virtual_memory().available)
+    except ImportError:
+        try:
+            return int(os.sysconf("SC_AVPHYS_PAGES") * os.sysconf("SC_PAGE_SIZE"))
+        except (AttributeError, OSError, ValueError):
+            return 0
+
+
 def encode_documents(texts: list[str]) -> array:
     # Use compact unsigned 16-bit token storage: Python int lists can consume tens of
     # gigabytes for a large byte-level corpus. EOS=256 fits in array('H').
@@ -265,6 +284,24 @@ def main() -> int:
             if source_errors:
                 raise ValueError("Source register validation failed:\\n- " + "\\n- ".join(source_errors))
             print("Source gate: " + source_messages[0])
+        corpus_size = args.corpus.stat().st_size
+        host_available_before_corpus = available_host_memory_bytes()
+        host_corpus_estimate = estimate_host_corpus_memory_bytes(corpus_size)
+        if not host_available_before_corpus or host_corpus_estimate > int(host_available_before_corpus * 0.70):
+            available_text = str(host_available_before_corpus) if host_available_before_corpus else "unknown"
+            raise ValueError(
+                "Host-RAM preflight blocked corpus loading before allocation: "
+                f"estimated corpus/token storage={host_corpus_estimate} bytes; "
+                f"available host RAM={available_text} bytes; "
+                "policy limit=70%. Use a smaller reviewed corpus or a larger verified host."
+            )
+        print(json.dumps({
+            "event": "host_corpus_preflight",
+            "corpus_file_size_bytes": corpus_size,
+            "estimated_host_corpus_memory_bytes": host_corpus_estimate,
+            "available_host_memory_bytes": host_available_before_corpus,
+            "memory_estimate_is_not_a_peak_usage_guarantee": True,
+        }, ensure_ascii=False))
         corpus = read_corpus(args.corpus)
         splits = validate_corpus_against_manifest(corpus, manifest)
         corpus_file_sha256 = sha256_file(args.corpus)
