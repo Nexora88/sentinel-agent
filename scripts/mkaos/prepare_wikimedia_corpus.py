@@ -161,11 +161,23 @@ def document_split(page_id: str, seed: str = f"mkaos-{RELEASE}-document-split-v1
 
 
 def iter_pages(archive: Path) -> Iterator[ET.Element]:
+    # Remove processed page elements from the root as well as clearing them;
+    # otherwise a multi-million-page dump leaves millions of empty nodes in RAM.
     with bz2.open(archive, "rb") as stream:
-        for _, element in ET.iterparse(stream, events=("end",)):
+        context = ET.iterparse(stream, events=("start", "end"))
+        _, root = next(context)
+        stack = [root]
+        for event, element in context:
+            if event == "start":
+                stack.append(element)
+                continue
             if local_name(element.tag) == "page":
                 yield element
                 element.clear()
+                if len(stack) >= 2:
+                    stack[-2].remove(element)
+            if stack and stack[-1] is element:
+                stack.pop()
 
 
 def prepare(archive: Path, output_dir: Path, checksum_file: Path | None) -> dict[str, Any]:
