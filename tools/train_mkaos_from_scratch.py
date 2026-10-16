@@ -152,6 +152,7 @@ def main() -> int:
     parser.add_argument("--manifest", required=True, type=Path, help="Human-reviewed provenance manifest")
     parser.add_argument("--source-register", type=Path, default=Path(__file__).resolve().parents[1] / "data" / "mkaos" / "source-register.json", help="Source register; every used source must be explicitly approved")
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--experimental-local-only", action="store_true", help="Opt into owner-authorized local experiments; this does not approve third-party data or authorize checkpoint distribution")
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--sequence-length", type=int, default=128)
@@ -191,12 +192,19 @@ def main() -> int:
         if errors:
             raise ValueError("Manifest validation failed:\n- " + "\n- ".join(errors))
         source_registry = json.loads(args.source_register.read_text(encoding="utf-8"))
-        from core.mkaos_corpus_gate import validate_source_registry
-        source_messages = validate_source_registry(manifest, source_registry)
-        source_errors = [m for m in source_messages if not m.startswith("Source register checks passed")]
-        if source_errors:
-            raise ValueError("Source register validation failed:\n- " + "\n- ".join(source_errors))
-        print("Source gate: " + source_messages[0])
+        from core.mkaos_corpus_gate import validate_experimental_local_manifest, validate_source_registry
+        if args.experimental_local_only:
+            source_messages = validate_experimental_local_manifest(manifest, source_registry)
+            source_errors = [m for m in source_messages if not m.startswith("Experimental local-only gate passed")]
+            if source_errors:
+                raise ValueError("Experimental local-only gate failed")
+            print("EXPERIMENTAL LOCAL-ONLY MODE: " + source_messages[0])
+        else:
+            source_messages = validate_source_registry(manifest, source_registry)
+            source_errors = [m for m in source_messages if not m.startswith("Source register checks passed")]
+            if source_errors:
+                raise ValueError("Source register validation failed:\\n- " + "\\n- ".join(source_errors))
+            print("Source gate: " + source_messages[0])
         corpus = read_corpus(args.corpus)
         splits = validate_corpus_against_manifest(corpus, manifest)
     except (OSError, json.JSONDecodeError, ValueError, ImportError) as exc:
@@ -402,6 +410,8 @@ def main() -> int:
     report = {
         "format_version": 1,
         "model_id": "MKAOS-TR-FromScratch-Experimental",
+        "training_mode": "experimental_local_only" if args.experimental_local_only else "source_approved",
+        "redistribution_allowed": False if args.experimental_local_only else "review_required",
         "trained_from_random_initialization": True,
         "pretrained_model_used": None,
         "external_model_weights_used": False,
