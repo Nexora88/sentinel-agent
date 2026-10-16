@@ -2,21 +2,21 @@
 
 ## Scope and current decision
 
-This pipeline pins the official Turkish Wikipedia XML article dump release **20261001** and creates UTF-8 JSONL training, validation, and document-level test splits. It records a local SHA-256 for the compressed archive and each selected output file, verifies the archive against Wikimedia's published MD5 list when supplied, and retains per-record title, page/revision IDs, timestamp, article URL, license notice, and attribution guidance.
+This pipeline pins the official Turkish Wikipedia XML article dump release **20260901** and creates UTF-8 JSONL training, validation, and document-level test splits. It records a local SHA-256 for the compressed archive and each selected output file, verifies the archive against Wikimedia's published MD5 list when supplied, and retains per-record title, page/revision IDs, timestamp, article URL, license notice, and attribution guidance.
 
 **Prepared does not mean legally approved.** The initial status remains `prepared_pending_human_rights_privacy_and_content_review`. The source registry must not mark this source approved and `model_training_allowed` must remain false until the project records a source-specific human review. Model-weight redistribution is a separate decision and remains unapproved.
 
 ## Pinned source
 
 - Project: Turkish Wikipedia, Wikimedia public dump service.
-- Release: `20261001` (do not use the moving `latest` alias in a reproducible run).
-- Archive: `trwiki-20261001-pages-articles-multistream.xml.bz2`
-- Exact archive URL: `https://dumps.wikimedia.org/trwiki/20261001/trwiki-20261001-pages-articles-multistream.xml.bz2`
+- Release: `20260901` (do not use the moving `latest` alias in a reproducible run).
+- Archive: `trwiki-20260901-pages-articles-multistream.xml.bz2`
+- Exact archive URL: `https://dumps.wikimedia.org/trwiki/20260901/trwiki-20260901-pages-articles-multistream.xml.bz2`
 - Official dump index: `https://dumps.wikimedia.org/trwiki/latest/`
 - Official dump documentation: https://meta.wikimedia.org/wiki/Data_dumps
 - Wikimedia license/reuse terms: https://meta.wikimedia.org/wiki/Terms_of_use/Creative_Commons_4.0/en
 
-The workflow downloads the release-specific `trwiki-20261001-md5sums.txt` file and verifies its published MD5 entry. MD5 is used only for upstream transport-integrity compatibility; SHA-256 is independently calculated and recorded for the archive and each output split. The generated manifest contains the actual hashes from the run; hashes are not guessed or committed before the file is downloaded.
+The workflow downloads the release-specific `trwiki-20260901-md5sums.txt` file and verifies its published MD5 entry. MD5 is used only for upstream transport-integrity compatibility; SHA-256 is independently calculated and recorded for the archive and each output split. The generated manifest contains the actual hashes from the run; hashes are not guessed or committed before the file is downloaded.
 
 ## Cleaning and filtering
 
@@ -52,7 +52,7 @@ Python 3.11+ is recommended. Install `requirements-corpus.txt` and download the 
 
 ```powershell
 python -m pip install -r requirements-corpus.txt
-$release = "20261001"
+$release = "20260901"
 $base = "https://dumps.wikimedia.org/trwiki/$release"
 New-Item -ItemType Directory -Force data\wikimedia\raw, data\wikimedia\prepared | Out-Null
 Invoke-WebRequest "$base/trwiki-$release-pages-articles-multistream.xml.bz2" -OutFile "data\wikimedia\raw\trwiki-$release-pages-articles-multistream.xml.bz2"
