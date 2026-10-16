@@ -47,6 +47,8 @@ def extract(input_tsv: Path, *, release: str, source_uri: str) -> tuple[list[dic
 
     by_hash: dict[str, str] = {}
     empty = 0
+    nonempty = 0
+    duplicates = 0
     for line_number, row in enumerate(reader, start=2):
         sentence = " ".join((row.get("sentence") or "").split())
         if not sentence:
@@ -56,8 +58,12 @@ def extract(input_tsv: Path, *, release: str, source_uri: str) -> tuple[list[dic
         if not normalized:
             empty += 1
             continue
+        nonempty += 1
         digest = sha256(normalized.encode("utf-8"))
-        by_hash.setdefault(digest, sentence)
+        if digest in by_hash:
+            duplicates += 1
+        else:
+            by_hash[digest] = sentence
 
     records: list[dict[str, Any]] = []
     for digest, sentence in sorted(by_hash.items()):
@@ -88,7 +94,8 @@ def extract(input_tsv: Path, *, release: str, source_uri: str) -> tuple[list[dic
         "input_file_sha256": file_hash,
         "unique_normalized_sentences": len(records),
         "empty_rows_skipped": empty,
-        "duplicate_normalized_sentences_removed": max(0, sum(1 for _ in []) ),
+        "nonempty_rows_seen": nonempty,
+        "duplicate_normalized_sentences_removed": duplicates,
         "split_counts": counts,
         "text_only": True,
         "audio_read_or_copied": False,
