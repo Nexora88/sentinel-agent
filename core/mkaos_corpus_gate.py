@@ -1,11 +1,16 @@
-"""Fail-closed source registry gate for MKAOS training."""
+"""Separate permission to train from permission to redistribute model weights.
+
+Training on a reviewed source does not automatically grant rights to publish
+checkpoint weights. A source may be approved for private/non-redistributable
+training while weight_distribution_review remains pending or not approved.
+"""
 from __future__ import annotations
 
 from typing import Any
 
 
 def validate_source_registry(manifest: Any, registry: Any) -> list[str]:
-    """Require explicit source-level approval before any checkpoint training."""
+    """Require source approval for training; independently gate weight distribution."""
     errors: list[str] = []
     if not isinstance(manifest, dict):
         return ["Training manifest must be a JSON object."]
@@ -58,11 +63,41 @@ def validate_source_registry(manifest: Any, registry: Any) -> list[str]:
             errors.append(f"Source {source_id!r} has no pinned approved_revision.")
         if not isinstance(source.get("approval_evidence"), str) or not source["approval_evidence"].strip():
             errors.append(f"Source {source_id!r} has no approval_evidence reference.")
-        if source.get("weight_distribution_review") != "approved":
-            errors.append(f"Source {source_id!r} has no approval for model-weight distribution.")
+        scope = source.get("training_scope")
+        if scope not in {"internal_nonredistributable", "redistributable"}:
+            errors.append(
+                f"Source {source_id!r} needs training_scope='internal_nonredistributable' "
+                "or 'redistributable'."
+            )
+        if scope == "redistributable" and source.get("weight_distribution_review") != "approved":
+            errors.append(
+                f"Source {source_id!r} claims redistributable training but has no approved "
+                "model-weight distribution review."
+            )
+        if scope == "internal_nonredistributable" and source.get("weight_distribution_review") == "approved":
+            # Not unsafe, but contradictory metadata often causes accidental publication.
+            if source.get("redistribution_permission") is False:
+                errors.append(
+                    f"Source {source_id!r} contradicts internal_nonredistributable scope "
+                    "with redistribution_permission=false and approved weight distribution."
+                )
     if errors:
         return errors
-    return ["Source register checks passed; this does not replace independent legal, privacy, or quality review."]
+    scopes = {
+        by_id[source_id].get("training_scope")
+        for source_id in used_ids
+        if source_id in by_id
+    }
+    if scopes == {"internal_nonredistributable"}:
+        return [
+            "Source register checks passed for internal non-redistributable training only; "
+            "checkpoint publication remains blocked until weight distribution is separately approved."
+        ]
+    return [
+        "Source register checks passed; redistributable weights are permitted only for sources "
+        "whose weight_distribution_review is explicitly approved. This does not replace independent "
+        "legal, privacy, or quality review."
+    ]
 
 
 def validate_experimental_local_manifest(manifest: Any, registry: Any) -> list[str]:
