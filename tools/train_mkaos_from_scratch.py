@@ -85,12 +85,8 @@ def validate_corpus_against_manifest(corpus: dict[str, str], manifest: Any) -> d
 
 
 def encode_documents(texts: list[str]) -> list[int]:
-    # Separator/EOS between documents prevents accidental concatenation semantics.
-    ids: list[int] = []
-    for text in texts:
-        ids.extend(text.encode("utf-8"))
-        ids.append(256)
-    return ids
+    """Use the exact same versioned tokenizer implementation as contract tests."""
+    return encode_contract_documents(texts)
 
 
 def write_mkaos_checkpoint(path: Path, tensors: dict[str, Any]) -> str:
@@ -399,6 +395,7 @@ def main() -> int:
         "pretrained_model_used": None,
         "external_model_weights_used": False,
         "architecture": {"type": "MKAOS-GQA-SwiGLU", "vocab_size": VOCAB_SIZE, "hidden_size": d, "layers": args.layers, "query_heads": nh, "kv_heads": nkh, "intermediate_size": intermediate, "max_sequence_len": args.sequence_length},
+        "tokenizer_contract_id": TOKENIZER_CONTRACT_ID,
         "tokenizer_sha256": sha256(tokenizer_bytes),
         "checkpoint_file": checkpoint_path.name,
         "checkpoint_sha256": checkpoint_hash,
