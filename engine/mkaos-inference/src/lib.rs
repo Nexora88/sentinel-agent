@@ -9,6 +9,7 @@ pub mod generation;
 pub mod sampling;
 pub mod reasoning;
 pub mod memory;
+pub mod embedding;
 pub mod sha256;
 pub mod stacked_decoder;
 pub mod tokenizer;

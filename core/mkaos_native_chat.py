@@ -31,8 +31,8 @@ def generate_native_reply(prompt: str, env: Mapping[str, str] | None = None) -> 
     expected_hash = settings.get("MKAOS_NATIVE_SHA256", "").strip().lower()
     if not checkpoint_value:
         raise NativeMkaosUnavailable(
-            "Yerel MKAOS checkpoint yapılandırılmadı. Onaylı eğitim sonrası "
-            "MKAOS_NATIVE_CHECKPOINT ve MKAOS_NATIVE_SHA256 ayarlayın."
+            "Native checkpoint is not configured. Yerel MKAOS checkpoint yapılandırılmadı. "
+            "Onaylı eğitim sonrası MKAOS_NATIVE_CHECKPOINT ve MKAOS_NATIVE_SHA256 ayarlayın."
         )
     if not expected_hash:
         raise NativeMkaosUnavailable(
@@ -63,7 +63,7 @@ def generate_native_reply(prompt: str, env: Mapping[str, str] | None = None) -> 
     max_new = integer("MKAOS_NATIVE_MAX_NEW_TOKENS", 256, 1, 2048)
     timeout = integer("MKAOS_NATIVE_TIMEOUT_SECONDS", 90, 1, 600)
     if heads % kv_heads:
-        raise NativeMkaosUnavailable("MKAOS_NATIVE_HEADS, KV_HEADS'e tam bölünmeli.")
+        raise NativeMkaosUnavailable("Native MKAOS heads and KV heads must be divisible; MKAOS_NATIVE_HEADS, KV_HEADS'e tam bölünmeli.")
     prompt_tokens = len(framed.encode("utf-8"))
     if prompt_tokens + max_new > max_seq:
         raise ValueError("İstem + üretim MKAOS_NATIVE_MAX_SEQ sınırını aşıyor.")

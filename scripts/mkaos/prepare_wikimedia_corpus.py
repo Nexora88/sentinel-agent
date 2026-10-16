@@ -201,6 +201,7 @@ def prepare(archive: Path, output_dir: Path, checksum_file: Path | None) -> dict
     output_hashes = {name: hashlib.sha256() for name in ("train", "validation", "test")}
     output_bytes = Counter()
     output_paths = {name: output_dir / f"{name}.jsonl" for name in output_hashes}
+    review_candidates: dict[str, list[dict[str, Any]]] = {name: [] for name in output_hashes}
     total_pages = 0
     retained_chars = 0
     redaction_events = 0
@@ -259,6 +260,24 @@ def prepare(archive: Path, output_dir: Path, checksum_file: Path | None) -> dict
             line = (json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")
             streams[split].write(line)
             output_hashes[split].update(line)
+            review_candidates[split].append({
+                "selection_key": hashlib.sha256(f"mkaos-sample-review-v1:{split}:{fields['page_id']}".encode("utf-8")).hexdigest(),
+                "record_id": record["record_id"],
+                "page_id": fields["page_id"],
+                "revision_id": fields["revision_id"],
+                "title": fields["title"],
+                "source_url": record["url"],
+                "text_sha256": digest,
+                "text_characters": len(text),
+                "review_decision": "pending_human_review",
+                "reviewer": None,
+                "reviewed_at_utc": None,
+                "notes": None,
+            })
+            # Keep only the lowest ten deterministic keys per split to preserve streaming RAM bounds.
+            review_candidates[split] = sorted(
+                review_candidates[split], key=lambda item: item["selection_key"]
+            )[:10]
             output_bytes[split] += len(line)
             split_counts[split] += 1
             retained_chars += len(text)
@@ -275,6 +294,26 @@ def prepare(archive: Path, output_dir: Path, checksum_file: Path | None) -> dict
         }
         for split, path in output_paths.items()
     }
+    sample_review_path = output_dir / "sample-review.json"
+    sample_review = {
+        "schema_version": 1,
+        "status": "pending_human_review",
+        "selection_method": "deterministic SHA-256 ordering by split and page ID; 10 candidates per split where available",
+        "instruction": "Open each source_url and compare it with the prepared record in a private local review session. Record reviewer, UTC date, decision, and notes. This file does not itself mean any sample was reviewed or that source rights are approved.",
+        "samples_by_split": {
+            split: sorted(review_candidates[split], key=lambda item: item["selection_key"])[:10]
+            for split in ("train", "validation", "test")
+        },
+        "review_summary": {
+            "selected_count": sum(min(10, len(items)) for items in review_candidates.values()),
+            "reviewed_count": 0,
+            "accepted_count": 0,
+            "rejected_count": 0,
+            "pending_count": sum(min(10, len(items)) for items in review_candidates.values()),
+        },
+    }
+    sample_review_path.write_text(json.dumps(sample_review, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
     manifest: dict[str, Any] = {
         "schema_version": 1,
         "dataset_id": "mkaos-trwiki-20260901-cleaned-v1",
@@ -320,6 +359,12 @@ def prepare(archive: Path, output_dir: Path, checksum_file: Path | None) -> dict
             "filters": dict(counts),
         },
         "outputs": output_files,
+        "sample_review": {
+            "path": sample_review_path.name,
+            "sha256": sha256_file(sample_review_path),
+            "status": "pending_human_review",
+            "selected_per_split": {split: len(items) for split, items in sample_review["samples_by_split"].items()},
+        },
         "approval": {
             "training_rights_review": "pending_human_review",
             "privacy_and_sensitive_content_review": "pending_human_review",

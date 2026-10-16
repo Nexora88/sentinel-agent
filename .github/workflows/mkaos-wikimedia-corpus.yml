@@ -11,6 +11,7 @@ on:
   push:
     branches:
       - mkaos-wikimedia-corpus-pipeline
+      - mkaos/turkish-1b-training-foundation
     paths:
       - ".github/workflows/mkaos-wikimedia-corpus.yml"
       - "scripts/mkaos/prepare_wikimedia_corpus.py"
@@ -78,12 +79,16 @@ jobs:
           if [ -f data/wikimedia/prepared/corpus-manifest.json ]; then
             cp data/wikimedia/prepared/corpus-manifest.json data/wikimedia/report/corpus-manifest.json
           fi
+          if [ -f data/wikimedia/prepared/sample-review.json ]; then
+            cp data/wikimedia/prepared/sample-review.json data/wikimedia/report/sample-review.json
+          fi
           {
             echo "# MKAOS Wikimedia corpus workflow"
             echo
             echo '- Pinned release: `20260901`'
             echo '- Source archive: `trwiki-20260901-pages-articles-multistream.xml.bz2`'
             echo "- This workflow does not train a model or approve the source."
+            echo "- A deterministic sample-review sheet is included; every decision remains pending until a human reviewer records it."
             echo "- Full corpus retention is disabled by default because this is a public repository and source-specific rights/privacy review is pending."
           } > data/wikimedia/report/README.md
 

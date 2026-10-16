@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "profile_id": "mkaos-tr-1b-from-scratch-v1",
+  "purpose": "Planning profile only; no training starts from this file.",
+  "tokenizer": {
+    "contract": "spec/mkaos-tokenizer-v1.json",
+    "format": "mkaos-byte-v1",
+    "vocab_size": 257,
+    "warning": "Byte-level tokenization is temporary and inefficient for Turkish at scale; a reviewed subword tokenizer is a prerequisite for production-scale training."
+  },
+  "model": {
+    "hidden_size": 2048,
+    "layers": 22,
+    "heads": 16,
+    "kv_heads": 4,
+    "intermediate_size": 6144
+  },
+  "training": {
+    "epochs": 1,
+    "batch_size": 1,
+    "sequence_length": 1024,
+    "gradient_accumulation_steps": 64,
+    "learning_rate": 0.0002,
+    "warmup_steps": 2000,
+    "min_learning_rate_ratio": 0.1,
+    "precision": "bf16",
+    "seed": 20261016,
+    "optimizer": "AdamW",
+    "gradient_checkpointing": true
+  },
+  "governance": {
+    "source_register": "data/mkaos/source-register.json",
+    "legal_review_required": true,
+    "weight_distribution_review_required": true,
+    "corpus_sha256_required": true,
+    "independent_test_required": true,
+    "default_training_enabled": false
+  },
+  "hardware": {
+    "accelerator_memory_gib_minimum_planning": 48,
+    "accelerator_memory_gib_recommended": 80,
+    "system_ram_gib_minimum_planning": 64,
+    "local_ssd_free_gib_recommended": 100,
+    "multi_gpu_required_for_comfortable_run": true
+  },
+  "caveats": [
+    "Memory values are planning targets, not measured guarantees.",
+    "The current trainer does not yet implement gradient checkpointing or distributed/sharded optimizer state; this profile is not executable until those features land.",
+    "No dataset is approved by this profile."
+  ]
+}
