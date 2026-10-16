@@ -138,9 +138,9 @@ jobs:
               print("No completed training report; failure details remain in job logs.")
               raise SystemExit(0)
           report = json.loads(report_path.read_text(encoding="utf-8"))
-          rows = report.get("history", [])
+          rows = report.get("step_history") or report.get("history", [])
           with (root / "loss-history.csv").open("w", newline="", encoding="utf-8") as f:
-              writer = csv.DictWriter(f, fieldnames=["epoch", "train_loss", "validation_loss"])
+              writer = csv.DictWriter(f, fieldnames=["step", "epoch", "train_loss", "validation_loss", "learning_rate"], extrasaction="ignore")
               writer.writeheader()
               writer.writerows(rows)
           # Simple SVG keeps the loss curve artifact independent of plotting packages.
@@ -154,7 +154,7 @@ jobs:
                   y = height-pad - (float(value)-lo) * (height-2*pad)/(hi-lo)
                   return f"{x:.1f},{y:.1f}"
               train = " ".join(point(i, r["train_loss"]) for i,r in enumerate(rows))
-              val = " ".join(point(i, r["validation_loss"]) for i,r in enumerate(rows))
+              val = " ".join(point(i, r["validation_loss"]) for i,r in enumerate(rows) if r.get("validation_loss") is not None)
               svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}"><rect width="100%" height="100%" fill="white"/><text x="{pad}" y="28" font-size="20">MKAOS training loss (epoch)</text><polyline fill="none" stroke="#2563eb" stroke-width="3" points="{train}"/><polyline fill="none" stroke="#dc2626" stroke-width="3" points="{val}"/><text x="{pad}" y="{height-18}" font-size="14">Blue: train loss · Red: validation loss · range {lo:.4f}–{hi:.4f}</text></svg>'
               (root / "loss-curve.svg").write_text(svg, encoding="utf-8")
           print(json.dumps({k: report.get(k) for k in ("model_id","parameter_count","checkpoint_sha256","corpus_sha256","manifest_sha256","best_validation_loss","independent_test_loss","device_name","precision","split_sample_counts")}, indent=2))
