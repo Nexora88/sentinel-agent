@@ -36,6 +36,7 @@ jobs:
           python -m unittest discover -s tests -p test_job_bus_tenant_isolation.py -v
           python -m unittest discover -s tests -p test_offline_egress_contract.py -v
           python -m unittest discover -s tests -p test_turkish_quality_contract.py -v
+          python -m unittest discover -s tests -p test_validate_mkaos_source_register.py -v
 
   test:
     runs-on: ubuntu-latest
@@ -54,6 +55,8 @@ jobs:
           pip install -r requirements.txt
       - name: Compile Python modules
         run: python -m compileall -q agents core scripts tools web
+      - name: Validate source register fail-closed policy
+        run: python tools/validate_mkaos_source_register.py
       - name: Check frontend JavaScript syntax
         run: node --check web/static/app.js
       - name: Validate Docker Compose profiles
