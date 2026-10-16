@@ -1,0 +1,112 @@
+name: MKAOS Wikimedia corpus preparation
+
+on:
+  workflow_dispatch:
+    inputs:
+      retain_corpus_artifact:
+        description: "Retain prepared JSONL split files as a repository artifact. Use only after reviewing source rights and privacy; artifacts may be accessible to repository readers."
+        required: true
+        type: boolean
+        default: false
+  push:
+    branches:
+      - mkaos-wikimedia-corpus-pipeline
+    paths:
+      - ".github/workflows/mkaos-wikimedia-corpus.yml"
+      - "scripts/mkaos/prepare_wikimedia_corpus.py"
+      - "requirements-corpus.txt"
+      - "tests/test_mkaos_wikimedia_corpus.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mkaos-wikimedia-corpus-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Download, verify, clean, deduplicate, and split pinned Turkish Wikipedia dump
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-corpus.txt
+
+      - name: Install pinned parser
+        run: python -m pip install -r requirements-corpus.txt
+
+      - name: Run corpus pipeline unit tests
+        run: python -m unittest discover -s tests -p "test_mkaos_wikimedia_corpus.py" -v
+
+      - name: Download pinned Wikimedia release and official checksum list
+        shell: bash
+        run: |
+          set -euo pipefail
+          release="20260901"
+          base="https://dumps.wikimedia.org/trwiki/${release}"
+          mkdir -p data/wikimedia/raw data/wikimedia/prepared
+          curl --fail --location --retry 5 --retry-all-errors --connect-timeout 30 \
+            "${base}/trwiki-${release}-pages-articles-multistream.xml.bz2" \
+            --output "data/wikimedia/raw/trwiki-${release}-pages-articles-multistream.xml.bz2"
+          curl --fail --location --retry 5 --retry-all-errors --connect-timeout 30 \
+            "${base}/trwiki-${release}-md5sums.txt" \
+            --output "data/wikimedia/raw/trwiki-${release}-md5sums.txt"
+          echo "Pinned release: ${release}"
+          echo "Archive size:"
+          wc -c "data/wikimedia/raw/trwiki-${release}-pages-articles-multistream.xml.bz2"
+
+      - name: Verify official checksum and prepare dataset
+        run: |
+          python scripts/mkaos/prepare_wikimedia_corpus.py \
+            --archive "data/wikimedia/raw/trwiki-20260901-pages-articles-multistream.xml.bz2" \
+            --upstream-md5-file "data/wikimedia/raw/trwiki-20260901-md5sums.txt" \
+            --output-dir "data/wikimedia/prepared"
+
+      - name: Copy machine-readable run report
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p data/wikimedia/report
+          if [ -f data/wikimedia/prepared/corpus-manifest.json ]; then
+            cp data/wikimedia/prepared/corpus-manifest.json data/wikimedia/report/corpus-manifest.json
+          fi
+          {
+            echo "# MKAOS Wikimedia corpus workflow"
+            echo
+            echo '- Pinned release: `20260901`'
+            echo '- Source archive: `trwiki-20260901-pages-articles-multistream.xml.bz2`'
+            echo "- This workflow does not train a model or approve the source."
+            echo "- Full corpus retention is disabled by default because this is a public repository and source-specific rights/privacy review is pending."
+          } > data/wikimedia/report/README.md
+
+      - name: Upload manifest and preparation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkaos-wikimedia-corpus-report
+          path: data/wikimedia/report/
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 6
+
+      - name: Retain prepared corpus only after explicit manual opt-in
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.retain_corpus_artifact == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkaos-trwiki-20260901-prepared-corpus
+          path: |
+            data/wikimedia/prepared/train.jsonl
+            data/wikimedia/prepared/validation.jsonl
+            data/wikimedia/prepared/test.jsonl
+            data/wikimedia/prepared/corpus-manifest.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 6

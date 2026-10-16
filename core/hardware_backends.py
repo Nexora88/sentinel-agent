@@ -42,6 +42,123 @@ def backend_registry() -> list[dict]:
     return [asdict(BackendStatus(*item)) for item in _BACKENDS]
 
 
+def probe_training_runtime(torch_module=None) -> dict:
+    """Inspect locally installed PyTorch training runtimes without network access.
+
+    A detected accelerator means PyTorch can see it; it does not certify the
+    Rust inference engine, model operators, numerical parity, or performance.
+    """
+    try:
+        if torch_module is None:
+            import torch as torch_module
+    except ImportError:
+        return {
+            "pytorch_available": False,
+            "training_runtime": None,
+            "device_name": None,
+            "device_count": 0,
+            "mixed_precision": [],
+            "inference_supported": False,
+            "evidence": "PyTorch is not installed in this Python environment.",
+        }
+
+    try:
+        cuda_available = bool(torch_module.cuda.is_available())
+    except Exception:
+        cuda_available = False
+    if cuda_available:
+        try:
+            is_rocm = bool(getattr(getattr(torch_module, "version", None), "hip", None))
+            device_name = str(torch_module.cuda.get_device_name(0))
+            device_count = int(torch_module.cuda.device_count())
+            properties = torch_module.cuda.get_device_properties(0)
+            total_memory = int(getattr(properties, "total_memory", 0) or 0)
+            bf16 = bool(
+                hasattr(torch_module.cuda, "is_bf16_supported")
+                and torch_module.cuda.is_bf16_supported()
+            )
+            return {
+                "pytorch_available": True,
+                "training_runtime": "amd_rocm" if is_rocm else "nvidia_cuda",
+                "device_name": device_name,
+                "device_count": device_count,
+                "total_device_memory_bytes": total_memory or None,
+                "mixed_precision": ["fp32", "fp16"] + (["bf16"] if bf16 else []),
+                "inference_supported": False,
+                "evidence": "PyTorch accelerator runtime detected locally; Rust inference support and benchmarks remain unverified.",
+            }
+        except Exception as exc:
+            return {
+                "pytorch_available": True,
+                "training_runtime": "cuda_api_probe_failed",
+                "device_name": None,
+                "device_count": 0,
+                "mixed_precision": ["fp32"],
+                "inference_supported": False,
+                "evidence": "Accelerator was reported available but property probe failed: " + type(exc).__name__,
+            }
+
+    try:
+        xpu_available = bool(
+            hasattr(torch_module, "xpu") and torch_module.xpu.is_available()
+        )
+    except Exception:
+        xpu_available = False
+    if xpu_available:
+        try:
+            return {
+                "pytorch_available": True,
+                "training_runtime": "intel_xpu",
+                "device_name": str(torch_module.xpu.get_device_name(0)),
+                "device_count": int(torch_module.xpu.device_count()),
+                "total_device_memory_bytes": None,
+                "mixed_precision": ["fp32"],
+                "inference_supported": False,
+                "evidence": "PyTorch Intel XPU runtime detected locally; MKAOS Rust inference support remains unverified.",
+            }
+        except Exception as exc:
+            return {
+                "pytorch_available": True,
+                "training_runtime": "intel_xpu_probe_failed",
+                "device_name": None,
+                "device_count": 0,
+                "mixed_precision": ["fp32"],
+                "inference_supported": False,
+                "evidence": "Intel XPU probe failed: " + type(exc).__name__,
+            }
+
+    try:
+        mps_available = bool(
+            hasattr(torch_module, "backends")
+            and hasattr(torch_module.backends, "mps")
+            and torch_module.backends.mps.is_available()
+        )
+    except Exception:
+        mps_available = False
+    if mps_available:
+        return {
+            "pytorch_available": True,
+            "training_runtime": "apple_metal",
+            "device_name": "Apple Metal (MPS)",
+            "device_count": 1,
+            "total_device_memory_bytes": None,
+            "mixed_precision": ["fp32"],
+            "inference_supported": False,
+            "evidence": "PyTorch MPS runtime detected locally; MKAOS Rust inference support remains unverified.",
+        }
+
+    return {
+        "pytorch_available": True,
+        "training_runtime": "cpu",
+        "device_name": "CPU",
+        "device_count": 1,
+        "total_device_memory_bytes": None,
+        "mixed_precision": ["fp32"],
+        "inference_supported": False,
+        "evidence": "PyTorch CPU training runtime available; no compatible accelerator was detected.",
+    }
+
+
 def probe_backend(name: str, probe: Callable[[], tuple[bool, str]]) -> dict:
     """Run an explicit caller-supplied local probe; never silently marks a backend supported."""
     known = {item[0]: item for item in _BACKENDS}

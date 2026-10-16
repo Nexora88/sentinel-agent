@@ -53,3 +53,7 @@ Thumbs.db
 
 # Docker
 .docker/
+
+# Local model assets and machine-specific download locks
+models/
+config/model-assets.lock
