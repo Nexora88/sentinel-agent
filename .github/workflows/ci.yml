@@ -215,7 +215,10 @@ jobs:
                   raise SystemExit("Missing /usr/bin/time maximum RSS")
               return int(match.group(1))
           digest = hashlib.sha256((out / "mkaos-owned.mkaosw").read_bytes()).hexdigest()
-          rust_digest = metric(throughput, "checkpoint_sha256", str)
+          hash_match = re.search(r"^checkpoint_sha256=([0-9a-f]{64})$", throughput, re.M)
+          if not hash_match:
+              raise SystemExit("Missing Rust checkpoint SHA-256 confirmation")
+          rust_digest = hash_match.group(1)
           if digest != training["checkpoint_sha256"] or digest != rust_digest:
               raise SystemExit("Checkpoint SHA-256 mismatch across trainer, persisted file, and Rust loader")
           report = {
