@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "status": "pending_human_review",
+  "source_id": "REPLACE_WITH_PINNED_SOURCE_ID",
+  "source_name": "REPLACE_WITH_DATASET_NAME",
+  "canonical_source_url": "https://REPLACE_WITH_CANONICAL_SOURCE",
+  "exact_release_or_revision": "REQUIRED",
+  "acquired_at_utc": "REQUIRED",
+  "files": [
+    {
+      "relative_path": "REQUIRED",
+      "size_bytes": null,
+      "sha256": "REQUIRED_64_HEX",
+      "license_url": "https://REQUIRED",
+      "license_spdx_or_name": "REQUIRED"
+    }
+  ],
+  "rights_review": {
+    "reviewer": "REQUIRED_HUMAN_REVIEWER",
+    "review_date_utc": "YYYY-MM-DD",
+    "evidence_urls": [],
+    "training_use_decision": "pending",
+    "commercial_use_decision": "pending",
+    "redistribution_of_raw_data_decision": "pending",
+    "model_weight_distribution_decision": "pending",
+    "attribution_requirements": "REQUIRED",
+    "share_alike_or_downstream_obligations": "REQUIRED",
+    "privacy_and_sensitive_content_review": "pending",
+    "decision_rationale": "REQUIRED"
+  },
+  "quality_review": {
+    "turkish_language_sampled": false,
+    "sample_size": 0,
+    "duplicate_review": "pending",
+    "pii_review": "pending",
+    "document_group_split_review": "pending",
+    "independent_test_split_preserved": false
+  },
+  "approval": {
+    "permitted_use_now": false,
+    "approved_revision": null,
+    "approval_evidence": null,
+    "training_scope": null,
+    "weight_distribution_review": "pending"
+  },
+  "warning": "Template only. Do not mark approved until a human reviewer has checked the exact release, actual files, applicable terms, privacy, attribution and model-weight implications. This JSON is not legal advice."
+}
