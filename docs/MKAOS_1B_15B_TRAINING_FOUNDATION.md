@@ -14,11 +14,23 @@
 - `configs/mkaos/train-1_5b.json`: yaklaşık 1,5B sınıfı için model boyutları ve donanım planlama hedefleri.
 - `tools/plan_mkaos_training_scale.py`: parametre sayısı ve mevcut trainer'ın bellek tahminini raporlar; model tahsis etmez, veri indirmez ve eğitimi başlatmaz.
 
-Profillerdeki `gradient_checkpointing` hedefi gelecekte uygulanacak bir gereksinimdir; mevcut trainer bu özelliği henüz uygulamıyor. Dağıtık eğitim ve optimizer-state sharding de henüz yok. Bu profiller bugün tek komutla 1B–1,5B eğitim çalıştırılabileceği anlamına gelmez.
+Trainer'a artık `--gradient-checkpointing`, epoch sınırında tam durum kaydıyla `--resume-from`, torchrun ile DDP veri parçalama ve isteğe bağlı `--optimizer-state-sharding` (ZeroRedundancyOptimizer) seçenekleri eklendi. Bu kod henüz bu PR'da çalıştırılıp doğrulanmadı; dolayısıyla desteklenen gerçek GPU/çoklu GPU yapılandırmaları kanıtlanmış sayılmaz. Checkpoint'ler Python/PyTorch durumunu içerdiğinden yalnızca güvenilir, yerel dosyalardan yüklenmelidir. Resume mevcut tasarımda epoch sınırındadır; yarım epoch'un tam batch konumundan devam ettiğini iddia etmez. Bu profiller bugün tek komutla 1B–1,5B eğitiminin çalışabileceği anlamına gelmez.
 
 ## Donanım yaklaşımı
 
 Büyük model için yalnızca parametre sayısı yetmez. AdamW parametre/gradient/optimizer durumları, aktivasyonlar, attention çalışma alanları, veri önbelleği ve checkpoint yazımı da bellek tüketir. Profildeki bellek hedefleri planlama değeridir, garanti değildir. Gerçek cihazın boş GPU belleği, sistem RAM'i, disk alanı ve BF16/FP16 desteği ayrı ölçülmelidir. Düşük RAM'li masaüstü sistemde tam 1B–1,5B eğitim gerçekçi kabul edilmez; önce kod/format pilotu, tam ölçekli eğitim için yeterli GPU veya kontrollü eğitim donanımı gerekir.
+
+## Eğitim devamlılığı ve dağıtık çalıştırma
+
+Küçük ve hakları temiz bir pilot veriyle, kod gözden geçirildikten ve testler açıldıktan sonra örnek komutlar:
+
+```bash
+python tools/train_mkaos_from_scratch.py --corpus /private/corpus.jsonl --manifest /private/manifest.json --output-dir /private/mkaos-run --gradient-checkpointing
+python tools/train_mkaos_from_scratch.py --corpus /private/corpus.jsonl --manifest /private/manifest.json --output-dir /private/mkaos-run --resume-from /private/mkaos-run/trainer-checkpoints/latest.pt --gradient-checkpointing
+torchrun --standalone --nproc_per_node=4 tools/train_mkaos_from_scratch.py --corpus /private/corpus.jsonl --manifest /private/manifest.json --output-dir /private/mkaos-run --distributed --optimizer-state-sharding --gradient-checkpointing
+```
+
+Bunlar kullanım taslağıdır, bu PR'da çalıştırılmış eğitim komutları değildir. Tam dağıtık devamlılık, eşit batch adedi, optimizer durumlarının tüm rank'larda doğru geri yüklenmesi, sinyal/çökme kurtarma, disk hatası ve gerçek GPU bellek ölçümü test edilmeden üretim kullanımı onaylanmamalıdır.
 
 ## Korpus ve haklar: şu anki durum
 
@@ -33,7 +45,7 @@ Türkçe Wikipedia/Wikimedia, Common Voice, Tatoeba ve HPLT kaynakları otomatik
 
 ## Bir sonraki mühendislik sırası
 
-1. Sabitlenmiş korpus sürümünü indirme ve hazırlama işini tamamlamak; arşiv SHA-256, satır/split sayıları, hazırlama logu ve örneklem incelemesi raporunu kaydetmek.
+1. Sabitlenmiş korpus sürümünü indirme ve hazırlama işini tamamlamak; arşiv SHA-256, her JSONL split SHA-256/byte boyutu/belge sayısı ve deterministik örneklem inceleme kuyruğunu kaydetmek. Örneklem kararları ayrıca insan tarafından girilmelidir.
 2. Kaynak bazında hak/mahremiyet/atıf inceleme dosyasını tamamlamak; kararı, kanıt URL'sini, sürümü, dosya hash'ini ve inceleyen kişiyi kaydetmek.
 3. Eğitim döngüsüne gradient checkpointing, checkpoint/resume, güvenli karma hassasiyet, optimizer-state kaydı ve deterministik devam eklemek.
 4. Dağıtık eğitim veya optimizer-state sharding seçeneğini uygulamak.
