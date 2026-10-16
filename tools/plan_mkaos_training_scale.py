@@ -27,7 +27,7 @@ def main() -> int:
     try:
         profile = json.loads(args.profile.read_text(encoding="utf-8"))
         if profile.get("schema_version") != 1: raise ValueError("Unsupported profile schema_version")
-        rendered = json.dumps(plan(profile), ensure_ascii=False, indent=2) + "\\n"
+        rendered = json.dumps(plan(profile), ensure_ascii=False, indent=2) + "\n"
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             with args.output.open("x", encoding="utf-8") as handle: handle.write(rendered)
