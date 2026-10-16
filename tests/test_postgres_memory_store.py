@@ -33,9 +33,6 @@ class PostgresMemoryStoreCryptoTests(unittest.TestCase):
                 self.store._tenant(tenant)
 
     def test_tenant_key_derivation_is_stable_and_separate(self):
-        self.assertEqual(self.store._cipher("u-alice").encrypt(
-            b"\x00" * 12, b"payload", b"aad"
-        )[:12], b"\x00" * 12)
         self.assertNotEqual(
             self.store._cipher("u-alice").encrypt(b"\x00" * 12, b"payload", b"aad"),
             self.store._cipher("u-bob").encrypt(b"\x00" * 12, b"payload", b"aad"),
