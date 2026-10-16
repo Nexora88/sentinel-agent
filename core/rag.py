@@ -51,7 +51,20 @@ class MemoryStore:
         self.persist_directory.mkdir(parents=True, exist_ok=True)
         # Native n-gram hashing is a transparent offline baseline, not semantic understanding.
         # For semantic retrieval, opt into a pre-installed local model; downloads are disabled.
-        self.embedding_provider = os.getenv("SEKA_EMBEDDINGS_PROVIDER", "mkaos-native").strip().lower()
+        require_semantic = os.getenv("SEKA_REQUIRE_SEMANTIC_EMBEDDINGS", "false").strip().lower() in {"1", "true", "yes", "on"}
+        requested_provider = os.getenv("SEKA_EMBEDDINGS_PROVIDER", "").strip().lower()
+        local_model_path = os.getenv("SEKA_LOCAL_EMBEDDING_MODEL_PATH", "").strip()
+        if require_semantic and requested_provider not in {"", "local-semantic"}:
+            raise ValueError("SEKA_REQUIRE_SEMANTIC_EMBEDDINGS is enabled; only local-semantic retrieval is permitted.")
+        if require_semantic:
+            self.embedding_provider = "local-semantic"
+        elif requested_provider:
+            self.embedding_provider = requested_provider
+        elif local_model_path and Path(local_model_path).expanduser().is_dir():
+            self.embedding_provider = "local-semantic"
+        else:
+            self.embedding_provider = "mkaos-native"
+        self.semantic_retrieval_required = require_semantic
         if self.embedding_provider == "mkaos-native":
             from core.native_embeddings import NativeHashEmbeddings
             embedding_function = NativeHashEmbeddings()
@@ -234,6 +247,7 @@ class MemoryStore:
         return {
             "mode": "local",
             "embedding_provider": getattr(self, "embedding_provider", "unknown"),
+            "semantic_retrieval_required": getattr(self, "semantic_retrieval_required", False),
             "documents": count,
             "max_documents": self.max_documents,
             "max_chunks_per_ingest": self.max_chunks_per_ingest,
