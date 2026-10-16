@@ -36,6 +36,15 @@ def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def sha256_file(path: Path) -> str:
+    """Hash a potentially large corpus file without loading it into an extra byte buffer."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def estimate_parameter_count(vocab_size: int, hidden_size: int, layers: int,
                              heads: int, kv_heads: int, intermediate_size: int) -> int:
     """Exact parameter count for this implementation's untied GQA/SwiGLU decoder."""
@@ -256,6 +265,8 @@ def main() -> int:
             print("Source gate: " + source_messages[0])
         corpus = read_corpus(args.corpus)
         splits = validate_corpus_against_manifest(corpus, manifest)
+        corpus_file_sha256 = sha256_file(args.corpus)
+        manifest_file_sha256 = sha256_file(args.manifest)
     except (OSError, json.JSONDecodeError, ValueError, ImportError) as exc:
         print(f"ERROR: training data gate failed: {exc}", file=sys.stderr)
         return 2
@@ -486,6 +497,26 @@ def main() -> int:
             yy = torch.tensor([ids[s + 1:s + args.sequence_length + 1] for s in chunk], dtype=torch.long, device=device)
             yield xx, yy
 
+    resume_config = {
+        "hidden_size": d,
+        "layers": args.layers,
+        "heads": nh,
+        "kv_heads": nkh,
+        "intermediate_size": intermediate,
+        "sequence_length": args.sequence_length,
+        "batch_size": args.batch_size,
+        "gradient_accumulation_steps": args.gradient_accumulation_steps,
+        "seed": args.seed,
+        "learning_rate": args.learning_rate,
+        "warmup_steps": args.warmup_steps,
+        "min_learning_rate_ratio": args.min_learning_rate_ratio,
+        "total_optimizer_steps": total_optimizer_steps,
+        "gradient_checkpointing": args.gradient_checkpointing,
+        "optimizer_state_sharding": args.optimizer_state_sharding,
+        "precision": precision,
+        "corpus_sha256": corpus_file_sha256,
+        "manifest_sha256": manifest_file_sha256,
+    }
     model = MkaosFromScratch().to(device)
     if distributed:
         from torch.nn.parallel import DistributedDataParallel
@@ -516,9 +547,8 @@ def main() -> int:
             saved = torch.load(args.resume_from, map_location="cpu", weights_only=False)
             if saved.get("format_version") != 1 or saved.get("tokenizer_sha256") != sha256(TOKENIZER_CONTRACT_PATH.read_bytes()):
                 raise ValueError("checkpoint format or tokenizer contract mismatch")
-            expected_config = {"hidden_size": d, "layers": args.layers, "heads": nh, "kv_heads": nkh, "intermediate_size": intermediate, "sequence_length": args.sequence_length, "batch_size": args.batch_size, "gradient_accumulation_steps": args.gradient_accumulation_steps, "seed": args.seed}
-            if saved.get("training_config") != expected_config:
-                raise ValueError("resume configuration does not match checkpoint architecture/data-shaping settings")
+            if saved.get("training_config") != resume_config:
+                raise ValueError("resume configuration, corpus hash, or manifest hash does not match the checkpoint")
             model_to_save = model.module if hasattr(model, "module") else model
             model_to_save.load_state_dict(saved["model_state"])
             optimizer.load_state_dict(saved["optimizer_state"])
@@ -600,7 +630,7 @@ def main() -> int:
                 "torch_rng_state": torch.get_rng_state(),
                 "cuda_rng_state": torch.cuda.get_rng_state_all() if device.type == "cuda" else None,
                 "tokenizer_sha256": sha256(TOKENIZER_CONTRACT_PATH.read_bytes()),
-                "training_config": {"hidden_size": d, "layers": args.layers, "heads": nh, "kv_heads": nkh, "intermediate_size": intermediate, "sequence_length": args.sequence_length, "batch_size": args.batch_size, "gradient_accumulation_steps": args.gradient_accumulation_steps, "seed": args.seed},
+                "training_config": resume_config,
             }
             temporary = checkpoint_dir / "latest.pt.tmp"
             torch.save(trainer_state, temporary)
@@ -671,7 +701,8 @@ def main() -> int:
         "checkpoint_sha256": checkpoint_hash,
         "dataset_id": manifest.get("dataset_id"),
         "dataset_revision": manifest.get("revision"),
-        "manifest_sha256": sha256(args.manifest.read_bytes()),
+        "manifest_sha256": manifest_file_sha256,
+        "corpus_sha256": corpus_file_sha256,
         "seed": args.seed,
         "device": str(device),
         "backend_runtime": backend_runtime,
