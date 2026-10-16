@@ -83,7 +83,9 @@ python tools/train_mkaos_from_scratch.py \
 
 Bu model byte-token tabanlı küçük deneysel bir mimaridir; büyük model performansı beklenmemeli. Test kaybı checkpoint seçimi bittikten sonra bir kez ölçülür ve model seçimi için kullanılmaz.
 
-## Rust checkpoint doğrulaması ve bağımsız Türkçe görevler\n\nİnsan değerlendirme rubriği ve test tasarımı: `docs/MKAOS_HUMAN_EVALUATION_PROTOCOL.md`.
+## Rust checkpoint doğrulaması ve bağımsız Türkçe görevler
+
+İnsan değerlendirme rubriği ve test tasarımı: `docs/MKAOS_HUMAN_EVALUATION_PROTOCOL.md`.
 
 Rust crate içindeki checkpoint loader, SHA-256, dosya yapısı, tensor boyutları ve sonlu ağırlıkları doğrulayabilir; bunun başarılı olması tek başına checkpoint'in model mimarisiyle uyumlu üretim çıkarımı yaptığı anlamına gelmez. Gerçek eğitim checkpoint'i yokken gerçek checkpoint yükleme testi raporlanamaz.
 
