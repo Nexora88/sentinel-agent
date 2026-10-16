@@ -27,7 +27,7 @@ def normalize(text: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", text).casefold().split())
 
 
-def split_for_source(source_hash: str) -> str:
+def split_for_group(source_hash: str) -> str:
     # Source-level assignment prevents the same underlying source entering all splits.
     bucket = int(source_hash[:8], 16) % 100
     return "train" if bucket < 80 else ("validation" if bucket < 90 else "test")
@@ -94,7 +94,7 @@ def extract(input_tsv: Path, *, release: str, source_uri: str) -> tuple[list[dic
             "consent": "open_license",
             "language": "tr",
             "topic": "unclassified",
-            "split": split_for_source(source_hash),
+            "split": split_for_group(source_hash),
             "human_review": "pending",
             "pii_status": "unknown",
             "release": release,
