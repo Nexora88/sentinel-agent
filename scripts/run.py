@@ -90,12 +90,11 @@ def main():
 
     args = parser.parse_args()
 
-    # The web panel must start even when Ollama/Chroma cannot initialize yet.
-    # Initialize the full agent graph only for commands that actually need it.
     if args.command == "web":
         import uvicorn
-        print(f"◈ SEKA → http://{args.host}:{args.port}")
-        uvicorn.run("web.app:app", host=args.host, port=args.port, reload=False, log_level="info")
+        print(f"◈ MKAOS → http://{args.host}:{args.port}")
+        # web.asgi registers /api/capabilities, poster, universe growth
+        uvicorn.run("web.asgi:app", host=args.host, port=args.port, reload=False, log_level="info")
         return
 
     pipeline = SentinelPipeline()
