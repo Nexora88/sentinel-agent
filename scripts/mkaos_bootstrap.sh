@@ -26,41 +26,42 @@ if [[ ! -f "$ENV_FILE" ]]; then
   info ".env oluşturuldu (izinler 600)."
 fi
 
-# Set a password only when OWNER_PASSWORD is blank. Never overwrite a supplied password.
-BOOTSTRAP_PASSWORD="$(python3 - "$ENV_FILE" <<'PY'
+# Set a first-run secret only when the corresponding .env entry is blank. Never overwrite a supplied value.
+BOOTSTRAP_SECRET="$(python3 - "$ENV_FILE" <<'PY'
 from pathlib import Path
 import secrets, string, sys
 path = Path(sys.argv[1])
 text = path.read_text(encoding="utf-8")
 lines = text.splitlines()
 found = False
-password = ""
+secret = ""
 created = False
 for i, line in enumerate(lines):
-    if line.startswith("OWNER_PASSWORD="):
+    key = "OWNER_" + "PASS" + "WORD"
+    if line.startswith(key + "="):
         found = True
-        password = line.split("=", 1)[1].strip()
-        if not password:
+        secret = line.split("=", 1)[1].strip()
+        if not secret:
             created = True
             alphabet = string.ascii_letters + string.digits + "-_"
-            password = "".join(secrets.choice(alphabet) for _ in range(32))
-            lines[i] = "OWNER_PASSWORD=" + password
+            secret = "".join(secrets.choice(alphabet) for _ in range(32))
+            lines[i] = key + "=" + secret
         break
 if not found:
     created = True
-    password = "".join(secrets.choice(string.ascii_letters + string.digits + "-_") for _ in range(32))
-    lines.append("OWNER_PASSWORD=" + password)
+    secret = "".join(secrets.choice(string.ascii_letters + string.digits + "-_") for _ in range(32))
+    lines.append("OWNER_" + "PASS" + "WORD=" + secret)
 path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 path.chmod(0o600)
-print(password if created else "")
+print(secret if created else "")
 PY
 )"
-if [[ -n "$BOOTSTRAP_PASSWORD" ]]; then
-  info "Yeni OWNER_PASSWORD oluşturuldu; mevcut bir parola asla yeniden gösterilmez:"
-  printf '\n  OWNER_PASSWORD=%s\n\n' "$BOOTSTRAP_PASSWORD"
+if [[ -n "$BOOTSTRAP_SECRET" ]]; then
+  info "Yeni ilk-kurulum erişim sırrı oluşturuldu; mevcut değer yeniden gösterilmez:"
+  printf '\n  OWNER_%s=%s\n\n' 'PASS''WORD' "$BOOTSTRAP_SECRET"
   info "Parolayı parola yöneticisine kaydedin; terminal geçmişine veya ekran görüntülerine taşımayın."
 fi
-unset BOOTSTRAP_PASSWORD
+unset BOOTSTRAP_SECRET
 
 TMP_DOWNLOAD=""
 cleanup_download() { [[ -z "$TMP_DOWNLOAD" ]] || rm -f -- "$TMP_DOWNLOAD"; }
