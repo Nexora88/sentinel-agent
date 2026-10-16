@@ -72,6 +72,27 @@ class MkaosCorpusGateTests(unittest.TestCase):
         messages = validate_source_registry({"records": [{"source_id": None}]}, sample_registry())
         self.assertTrue(any("needs a non-empty source_id" in message for message in messages))
 
+    def test_mixed_training_scopes_keep_checkpoint_nonredistributable(self):
+        registry = sample_registry(scope="internal_nonredistributable", distribution_review="pending")
+        registry["current_approved_sources"].append("other-source")
+        registry["sources"].append({
+            "source_id": "other-source",
+            "status": "approved",
+            "permitted_use_now": True,
+            "approved_revision": "release-2",
+            "approval_evidence": "docs/approval-record-2.md",
+            "training_scope": "redistributable",
+            "weight_distribution_review": "approved",
+        })
+        manifest = {"records": [
+            {"source_id": "safe-source"},
+            {"source_id": "other-source"},
+        ]}
+        messages = validate_source_registry(manifest, registry)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("mixes internal-only and redistributable scopes", messages[0])
+        self.assertIn("Treat the resulting checkpoint as non-redistributable", messages[0])
+
     def test_approved_source_passes_with_warning(self):
         messages = validate_source_registry(sample_manifest(), sample_registry())
         self.assertEqual(len(messages), 1)
