@@ -149,7 +149,7 @@ jobs:
       - name: Generate local CycloneDX SBOM
         run: python tools/generate_mkaos_sbom.py --requirements requirements.txt --output artifacts/mkaos-sbom.cdx.json
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mkaos-sbom-cyclonedx
           path: artifacts/mkaos-sbom.cdx.json
@@ -260,7 +260,7 @@ jobs:
       - name: Remove non-redistributable checkpoint before artifact publication
         run: rm -f artifacts/mkaos-local-experiment/mkaos-owned.mkaosw artifacts/mkaos-local-experiment/tokenizer.json
       - name: Publish metrics only (never model weights)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mkaos-local-only-training-report
           path: |
