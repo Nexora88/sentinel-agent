@@ -49,12 +49,47 @@ MKAOS, Ollama'yı zorunlu çalışma zamanı yapmayacak ve üçüncü taraf mode
 - Train/validation loss, NaN/Inf sayısı, checkpoint hash'i ve sabit test kümesi sonuçları.
 - Örnek hatalar, insan değerlendirmesi, ağ erişimi ve harici servislere yapılan çağrıların kaydı.
 
+## Faz 1 — yerel tanılama aracını çalıştırma
+
+Yeni araç `tools/diagnose_mkaos_training.py` ağ kullanmadan şu ölçümleri üretir:
+- Python, PyTorch, CUDA/ROCm görünürlüğü, GPU adı/toplam ve boş VRAM (PyTorch destekliyorsa), sistem RAM'i ve CPU çekirdek sayısı.
+- Verilen model yapılandırmasının parametre ve yaklaşık eğitim belleği hesabı.
+- İsteğe bağlı JSONL korpus için yerel okuma/JSON parse, UTF-8 byte-token sayımı ve saniyedeki token hızı.
+- Gerçek checkpoint ve yerel `mkaos-generate` ikilisi sağlanırsa tek tokenlık üretimin soğuk süreç duvar saati gecikmesi. Bu ölçüm süreç açılışı ve model yüklemesini de içerir; sıcak, süreç içi TTFT değildir.
+
+Önce donanım ve varsayılan küçük yapılandırmayı ölç:
+
+```bash
+python tools/diagnose_mkaos_training.py
+```
+
+Korpus hızını ölçmek için (dosya yalnızca yerel okunur):
+
+```bash
+python tools/diagnose_mkaos_training.py --corpus /yerel/yol/corpus.jsonl
+```
+
+Eğitimde kullanılan yapılandırmaya yaklaşmak için gerçek değerleri açıkça geçir:
+
+```bash
+python tools/diagnose_mkaos_training.py --corpus /yerel/yol/corpus.jsonl --hidden-size 64 --layers 2 --heads 4 --kv-heads 2 --intermediate-size 128 --batch-size 8 --sequence-length 128
+```
+
+Yerel Rust CLI ve checkpoint hazırsa TTFT ölçümü:
+
+```bash
+python tools/diagnose_mkaos_training.py --native-cli ./engine/mkaos-inference/target/release/mkaos-generate --checkpoint /yerel/yol/model.mkaosw --heads 4 --kv-heads 2 --sequence-length 128
+```
+
+Bu araç **eğitimi başlatmaz, ayar değiştirmez, dosya yüklemez ve veri göndermez**. Bellek tahmini yaklaşık değerdir. Korpus hızı, eğitim adımı hızının yerine geçmez. Gerçek hata nedenini saptamak için başarısız koşunun tam traceback'i ve aynı koşudaki kaynak ölçümleri gereklidir.
+
 ## İlk uygulanacak işler
-1. Son başarısız eğitim koşusunun hata izini ve donanım raporunu al.
-2. Eğitim aracına dry-run/bellek tahmini ve küçük sentetik smoke test ekle.
-3. Resume/checkpoint ve ölçüm kayıtlarını doğrula.
-4. Korpus manifestini ve split'leri doğrula; veri kalitesi raporu çıkar.
-5. Küçük modelde uçtan uca eğitim ve Rust checkpoint round-trip tamamla.
-6. Bundan sonra model boyutunu artır ve gerçek Türkçe değerlendirmeye geç.
+1. Tanılama aracını eğitim çökmesinin yaşandığı aynı PC ve Python ortamında çalıştır; JSON çıktısını sakla.
+2. Son başarısız eğitim koşusunun tam hata izini ve o koşuda kullanılan tüm parametreleri al.
+3. Eğitim aracına dry-run/bellek tahmini ve küçük sentetik smoke test ekle.
+4. Resume/checkpoint ve ölçüm kayıtlarını doğrula.
+5. Korpus manifestini ve split'leri doğrula; veri kalitesi raporu çıkar.
+6. Küçük modelde uçtan uca eğitim ve Rust checkpoint round-trip tamamla.
+7. Bundan sonra model boyutunu artır ve gerçek Türkçe değerlendirmeye geç.
 
 **Önemli:** Bu plan kodda bütün özelliklerin tamamlandığı anlamına gelmez. Her madde ayrı commit, test ve ölçümle kapatılmalıdır. Donanım raporu ve başarısız log olmadan kesin çökme nedeni söylenemez.
