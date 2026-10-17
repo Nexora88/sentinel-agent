@@ -93,3 +93,8 @@ After the initial audit, the 12-record first-party manifest was corrected in a n
 - The review document now names revision 2 and explains the correction. No training permission was created by this change; source-register and training gates remain closed pending actual maintainer review.
 
 This is a technical provenance repair only. It does not verify authorship rights, clear privacy, approve the license, or authorize checkpoint distribution.
+
+
+## Follow-up check — private training runner
+
+The authenticated GitHub Actions runner-list API was queried for `Nexora88/sentinel-agent` on 2026-10-17 and returned HTTP 200 with `total_count: 0` and no registered runners. Therefore, no repository-level self-hosted GPU runner with the required labels is currently available to verify. The 10 GiB free-space requirement on `/opt/mkaos-private-checkpoints` cannot be checked without an actual runner. The approved-training workflow was not dispatched, and no training was started.
