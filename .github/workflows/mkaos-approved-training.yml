@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 360
     steps:
       - name: Checkout approved source revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verify operator approval reference and private input paths
         shell: bash
