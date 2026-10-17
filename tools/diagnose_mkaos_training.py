@@ -116,9 +116,9 @@ def corpus_benchmark(path: Path, sample_limit: int) -> dict[str, Any]:
             json_bytes += len(raw)
             if not raw.strip():
                 continue
-            lines += 1
-            if sample_limit and lines > sample_limit:
+            if sample_limit and lines >= sample_limit:
                 break
+            lines += 1
             try:
                 item = json.loads(raw)
                 text = item.get("text") if isinstance(item, dict) else None
