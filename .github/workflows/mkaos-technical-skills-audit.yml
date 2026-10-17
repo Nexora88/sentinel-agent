@@ -1,0 +1,73 @@
+name: MKAOS Technical Skills Source Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      language:
+        description: "CodeSearchNet language archive to audit"
+        required: true
+        type: choice
+        options:
+          - python
+          - javascript
+          - java
+          - go
+          - ruby
+          - php
+      confirm_source_review:
+        description: "Confirm this run is for source/license auditing only (not model training)"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mkaos-technical-source-audit
+  cancel-in-progress: false
+
+jobs:
+  download-and-audit:
+    if: inputs.confirm_source_review == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout MKAOS repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download official CodeSearchNet language archive
+        env:
+          LANGUAGE: ${{ inputs.language }}
+        run: |
+          set -euo pipefail
+          mkdir -p .audit-tmp reports/mkaos
+          url="https://s3.amazonaws.com/code-search-net/CodeSearchNet/v2/${LANGUAGE}.zip"
+          curl --fail --location --retry 3 --retry-delay 2 --output ".audit-tmp/${LANGUAGE}.zip" "$url"
+          unzip -t ".audit-tmp/${LANGUAGE}.zip"
+          sha256sum ".audit-tmp/${LANGUAGE}.zip" > ".audit-tmp/${LANGUAGE}.sha256"
+          unzip -Z1 ".audit-tmp/${LANGUAGE}.zip" > ".audit-tmp/${LANGUAGE}-file-list.txt"
+          python scripts/mkaos/audit_technical_archive.py \
+            --archive ".audit-tmp/${LANGUAGE}.zip" \
+            --file-list ".audit-tmp/${LANGUAGE}-file-list.txt" \
+            --sha-file ".audit-tmp/${LANGUAGE}.sha256" \
+            --language "$LANGUAGE" \
+            --source-url "$url" \
+            --output "reports/mkaos/codesearchnet-${LANGUAGE}-audit.json"
+
+      - name: Upload audit report only (never upload source corpus)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkaos-technical-source-audit-${{ inputs.language }}
+          path: reports/mkaos/codesearchnet-${{ inputs.language }}-audit.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove downloaded source data
+        if: always()
+        run: rm -rf .audit-tmp
