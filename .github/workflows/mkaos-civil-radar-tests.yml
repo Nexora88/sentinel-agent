@@ -1,0 +1,28 @@
+name: MKAOS Civil Radar Simulation Tests
+
+on:
+  push:
+    paths:
+      - "scripts/mkaos/civil_radar_simulation.py"
+      - "tests/test_mkaos_civil_radar_simulation.py"
+      - ".github/workflows/mkaos-civil-radar-tests.yml"
+  pull_request:
+    paths:
+      - "scripts/mkaos/civil_radar_simulation.py"
+      - "tests/test_mkaos_civil_radar_simulation.py"
+      - ".github/workflows/mkaos-civil-radar-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-signal-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run deterministic synthetic signal tests
+        run: python -m unittest tests.test_mkaos_civil_radar_simulation -v
