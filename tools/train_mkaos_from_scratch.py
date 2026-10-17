@@ -247,6 +247,11 @@ def main() -> int:
                         help="Training precision; auto uses fp32 on CPU and the safest supported mixed precision on CUDA.")
     args = parser.parse_args()
 
+    # Determine the requested topology before corpus batching uses it below.
+    distributed_env_world_size = int(os.environ.get("WORLD_SIZE", "1"))
+    distributed = args.distributed and distributed_env_world_size > 1
+    world_size = distributed_env_world_size if distributed else 1
+
     if min(args.epochs, args.batch_size, args.sequence_length, args.hidden_size,
            args.layers, args.heads, args.kv_heads, args.intermediate_size,
            args.gradient_accumulation_steps) < 1:
@@ -343,8 +348,6 @@ def main() -> int:
         print("ERROR: PyTorch is required for training. Install a locally approved PyTorch build; no model downloads are used.", file=sys.stderr)
         return 2
 
-    distributed_env_world_size = int(os.environ.get("WORLD_SIZE", "1"))
-    distributed = args.distributed and distributed_env_world_size > 1
     if args.optimizer_state_sharding and not distributed:
         print("ERROR: --optimizer-state-sharding requires --distributed with torchrun WORLD_SIZE > 1.", file=sys.stderr)
         return 2
