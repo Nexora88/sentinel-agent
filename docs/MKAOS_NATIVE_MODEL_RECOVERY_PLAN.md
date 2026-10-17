@@ -93,3 +93,34 @@ Bu araç **eğitimi başlatmaz, ayar değiştirmez, dosya yüklemez ve veri gön
 7. Bundan sonra model boyutunu artır ve gerçek Türkçe değerlendirmeye geç.
 
 **Önemli:** Bu plan kodda bütün özelliklerin tamamlandığı anlamına gelmez. Her madde ayrı commit, test ve ölçümle kapatılmalıdır. Donanım raporu ve başarısız log olmadan kesin çökme nedeni söylenemez.
+
+## Faz 2 — küçük modelde eğitim/kaydetme/yeniden yükleme kapısı
+
+Yeni `.github/workflows/mkaos-small-model-smoke.yml` CPU-only GitHub runner üzerinde 32 hidden-size / 1 katmanlı deneysel bir model eğitir; checkpoint ve tokenizer rapor hash'lerini doğrular; ardından **aynı kaydedilmiş checkpoint'i** yerel Rust çıkarım CLI ile açıp tek token üretimini kontrol eder. Bu, GPU kapasitesini ölçmez ve modelin Türkçe görev kalitesini kanıtlamaz. Ama eğitim → kalıcı dosya → doğrulama → native yükleme zincirindeki bozuklukları küçük maliyetle yakalar.
+
+Yerel ilk deneme için mevcut eğitim aracı şu küçük ayarlarla kullanılabilir (yalnızca insan tarafından onaylanmış, yerel deney için izinli korpus/manifest ile):
+
+```bash
+python tools/train_mkaos_from_scratch.py --corpus /yerel/corpus.jsonl --manifest /yerel/manifest.json --source-register data/mkaos/source-register.json --output-dir ./artifacts/mkaos-small --experimental-local-only --epochs 1 --batch-size 1 --sequence-length 64 --hidden-size 32 --layers 1 --heads 4 --kv-heads 2 --intermediate-size 64 --seed 20261017
+python tools/verify_mkaos_training_artifacts.py ./artifacts/mkaos-small/training-report.json
+```
+
+Deneysel yerel mod, lisans onayı veya ağırlıkları dağıtma izni vermez. GitHub smoke modeli CI sonunda silinir; ağırlıklar artefakt olarak yayımlanmaz.
+
+## Faz 3 — 500.000 kaydı ölçülebilir korpusa dönüştürme
+
+Yeni `tools/audit_mkaos_corpus.py` korpus içeriğini yerel makinede okur; metinleri çıktıya yazmadan aşağıdaki JSON raporunu üretir:
+
+- Geçerli/bozuk kayıt, örnek kimliği ve manifest SHA-256 eşleşmesi.
+- Birebir tekrarlar ve Unicode NFKC + küçük harf + boşluk normalizasyonuyla yakın tekrar adayları.
+- Normalize edilmiş tekrarların train/validation/test sınırlarını aşması (sızıntı).
+- Split başına kayıt sayısı, UTF-8 byte-token + EOS tahmini, görülen farklı byte değerleri ve yerel okuma/parse hızı.
+- Manifestte kaynak, lisans/izin alanları, insan incelemesi, PII durumu ve split kuralları.
+
+```bash
+python tools/audit_mkaos_corpus.py --corpus /yerel/corpus.jsonl --manifest /yerel/manifest.json --output ./artifacts/mkaos-corpus-audit.json
+```
+
+Sadece özel olarak onaylanmış, dağıtılmayacak yerel deney için `--experimental-local-only` eklenebilir. Rapor `quality_gate: fail` verirse sorun çözülmeden eğitim başlatılmamalı. Yakın tekrar kontrolü anlamsal eşdeğerliği tümüyle bulamaz; otomatik kontrol lisans/hukuk incelemesi, gizli anahtar/PII taraması ve insan doğruluğu incelemesinin yerini almaz. Mevcut kaynak kayıt defterindeki bekleyen veya engellenmiş kaynaklar otomatik olarak izinli sayılmaz. Eğitim için kullanılabilir benzersiz byte-token hacmi, örnek uzunluğu dağılımı ve kalite; ham 500 bin satır sayısından daha anlamlıdır.
+
+İlk odak görevler: Türkçe kodu açıklama ve statik inceleme; güvenli yazılım geliştirme; log/zafiyet bulgularını açıklama, önem derecelendirme ve düzeltme önerileri. Siber güvenlik kapsamı savunmacı ve yetkili testlerle sınırlıdır. Küçük model turu geçse bile bir sonraki model boyutuna ancak gerçek donanım raporu, tepe RAM/VRAM, adım/saniye, kaydet-yükle ve bağımsız Türkçe test sonuçları kaydedilince geçilir.
