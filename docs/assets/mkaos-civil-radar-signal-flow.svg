@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
+  <title id="title">MKAOS civil radar learning simulation</title>
+  <desc id="desc">Educational block diagram showing synthetic signal generation, noise, filtering, uncertainty, and a civil weather or search-and-rescue visualization.</desc>
+  <rect width="1200" height="520" rx="24" fill="#0b1220"/>
+  <text x="60" y="62" fill="#e6f4ff" font-family="Arial,sans-serif" font-size="30" font-weight="700">MKAOS · Civil Radar Learning Lab</text>
+  <text x="60" y="94" fill="#8da6bc" font-family="Arial,sans-serif" font-size="17">SYNTHETIC DATA ONLY · EDUCATIONAL SIGNAL PROCESSING</text>
+  <g font-family="Arial,sans-serif" text-anchor="middle">
+    <rect x="60" y="150" width="220" height="110" rx="14" fill="#132b3b" stroke="#2f9fb0" stroke-width="2"/>
+    <text x="170" y="190" fill="#d9f7ff" font-size="20" font-weight="700">1. Signal source</text>
+    <text x="170" y="222" fill="#9dc8d4" font-size="15">Synthetic echo pulses</text>
+    <rect x="340" y="150" width="220" height="110" rx="14" fill="#132b3b" stroke="#2f9fb0" stroke-width="2"/>
+    <text x="450" y="190" fill="#d9f7ff" font-size="20" font-weight="700">2. Noise model</text>
+    <text x="450" y="222" fill="#9dc8d4" font-size="15">Seeded random noise</text>
+    <rect x="620" y="150" width="220" height="110" rx="14" fill="#132b3b" stroke="#2f9fb0" stroke-width="2"/>
+    <text x="730" y="190" fill="#d9f7ff" font-size="20" font-weight="700">3. Filter</text>
+    <text x="730" y="222" fill="#9dc8d4" font-size="15">Moving-average baseline</text>
+    <rect x="900" y="150" width="240" height="110" rx="14" fill="#183428" stroke="#55c991" stroke-width="2"/>
+    <text x="1020" y="190" fill="#e0fff0" font-size="20" font-weight="700">4. Interpretation</text>
+    <text x="1020" y="222" fill="#a5dfbf" font-size="15">Signal + uncertainty</text>
+    <g fill="none" stroke="#65d8e5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M280 205 H326"/><path d="M314 194 L326 205 L314 216"/>
+      <path d="M560 205 H606"/><path d="M594 194 L606 205 L594 216"/>
+      <path d="M840 205 H886"/><path d="M874 194 L886 205 L874 216"/>
+    </g>
+    <rect x="60" y="310" width="1080" height="140" rx="14" fill="#101c2b" stroke="#263c50"/>
+    <text x="90" y="345" text-anchor="start" fill="#c9d8e6" font-size="18" font-weight="700">Example civil applications</text>
+    <text x="95" y="390" text-anchor="start" fill="#85d8e6" font-size="17">Weather patterns</text>
+    <text x="365" y="390" text-anchor="start" fill="#85d8e6" font-size="17">Aviation safety education</text>
+    <text x="710" y="390" text-anchor="start" fill="#85d8e6" font-size="17">Search &amp; rescue</text>
+    <text x="95" y="420" text-anchor="start" fill="#91a6ba" font-size="14">Reproducible seed</text>
+    <text x="365" y="420" text-anchor="start" fill="#91a6ba" font-size="14">No real sensor feed</text>
+    <text x="710" y="420" text-anchor="start" fill="#91a6ba" font-size="14">No targeting or fire-control</text>
+  </g>
+</svg>
