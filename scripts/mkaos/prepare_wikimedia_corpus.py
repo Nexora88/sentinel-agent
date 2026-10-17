@@ -15,6 +15,7 @@ import importlib.metadata
 import json
 import re
 import sys
+import time
 import unicodedata
 import xml.etree.ElementTree as ET
 from collections import Counter
@@ -194,6 +195,9 @@ def prepare(archive: Path, output_dir: Path, checksum_file: Path | None) -> dict
             "Refusing to process a potentially corrupted download."
         )
 
+    print(f"[prepare] Archive checksum verified; starting streaming XML parse: {archive.name}", flush=True)
+    started_at = time.monotonic()
+
     # A single content digest prevents identical text appearing in multiple splits.
     seen_content: set[str] = set()
     counts: Counter[str] = Counter()
@@ -212,6 +216,13 @@ def prepare(archive: Path, output_dir: Path, checksum_file: Path | None) -> dict
         streams = {"train": train, "validation": validation, "test": test}
         for page in iter_pages(archive):
             total_pages += 1
+            if total_pages == 1 or total_pages % 5000 == 0:
+                elapsed = max(time.monotonic() - started_at, 0.001)
+                print(
+                    f"[prepare] pages={total_pages:,} retained={counts['retained_documents']:,} "
+                    f"elapsed={elapsed / 60:.1f} min rate={total_pages / elapsed:.1f} pages/s",
+                    flush=True,
+                )
             fields = page_fields(page)
             if fields is None:
                 counts["excluded_non_main_namespace_or_missing_revision"] += 1
@@ -284,6 +295,13 @@ def prepare(archive: Path, output_dir: Path, checksum_file: Path | None) -> dict
             counts["retained_documents"] += 1
             if redactions:
                 counts["documents_with_contact_redactions"] += 1
+
+    elapsed = time.monotonic() - started_at
+    print(
+        f"[prepare] XML scan complete: pages={total_pages:,}, "
+        f"retained={counts['retained_documents']:,}, elapsed={elapsed / 60:.1f} min",
+        flush=True,
+    )
 
     output_files = {
         split: {
@@ -390,6 +408,7 @@ def main() -> int:
     parser.add_argument("--upstream-md5-file", type=Path, help="Official Wikimedia MD5 list for the same release")
     args = parser.parse_args()
     manifest = prepare(args.archive, args.output_dir, args.upstream_md5_file)
+    print("[prepare] Manifest and sample-review sheet written.", flush=True)
     print(json.dumps({
         "dataset_id": manifest["dataset_id"],
         "archive_sha256": manifest["source"]["archive_sha256"],
