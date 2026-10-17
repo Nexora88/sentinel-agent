@@ -80,3 +80,16 @@ The manifest currently labels each record `human_review: approved` and `pii_stat
 ## Current conclusion
 
 **BLOCKED — waiting for completed Wikimedia report and human rights/privacy review.** No Wikimedia examples are claimed reviewed, no training has been started, no checkpoint has been created, and no independent model performance result is available.
+
+
+## Follow-up correction — first-party manifest revision 2
+
+After the initial audit, the 12-record first-party manifest was corrected in a new revision rather than overwriting the old Git history:
+
+- `data/mkaos/first-party-smoke-v1.manifest.json` now declares revision `2`.
+- SHA-256 for each record is defined and recomputed over the exact UTF-8 bytes of its JSONL `text` field only (no JSON wrapper or trailing newline). Automated verification reports **12/12 hashes match, 0 mismatches**.
+- All records now say `human_review: pending` and `pii_status: pending_review`; `license_reviewed` remains `false`; CC0 remains proposed/unapproved. The prior unsupported `approved`/`cleared` flags were not retained.
+- Split counts remain 4 train / 4 validation / 4 test. The dataset text itself was not changed by this manifest correction.
+- The review document now names revision 2 and explains the correction. No training permission was created by this change; source-register and training gates remain closed pending actual maintainer review.
+
+This is a technical provenance repair only. It does not verify authorship rights, clear privacy, approve the license, or authorize checkpoint distribution.

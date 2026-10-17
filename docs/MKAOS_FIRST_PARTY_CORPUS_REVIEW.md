@@ -4,15 +4,16 @@ Status: **PENDING HUMAN MAINTAINER REVIEW — TRAINING BLOCKED**
 
 Dataset: `data/mkaos/first-party-smoke-v1.jsonl`  
 Manifest: `data/mkaos/first-party-smoke-v1.manifest.json`  
-Current dataset revision: `1`
+Current dataset revision: `2`
 
 ## Current facts
 
 - 12 AI-assisted Turkish diagnostic samples are present (4 train, 4 validation, 4 independent test).
-- Per-record UTF-8 text SHA-256 values are recorded in the manifest.
+- Revision 2 recomputes all 12 per-record SHA-256 values over the exact UTF-8 bytes of each JSONL `text` field (excluding JSON wrapper and newline); an automated recheck found 12/12 matches.
+- Every record is explicitly marked `human_review=pending` and `pii_status=pending_review`; this is not a privacy clearance.
 - No third-party corpus text was intentionally copied and no personal data is intended; these statements still require review.
-- The proposed `CC0-1.0` label is **not approved**.
-- `human_review=pending` and `license_reviewed=false` are intentional. Do not change them to make validation pass.
+- The proposed `CC0-1.0` label is **not approved**; `license_reviewed=false` remains.
+- The previous manifest revision had contradictory approved/cleared flags and mismatching hashes. Revision 2 records a transparent correction; it does not approve training.
 - No training run, checkpoint hash, or Rust inference benchmark is claimed by this document.
 
 ## Human maintainer review checklist
@@ -45,7 +46,7 @@ Do not use an unchecked or blank decision record as approval. Do not claim legal
 
 Run from the repository root in a controlled local environment with a compatible Python and PyTorch installation. This corpus is intentionally too small for meaningful language-model capability claims; use a short sequence length only to exercise the pipeline.
 
-1. Update the manifest only after the human decision is documented: set `human_review` to `approved` for every reviewed record and record the actual reviewed license decision. Set `license_reviewed=true` only if that review really occurred.
+1. Only after a human decision is documented, update each reviewed record's `human_review` and privacy status to reflect the actual decision, and record the actual reviewed license decision. Set `license_reviewed=true` only if that review really occurred. Do not bulk-approve records.
 2. Ensure the source register authorizes the exact local-only dataset; do not approve third-party sources by implication.
 3. Validate the manifest and source gate. A failing gate means **do not train**.
 4. Run the random-initialization trainer in local-only mode with a short smoke-test configuration, for example:

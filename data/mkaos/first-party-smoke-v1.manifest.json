@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
   "dataset_id": "mkaos-first-party-turkish-smoke-v1",
-  "revision": "1",
-  "created_at": "2026-10-16",
-  "curator": "AI-assisted original draft; project owner approved these 12 exact records for local-only non-redistributable experimental training in ChatGPT on 2026-10-16",
+  "revision": "2",
+  "created_at": "2026-10-17",
+  "curator": "AI-assisted original draft; revision 2 corrects per-record text hashes and resets unverified review claims to pending.",
   "source_kind": "owner_created_or_rights_cleared_local",
   "data_rights_mode": "owner_supplied_local_nonredistributable",
   "license_reviewed": false,
-  "notes": "Project owner explicitly approved the exact 12 listed records for a local-only experimental training run on 2026-10-16. This records content/use approval for this bounded experiment only; license_reviewed remains false, CC0 remains proposed and unapproved, no third-party source rights or model-weight redistribution rights are asserted, and the resulting checkpoint must not be distributed. The records are AI-assisted original drafts; independent human/legal review and useful-model quality validation remain pending.",
+  "notes": "Revision 2: SHA-256 is computed over the exact UTF-8 bytes of each JSONL record text field, with no JSON wrapper or newline. All human review and privacy statuses are pending. CC0 remains proposed and unapproved. This revision does not grant training rights or model-weight distribution rights; local-only training remains blocked until a documented maintainer review and source-register approval.",
   "records": [
     {
       "sample_id": "train-001",
@@ -18,8 +18,8 @@
       "sha256": "42a0fc8ada2337e3e61764197624a6fdeb529c71a8a37297adad038b798649db",
       "language": "tr",
       "topic": "model-development-and-software-testing",
-      "human_review": "approved",
-      "pii_status": "cleared",
+      "human_review": "pending",
+      "pii_status": "pending_review",
       "split": "train"
     },
     {
@@ -31,8 +31,8 @@
       "sha256": "ec5ef535d7ed1899a2612c10632a2a8c9559b7e4bd5ddb503d821e90eb1ce2c9",
       "language": "tr",
       "topic": "model-development-and-software-testing",
-      "human_review": "approved",
-      "pii_status": "cleared",
+      "human_review": "pending",
+      "pii_status": "pending_review",
       "split": "train"
     },
     {
@@ -44,8 +44,8 @@
       "sha256": "e873565931f2a685268daa7fa07a4d4b722fea77dc9e1f5757531aa3e3a1b3cc",
       "language": "tr",
       "topic": "model-development-and-software-testing",
-      "human_review": "approved",
-      "pii_status": "cleared",
+      "human_review": "pending",
+      "pii_status": "pending_review",
       "split": "train"
     },
     {
@@ -57,8 +57,8 @@
       "sha256": "747eed1792c94ae8327a3f6b9da5b6cfecc78c30b50fa29a37246888c08e31f1",
       "language": "tr",
       "topic": "model-development-and-software-testing",
-      "human_review": "approved",
-      "pii_status": "cleared",
+      "human_review": "pending",
+      "pii_status": "pending_review",
       "split": "train"
     },
     {
@@ -70,8 +70,8 @@
       "sha256": "08490c8b84f1f6fd205b20f6a0eed6d2e31dda850b06367ceb1b6bc6c889bffe",
       "language": "tr",
       "topic": "model-development-and-software-testing",
-      "human_review": "approved",
-      "pii_status": "cleared",
+      "human_review": "pending",
+      "pii_status": "pending_review",
       "split": "validation"
     },
     {
@@ -83,8 +83,8 @@
       "sha256": "e0e1711711c25fdddc047547af55ee0650345f71c012c9cd7c600e78b5b5fae3",
       "language": "tr",
       "topic": "model-development-and-software-testing",
-      "human_review": "approved",
-      "pii_status": "cleared",
+      "human_review": "pending",
+      "pii_status": "pending_review",
       "split": "validation"
     },
     {
@@ -96,8 +96,8 @@
       "sha256": "93fb3aa335d5d4bf1cec6edd3e5e37a242f2e88ee1cae4a2c8b79261aabf6917",
       "language": "tr",
       "topic": "model-development-and-software-testing",
-      "human_review": "approved",
-      "pii_status": "cleared",
+      "human_review": "pending",
+      "pii_status": "pending_review",
       "split": "validation"
     },
     {
@@ -109,8 +109,8 @@
       "sha256": "ac43d421d9d31ec10f3e8322c17bb95972c9265b9419759132cfc7b657323e5a",
       "language": "tr",
       "topic": "model-development-and-software-testing",
-      "human_review": "approved",
-      "pii_status": "cleared",
+      "human_review": "pending",
+      "pii_status": "pending_review",
       "split": "validation"
     },
     {
@@ -122,8 +122,8 @@
       "sha256": "c0b4a7e90c44ed8529ed46f86ba88f104eaf8faa15e450e4990ac4b1b8816d23",
       "language": "tr",
       "topic": "model-development-and-software-testing",
-      "human_review": "approved",
-      "pii_status": "cleared",
+      "human_review": "pending",
+      "pii_status": "pending_review",
       "split": "test"
     },
     {
@@ -135,8 +135,8 @@
       "sha256": "6ba577ba4c8dbaa1fa718f23be26ed0b81aa1a6268bc589faf70c09932e01054",
       "language": "tr",
       "topic": "model-development-and-software-testing",
-      "human_review": "approved",
-      "pii_status": "cleared",
+      "human_review": "pending",
+      "pii_status": "pending_review",
       "split": "test"
     },
     {
@@ -148,8 +148,8 @@
       "sha256": "2c7f591d69c7ef08ced3a5e881e8370a9ae83a5999819aa55ec338c8cca9df7a",
       "language": "tr",
       "topic": "model-development-and-software-testing",
-      "human_review": "approved",
-      "pii_status": "cleared",
+      "human_review": "pending",
+      "pii_status": "pending_review",
       "split": "test"
     },
     {
@@ -161,22 +161,23 @@
       "sha256": "962f61ed31dce57f7d5ed3cff13f937c2ea8507ec148c20b7786b612607062ef",
       "language": "tr",
       "topic": "model-development-and-software-testing",
-      "human_review": "approved",
-      "pii_status": "cleared",
+      "human_review": "pending",
+      "pii_status": "pending_review",
       "split": "test"
     }
   ],
   "owner_experimental_approval": {
-    "status": "approved_by_project_owner_in_chat",
-    "date": "2026-10-16",
+    "status": "pending_documented_maintainer_review",
+    "date": null,
     "dataset_id": "mkaos-first-party-turkish-smoke-v1",
-    "revision": "1",
-    "scope": "Use these exact 12 first-party AI-assisted draft records for one bounded from-random-initialization local-only experimental training and same-checkpoint Rust inference test.",
+    "revision": "2",
+    "scope": "not approved; no training until human review and source-register gate are explicitly satisfied",
     "restrictions": [
       "license_reviewed remains false",
-      "no third-party corpus is included by intent; source provenance still requires independent review",
-      "checkpoint and model weights must not be redistributed",
-      "this is not production or general-purpose Turkish model approval"
+      "human_review and pii_status remain pending",
+      "no third-party source rights are asserted",
+      "checkpoint and model weights must not be redistributed without a separate decision",
+      "this tiny corpus is only a pipeline smoke test, not a general-purpose Turkish model"
     ]
   }
 }
