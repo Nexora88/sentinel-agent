@@ -98,3 +98,19 @@ This is a technical provenance repair only. It does not verify authorship rights
 ## Follow-up check — private training runner
 
 The authenticated GitHub Actions runner-list API was queried for `Nexora88/sentinel-agent` on 2026-10-17 and returned HTTP 200 with `total_count: 0` and no registered runners. Therefore, no repository-level self-hosted GPU runner with the required labels is currently available to verify. The 10 GiB free-space requirement on `/opt/mkaos-private-checkpoints` cannot be checked without an actual runner. The approved-training workflow was not dispatched, and no training was started.
+
+
+## Follow-up check — local development machine and current workflow state (2026-10-17)
+
+A fresh Remote Desktop Commander check reached `LAPTOP-4AV7HMO0` and reported:
+
+- OS: Windows 11 Home Single Language, 64-bit (not the required Linux x64 runner).
+- Detected display adapter: Intel(R) UHD Graphics.
+- `nvidia-smi`: not found. This does not by itself prove that no other accelerator exists, but no usable CUDA GPU was demonstrated.
+- `/opt/mkaos-private-checkpoints`: not present at the Windows `C:\\opt\\mkaos-private-checkpoints` check path; the required Linux checkpoint mount and its free space were not verified.
+- Python invocation: `python` was not available in the remote shell.
+- Local repository status at check time: `main...origin/main`, no reported working-tree changes.
+
+The Wikimedia corpus workflow run #11 was checked again after the machine probe. It remained `in_progress` at the preparation step, and `mkaos-wikimedia-corpus-report` was still absent. Its unit tests and pinned dump/checksum-list download steps had passed; output counts and manifest hashes were not yet available.
+
+**Action decision:** do not dispatch the approved-training workflow. The source register still has zero approved sources and both training gates false, and the reachable Windows machine has not been demonstrated to satisfy the Linux/GPU/storage requirements. Starting training with an invented approval reference or bypassing these checks would be unsafe and would produce an unauditable run. Next valid steps are: finish and review the corpus report; obtain a real source-specific human/legal decision; then register and validate a trusted private Linux GPU runner with the exact labels, accelerator, and at least 10 GiB free checkpoint storage.
