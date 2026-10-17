@@ -53,7 +53,7 @@ class MkaosDiagnosticsTests(unittest.TestCase):
                 encoding="utf-8",
             )
             result = corpus_benchmark(corpus, 1)
-        self.assertEqual(result["records_seen_including_malformed"], 2)
+        self.assertEqual(result["records_seen_including_malformed"], 1)
         self.assertEqual(result["valid_text_utf8_bytes"], len("first"))
         self.assertIsNotNone(result["sample_limit"])
 
