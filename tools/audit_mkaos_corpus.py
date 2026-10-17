@@ -12,10 +12,13 @@ import json
 import sys
 import time
 import unicodedata
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 from tools.validate_mkaos_training_manifest import validate_manifest
 
 
