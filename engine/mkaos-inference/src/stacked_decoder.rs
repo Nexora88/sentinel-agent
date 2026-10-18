@@ -1,6 +1,6 @@
 //! Multi-layer Llama-style decoder reference with grouped-query attention and per-layer incremental KV cache.
 //! This is a tested-by-unit-tests synthetic-weight implementation; it is not yet a SmolLM2 file adapter.
-use crate::{apply_rope, embed_tokens, KernelError, Tensor2};
+use crate::{embed_tokens, KernelError, Tensor2};
 
 #[derive(Debug, Clone)]
 pub struct GqaLayerWeights {
@@ -324,7 +324,7 @@ mod tests {
         let m = model();
         for pos in 0..8 {
             let x = Tensor2::new(1, 8, (0..8).map(|i| (i as f32 - 3.0) * 0.17).collect()).unwrap();
-            let expected = apply_rope(&x, m.head_dim, pos, m.config.rope_theta).unwrap();
+            let expected = crate::apply_rope(&x, m.head_dim, pos, m.config.rope_theta).unwrap();
             let actual = m.apply_cached_rope(&x, pos).unwrap();
             for (a, b) in actual.as_slice().iter().zip(expected.as_slice()) {
                 assert!((a - b).abs() < 1e-6, "cached RoPE mismatch at position {pos}: {a} vs {b}");
