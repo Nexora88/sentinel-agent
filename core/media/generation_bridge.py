@@ -31,6 +31,92 @@ class GenerationBridge:
         )
 
 
+class LocalVisionAdapter:
+    """Image understanding through an explicitly configured local Ollama vision model.
+
+    This adapter never downloads models and never sends image bytes to a public service.
+    It is enabled only for loopback/private hosts and a non-empty model name.
+    """
+    name = "local-ollama-vision"
+
+    def __init__(self, base_url: str | None = None, model: str | None = None):
+        import os
+        from urllib.parse import urlparse
+        self.base_url = (base_url if base_url is not None else os.getenv("MKAOS_OLLAMA_URL", "http://127.0.0.1:11434")).strip().rstrip("/")
+        self.model = (model if model is not None else os.getenv("MKAOS_VISION_MODEL", "")).strip()
+        parsed = urlparse(self.base_url)
+        host = (parsed.hostname or "").lower()
+        local_host = host in {"localhost", "127.0.0.1", "::1", "host.docker.internal"} or host.endswith(".internal")
+        if parsed.scheme != "http" or not local_host or parsed.username or parsed.password:
+            self.base_url = ""
+        self.enabled = bool(self.base_url and self.model)
+
+    def capabilities(self) -> dict:
+        return {
+            "name": self.name,
+            "enabled": self.enabled,
+            "backend_configured": self.enabled,
+            "operations": ["understand_image"] if self.enabled else [],
+            "mode": "local_vision_model" if self.enabled else "unavailable",
+            "model": self.model or None,
+            "policy": "loopback/private local endpoint only; no model download or public fallback",
+        }
+
+    def execute(self, operation: str, payload: dict) -> dict:
+        if operation != "understand_image" or not self.enabled:
+            raise RuntimeError("Yerel g?rsel anlama modeli yap?land?r?lmam??.")
+        import base64
+        import io
+        from pathlib import Path
+        import requests
+        raw = payload.get("image_bytes")
+        if raw is None:
+            path_value = payload.get("image_path")
+            if not path_value:
+                raise RuntimeError("G?rsel baytlar? veya yerel dosya yolu gerekli.")
+            path = Path(str(path_value)).resolve()
+            allowed_roots = [Path("./memory/uploads").resolve(), Path("./memory/generated_images").resolve()]
+            if not path.is_file() or not any(root == path or root in path.parents for root in allowed_roots):
+                raise RuntimeError("G?rsel yaln?zca izin verilen yerel medya dizinlerinden okunabilir.")
+            if path.stat().st_size > 12 * 1024 * 1024:
+                raise RuntimeError("G?rsel 12 MB s?n?r?n? a??yor.")
+            raw = path.read_bytes()
+        if not isinstance(raw, (bytes, bytearray)) or not raw or len(raw) > 12 * 1024 * 1024:
+            raise RuntimeError("G?rsel bo? veya 12 MB s?n?r?n? a??yor.")
+        try:
+            from PIL import Image
+            with Image.open(io.BytesIO(raw)) as image:
+                image.verify()
+            with Image.open(io.BytesIO(raw)) as image:
+                if image.width * image.height > 20_000_000:
+                    raise RuntimeError("G?rsel 20 megapiksel s?n?r?n? a??yor.")
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError("Desteklenmeyen veya bozuk g?rsel dosyas?.") from exc
+        prompt = str(payload.get("prompt") or "G?rseli T?rk?e olarak a??kla; g?rd???n ile ??kar?m?n? ay?r.")[:2000]
+        request_body = {"model": self.model, "stream": False, "messages": [{
+            "role": "user", "content": prompt,
+            "images": [base64.b64encode(bytes(raw)).decode("ascii")],
+        }]}
+        try:
+            with requests.Session() as session:
+                session.trust_env = False
+                response = session.post(self.base_url + "/api/chat", json=request_body,
+                                        timeout=(3, 120), allow_redirects=False)
+            response.raise_for_status()
+            data = response.json()
+            answer = data.get("message", {}).get("content", "")
+            if not isinstance(answer, str) or not answer.strip():
+                raise RuntimeError("Yerel g?rsel modeli bo? yan?t verdi.")
+            return {"success": True, "text": answer[:12000], "model": self.model,
+                    "source": "local_ollama_vision", "network": False}
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError("Yerel g?rsel modeline ula??lamad? veya yan?t? okunamad?; d?? servise ge?i? yap?lmad?.") from exc
+
+
 class LocalCanvasAdapter:
     """Pillow + ffmpeg — ağ ve SD zorunlu değil."""
     name = "local-canvas"
@@ -77,10 +163,11 @@ class ImageGeneratorAdapter:
         configured = bool(getattr(self.generator, "sd_url", ""))
         return {
             "name": self.name,
-            "enabled": True,
+            "enabled": configured,
             "backend_configured": configured,
-            "operations": ["generate", "edit", "background", "video", "story_video"],
-            "policy": "self-hosted only; no public fallback",
+            "operations": ["generate", "edit", "background", "video", "story_video"] if configured else [],
+            "mode": "local_neural_image_and_storyboard_video" if configured else "unavailable",
+            "policy": "self-hosted only; no public fallback; configuration is not a runtime health check",
         }
 
     def execute(self, operation: str, payload: dict) -> dict:

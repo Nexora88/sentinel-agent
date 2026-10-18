@@ -42,3 +42,10 @@ For stronger isolation:
 5. Verify that failure to reach a remote service fails closed; no silent hosted-model fallback.
 
 A firewall rule or Docker network declaration is not proof by itself. Host services, DNS, update agents, other containers, mounted sockets, and physical access remain outside this app-level guarantee. Report results as tested scope, date, host OS, and commands—not as “unbreakable” security.
+
+
+## Local image understanding and media status
+
+`LocalVisionAdapter` adds an optional `understand_image` operation backed by an already-installed local Ollama vision model. Configure `MKAOS_OLLAMA_URL` (loopback/private local endpoint) and `MKAOS_VISION_MODEL`; no model is downloaded automatically and no public API fallback exists. Image inputs are limited to 12 MB and 20 megapixels. This capability is reported as unavailable unless the endpoint and model name are explicitly configured; configuration alone is not a health check.
+
+Neural image generation still requires a locally managed Stable Diffusion WebUI endpoint via `SD_API_URL`. Local poster/code-card generation is deterministic drawing, not text-to-image AI. Story videos are keyframe/slideshow videos rendered with local ffmpeg, not neural text-to-video. Video understanding and neural text-to-video are not claimed by this change.

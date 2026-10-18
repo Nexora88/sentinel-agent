@@ -32,6 +32,27 @@ class MediaEngineTests(unittest.TestCase):
             engine=MediaEngine(GenerationBridge(), state_path=str(Path(d)/"jobs.json"))
             with self.assertRaises(MediaEngineError): engine.submit("edit", {"image":b"secret"})
 
+
+    def test_vision_adapter_is_disabled_without_explicit_model(self):
+        from core.media.generation_bridge import LocalVisionAdapter
+        adapter = LocalVisionAdapter(base_url="http://127.0.0.1:11434", model="")
+        caps = adapter.capabilities()
+        self.assertFalse(caps["enabled"])
+        self.assertEqual(caps["operations"], [])
+
+    def test_vision_adapter_rejects_public_endpoint(self):
+        from core.media.generation_bridge import LocalVisionAdapter
+        adapter = LocalVisionAdapter(base_url="https://example.com", model="llava")
+        self.assertFalse(adapter.capabilities()["enabled"])
+
+    def test_image_generator_capabilities_do_not_claim_unconfigured_backend(self):
+        from core.media.generation_bridge import ImageGeneratorAdapter
+        from tools.image_gen import ImageGenerator
+        with tempfile.TemporaryDirectory() as d, patch.dict("os.environ", {"SD_API_URL": ""}):
+            caps = ImageGeneratorAdapter(ImageGenerator(d)).capabilities()
+        self.assertFalse(caps["enabled"])
+        self.assertEqual(caps["operations"], [])
+
 class ForgetMemoryTests(unittest.TestCase):
     def test_topic_must_be_specific_enough(self):
         instance=PersonalMemory.__new__(PersonalMemory)
