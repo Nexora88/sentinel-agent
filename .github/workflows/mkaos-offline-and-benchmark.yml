@@ -63,7 +63,7 @@ jobs:
         run: python tools/evaluate_mkaos_quality.py --server-url http://127.0.0.1:11435 --max-new-tokens 24 --output mkaos-resident-quality.json
       - name: Upload benchmark report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mkaos-offline-and-ollama-benchmark
           if-no-files-found: warn

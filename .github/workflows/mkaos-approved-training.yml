@@ -162,7 +162,7 @@ jobs:
 
       - name: Upload evaluation metadata only (never upload private corpus or weights)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mkaos-training-report-${{ github.run_id }}
           path: |

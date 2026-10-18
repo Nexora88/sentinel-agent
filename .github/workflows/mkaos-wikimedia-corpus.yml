@@ -96,7 +96,7 @@ jobs:
 
       - name: Upload manifest and preparation report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mkaos-wikimedia-corpus-report
           path: data/wikimedia/report/
@@ -106,7 +106,7 @@ jobs:
 
       - name: Retain prepared corpus only after explicit manual opt-in
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.retain_corpus_artifact == true }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mkaos-trwiki-20260901-prepared-corpus
           path: |
