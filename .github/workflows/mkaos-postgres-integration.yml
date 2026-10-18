@@ -51,7 +51,7 @@ jobs:
       MKAOS_TEST_POSTGRES_DSN: postgresql://mkaos_app:mkaos_ci_password@localhost:5432/mkaos_test
       MKAOS_MEMORY_ENCRYPTION_KEY: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
