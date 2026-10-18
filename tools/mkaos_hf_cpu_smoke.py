@@ -31,7 +31,9 @@ def main() -> int:
         second = model(**inputs).logits.detach().to(torch.float32).cpu()
     delta = (first - second).abs()
     max_abs = float(delta.max().item())
-    cosine = float(torch.nn.functional.cosine_similarity(first.reshape(1, -1), second.reshape(1, -1)).item())
+    # Floating-point cosine implementations can round slightly above 1.0 for identical vectors.
+    cosine_raw = float(torch.nn.functional.cosine_similarity(first.reshape(1, -1), second.reshape(1, -1)).item())
+    cosine = max(-1.0, min(1.0, cosine_raw))
     report = {
         "test": "hf_cpu_reference_smoke_not_conversion",
         "model_id": MODEL_ID, "revision": MODEL_REVISION,
