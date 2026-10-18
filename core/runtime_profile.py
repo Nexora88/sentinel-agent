@@ -68,11 +68,11 @@ def _model_tier(total_ram_mb: int | None, total_vram_mb: int | None = None) -> d
                 "reason_tr": "RAM algılanamadı; model seçimini kullanıcı yapmalı."}
     if total_ram_mb < 3072:
         return {"tier": "minimal", "suggested_chat_model": None,
-                "suggested_code_model": None,
+                "suggested_code_model": None, "suggested_context_tokens": 0,
                 "reason_tr": "3 GB altı RAM: LLM garantisi yok; kuralsal temel işlevleri kullan."}
     if total_ram_mb < 6144:
         return {"tier": "low", "suggested_chat_model": "qwen2.5:0.5b",
-                "suggested_code_model": None,
+                "suggested_code_model": None, "suggested_context_tokens": 2048,
                 "reason_tr": "Düşük RAM: küçük nicemlenmiş model dene ve gerçek bellek kullanımını ölç."}
     if total_ram_mb < 12288:
         return {"tier": "entry", "suggested_chat_model": "qwen2.5:1.5b",
