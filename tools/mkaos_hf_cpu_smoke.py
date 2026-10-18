@@ -21,7 +21,6 @@ def main() -> int:
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, revision=MODEL_REVISION)
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_ID, revision=MODEL_REVISION, torch_dtype=torch.float32,
-        low_cpu_mem_usage=True,
     ).to("cpu").eval()
     load_seconds = time.perf_counter() - started
     inputs = tokenizer("Explain what a computer program is in one sentence.", return_tensors="pt")
