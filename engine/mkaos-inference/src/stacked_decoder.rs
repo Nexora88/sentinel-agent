@@ -62,6 +62,9 @@ pub struct GqaDecoder {
     hidden_size: usize,
     head_dim: usize,
     kv_width: usize,
+    // Precomputed RoPE tables: avoids powf/sin/cos in every generated token.
+    rope_cos: Vec<f32>,
+    rope_sin: Vec<f32>,
 }
 impl GqaDecoder {
     /// Assemble a decoder only when the checkpoint has the exact owned-model tensor contract.
@@ -168,7 +171,19 @@ impl GqaDecoder {
         if weights.token_embedding.rows() != weights.lm_head.cols() {
             return Err(KernelError::InvalidConfig);
         }
-        Ok(Self { config, weights, hidden_size: d, head_dim, kv_width })
+        let half = head_dim / 2;
+        let table_len = config.max_sequence_len.checked_mul(half).ok_or(KernelError::InvalidDimension)?;
+        let mut rope_cos = Vec::with_capacity(table_len);
+        let mut rope_sin = Vec::with_capacity(table_len);
+        for pos in 0..config.max_sequence_len {
+            for i in 0..half {
+                let freq = 1.0 / config.rope_theta.powf((2 * i) as f32 / head_dim as f32);
+                let angle = pos as f32 * freq;
+                rope_cos.push(angle.cos());
+                rope_sin.push(angle.sin());
+            }
+        }
+        Ok(Self { config, weights, hidden_size: d, head_dim, kv_width, rope_cos, rope_sin })
     }
 
     /// Consumes exactly one token and returns vocabulary logits. The KV cache is updated
@@ -184,8 +199,8 @@ impl GqaDecoder {
         let pos = cache.sequence_len;
         for (index, w) in self.weights.layers.iter().enumerate() {
             let n1 = norm_scale(&x, &w.input_norm, self.config.rms_epsilon)?;
-            let q = apply_rope(&n1.matmul(&w.q_proj)?, self.head_dim, pos, self.config.rope_theta)?;
-            let k = apply_rope(&n1.matmul(&w.k_proj)?, self.head_dim, pos, self.config.rope_theta)?;
+            let q = self.apply_cached_rope(&n1.matmul(&w.q_proj)?, pos)?;
+            let k = self.apply_cached_rope(&n1.matmul(&w.k_proj)?, pos)?;
             let v = n1.matmul(&w.v_proj)?;
             let kv = &mut cache.layers[index];
             kv.keys.extend_from_slice(k.as_slice());
@@ -228,6 +243,28 @@ impl GqaDecoder {
         let logits = normalized.matmul(&self.weights.lm_head)?;
         if logits.as_slice().iter().any(|x| !x.is_finite()) { return Err(KernelError::NonFiniteInput); }
         Ok(logits.as_slice().to_vec())
+    }
+
+    fn apply_cached_rope(&self, x: &Tensor2, position: usize) -> Result<Tensor2, KernelError> {
+        if position >= self.config.max_sequence_len || x.rows() != 1 || x.cols() % self.head_dim != 0 {
+            return Err(KernelError::InvalidConfig);
+        }
+        let half = self.head_dim / 2;
+        let heads = x.cols() / self.head_dim;
+        let mut out = x.as_slice().to_vec();
+        let table_offset = position * half;
+        for h in 0..heads {
+            let base = h * self.head_dim;
+            for i in 0..half {
+                let cos = self.rope_cos[table_offset + i];
+                let sin = self.rope_sin[table_offset + i];
+                let a = x.as_slice()[base + i];
+                let b = x.as_slice()[base + half + i];
+                out[base + i] = a * cos - b * sin;
+                out[base + half + i] = b * cos + a * sin;
+            }
+        }
+        Tensor2::new(1, x.cols(), out)
     }
 
     /// Slow correctness reference: recompute a fresh cache for the entire prefix.
