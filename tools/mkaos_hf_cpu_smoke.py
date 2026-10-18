@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CPU-only HF reference smoke test; saves logits for future cross-runtime parity."""
+"""CPU-only HF reference smoke test; saves logits and tokenizer fixtures for cross-runtime parity."""
 from __future__ import annotations
 import argparse, hashlib, json, platform, time
 from pathlib import Path
@@ -28,6 +28,7 @@ def main() -> int:
     ).to("cpu").eval()
     load_seconds = time.perf_counter() - started
     inputs = tokenizer(INPUT_TEXT, return_tensors="pt")
+    raw_input_ids = tokenizer(INPUT_TEXT, add_special_tokens=False, return_tensors="np")["input_ids"]
     with torch.inference_mode():
         t0 = time.perf_counter()
         first = model(**inputs).logits.detach().to(torch.float32).cpu().contiguous()
@@ -43,12 +44,11 @@ def main() -> int:
     attention_mask_np = inputs.get("attention_mask", torch.ones_like(inputs["input_ids"])).cpu().numpy()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.logits_output.parent.mkdir(parents=True, exist_ok=True)
-    # The .npz is intended as a reproducible reference fixture for a future adapter;
-    # it does not itself establish Rust/MKAOSW1 compatibility.
     np.savez_compressed(
         args.logits_output,
         logits=logits_np,
         input_ids=input_ids_np,
+        raw_input_ids=np.asarray(raw_input_ids, dtype=np.int64),
         attention_mask=attention_mask_np,
         input_text=np.asarray(INPUT_TEXT),
         model_id=np.asarray(MODEL_ID),
@@ -64,7 +64,9 @@ def main() -> int:
         "device": "cpu", "platform": platform.platform(), "python": platform.python_version(),
         "torch": torch.__version__, "transformers": transformers.__version__,
         "input_text": INPUT_TEXT, "input_token_count": int(inputs["input_ids"].shape[-1]),
-        "input_ids": input_ids_np.tolist(), "logit_shape": list(first.shape),
+        "input_ids_with_special_tokens": input_ids_np.tolist(),
+        "raw_input_ids_without_special_tokens": np.asarray(raw_input_ids).tolist(),
+        "logit_shape": list(first.shape),
         "load_seconds": round(load_seconds, 4), "forward_seconds": round(first_seconds, 4),
         "repeat_forward_max_absolute_error": max_abs,
         "repeat_forward_cosine_similarity": cosine,
