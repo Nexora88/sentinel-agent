@@ -1,6 +1,19 @@
 name: MKAOS Daily Improvement Loop
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/mkaos-daily-improvement.yml"
+      - "agents/**"
+      - "core/**"
+      - "engine/**"
+      - "scripts/**"
+      - "tests/**"
+      - "tools/**"
+      - "requirements.txt"
+      - "data/mkaos-source-register.template.tsv"
+      - "docs/model-provenance.template.json"
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
