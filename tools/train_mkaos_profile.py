@@ -35,6 +35,11 @@ def load_profile(path: Path) -> dict:
     expected = profile.get("expected_parameter_count")
     if type(expected) is not int or expected != actual:
         raise ValueError(f"parameter count mismatch: profile={expected!r}, computed={actual}")
+    execution_status = profile.get("execution_status", {})
+    if execution_status.get("planning_only") is True or execution_status.get("blocked") is True:
+        blockers = execution_status.get("blockers", [])
+        detail = "; ".join(str(item) for item in blockers) or "profile is not approved for execution"
+        raise ValueError(f"profile is planning-only and blocked: {detail}")
     return profile
 
 
@@ -103,3 +108,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

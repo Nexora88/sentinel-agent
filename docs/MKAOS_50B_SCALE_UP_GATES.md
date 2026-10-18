@@ -1,6 +1,8 @@
 # MKAOS 50B scale-up gates
 
-**Status: architectural target only. No MKAOS 50B checkpoint has been trained.** The current source register has no approved production data and keeps training disabled. The existing trainer is a single-process prototype; it does not implement distributed training, optimizer-state sharding, gradient checkpointing, or a production tokenizer.
+> Historical planning document for the previous 50B target. The active architectural target is now 10B; see [MKAOS 10B scale-up and cloud readiness](MKAOS_10B_SCALE_UP_GATES.md).
+
+**Status: architectural target only. No MKAOS 50B checkpoint has been trained.** The current source register has no approved production data and keeps training disabled.
 
 ## What “50B” means
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan (but do not launch) an MKAOS 50B-from-scratch training run.
+"""Plan (but do not launch) an MKAOS from-scratch training run.
 
 This tool performs estimates only. It never downloads data, loads a corpus into RAM,
 starts training, or bypasses the source/provenance gate in train_mkaos_from_scratch.py.
@@ -77,8 +77,8 @@ def gib(n: int | None) -> float | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target-billions", type=float, default=50.0,
-                        help="Architectural target in billions of parameters (planning only; default 50).")
+    parser.add_argument("--target-billions", type=float, default=10.0,
+                        help="Architectural target in billions of parameters (planning only; default 10).")
     parser.add_argument("--corpus", type=Path, help="Optional existing corpus path; only its file size is read.")
     parser.add_argument("--sequence-length", type=int, default=4096)
     parser.add_argument("--micro-batch-size", type=int, default=1)
@@ -94,27 +94,31 @@ def main() -> int:
     if args.tokens_per_parameter <= 0:
         parser.error("tokens-per-parameter must be positive")
 
-    # 50B is the default architectural target only; this tool does not create or train it.
+    # 10B is the default architectural target only; this tool does not create or train it.
     # Keep vocab fixed to current byte tokenizer to make this estimate comparable.
-    # Approximate width scaling preserves the existing 48-layer shape and rounds
-    # to head multiples; reported count is recomputed from the actual dimensions.
-    raw_width = max(1024, int((args.target_billions * 1_000_000_000 / (48 * 10)) ** 0.5))
-    lower_width = max(1024, (raw_width // 1024) * 1024)
-    width_candidates = (lower_width, lower_width + 1024)
-    width = min(
-        width_candidates,
-        key=lambda candidate: abs(
-            parameter_count(257, candidate, 48, candidate // 128,
-                            max(1, candidate // 1024), int(candidate * 2.6667))
-            - args.target_billions * 1_000_000_000
-        ),
-    )
-    intermediate = int(width * 2.6667)
+    # The 10B profile uses the exact checked-in dimensions; other values use a
+    # rounded 50-layer family and then recompute the true parameter count.
+    if args.target_billions == 10.0:
+        width, layers, intermediate = 4096, 50, 13312
+    else:
+        layers = 50
+        raw_width = max(1024, int((args.target_billions * 1_000_000_000 / (layers * 10)) ** 0.5))
+        lower_width = max(1024, (raw_width // 1024) * 1024)
+        width_candidates = (lower_width, lower_width + 1024)
+        width = min(
+            width_candidates,
+            key=lambda candidate: abs(
+                parameter_count(257, candidate, layers, candidate // 128,
+                                max(1, candidate // 1024), int(candidate * 2.6667))
+                - args.target_billions * 1_000_000_000
+            ),
+        )
+        intermediate = int(width * 2.6667)
     config = {
         "profile": f"mkaos-{args.target_billions:g}b-scratch-target",
         "vocab_size": 257,
         "hidden_size": width,
-        "layers": 48,
+        "layers": layers,
         "heads": width // 128,
         "kv_heads": max(1, width // 1024),
         "intermediate_size": intermediate,
@@ -158,8 +162,8 @@ def main() -> int:
         "limitations": [
             "Memory values are planning estimates, not a fit guarantee; real peak memory can be higher.",
             "Sharding estimate assumes ideal even sharding and does not model communication or replicated state.",
-            "A 50B model needs a distributed-training implementation and substantial accelerator capacity; this repository trainer is not distributed.",
-            "For the requested target, BF16 weights alone at exactly 50B are about 93 GiB (46.6 GiB at 4-bit before scales/runtime); the actual rounded profile above reports memory for its computed parameter count. Full Adam-style training state at exactly 50B is about 745 GiB before activations and sharding.",
+            "Large targets require measured distributed-training capacity; this planner does not prove the trainer or selected hardware can fit the model.",
+            f"For the computed profile, BF16 weights alone are about {gib(bf16_weights_bytes):.2f} GiB; Adam-style training-state estimate is about {gib(training_state_bytes):.2f} GiB before activation, communication and implementation overhead.",
             "The 200 GB file size is not the same as usable, deduplicated training tokens.",
             "Current byte tokenizer means UTF-8 byte count is only a rough upper-bound proxy, not a measured tokenizer token count.",
             "This planner does not read or download corpus contents and does not approve sources or manifests.",
