@@ -22,6 +22,8 @@ MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik t
 
 Yol haritası: [docs/MKAOS_INDEPENDENCE_MILESTONES.md](docs/MKAOS_INDEPENDENCE_MILESTONES.md). Günlük kalite döngüsü, çevrimdışı dayanıklılık ve donanım sürümleri: [MKAOS_DAILY_IMPROVEMENT_AND_EDITIONS.md](docs/MKAOS_DAILY_IMPROVEMENT_AND_EDITIONS.md).
 
+50B mimari hedefi, lisanslı temel model entegrasyonu ve bulut ölçek kapıları: [docs/MKAOS_50B_SCALE_UP_GATES.md](docs/MKAOS_50B_SCALE_UP_GATES.md). Bu hedef eğitilmiş model iddiası değildir; kaynak kayıt defteri eğitim ve model indirme kapılarını kapalı tutar.
+
 ## Native Rust chat integration status
 
 - `POST /api/chat` defaults to `MKAOS_CHAT_BACKEND=native-rust` and invokes the locally packaged Rust CLI without a shell.
@@ -268,3 +270,4 @@ Read the current evidence and contribution policy in [MKAOS Open-Source Readines
 The dependency-free, read-only local checkpoint inspector is `tools/mkaos_hf_adapter_preflight.py`; guide: [HF portability, output guardrails, PEFT and offline operation](docs/MKAOS_HF_PORTABILITY_AND_OFFLINE_SECURITY.md). It does not convert arbitrary `.safetensors` weights into `MKAOSW1`: architecture, tokenizer and numerical parity must be implemented and tested first. Final reasoning output now passes through a narrow local guard that redacts high-confidence credential-shaped strings; this is not a general fact-checker or model-safety certification. Dataset/model license, privacy, attribution and training approval gates remain mandatory.
 
 The Hugging Face architecture decision table and required parity protocol are in [MKAOS HF compatibility matrix](docs/MKAOS_HF_COMPATIBILITY_MATRIX.md). A pinned SmolLM2-135M-Instruct CPU reference smoke workflow is defined at `.github/workflows/mkaos-hf-cpu-smoke.yml`. Its repeat-logit check validates the reference runtime only; it does not claim MKAOSW1 conversion parity. Numerical comparison metrics are implemented in `tools/mkaos_numerical_parity.py`.
+
