@@ -63,6 +63,26 @@ def validate_source_registry(manifest: Any, registry: Any) -> list[str]:
             errors.append(f"Source {source_id!r} has no pinned approved_revision.")
         if not isinstance(source.get("approval_evidence"), str) or not source["approval_evidence"].strip():
             errors.append(f"Source {source_id!r} has no approval_evidence reference.")
+        rights = source.get("rights_review")
+        if not isinstance(rights, dict):
+            errors.append(f"Source {source_id!r} has no source-specific rights_review record.")
+        else:
+            if not isinstance(rights.get("reviewer"), str) or not rights["reviewer"].strip():
+                errors.append(f"Source {source_id!r} rights_review has no human reviewer.")
+            if not isinstance(rights.get("review_date_utc"), str) or not rights["review_date_utc"].strip():
+                errors.append(f"Source {source_id!r} rights_review has no review date.")
+            evidence = rights.get("evidence_urls")
+            if not isinstance(evidence, list) or not evidence or any(
+                not isinstance(item, str) or not item.strip() for item in evidence
+            ):
+                errors.append(f"Source {source_id!r} rights_review needs evidence references.")
+            if rights.get("training_use_decision") not in {"yes", "approved", "allowed"}:
+                errors.append(f"Source {source_id!r} rights_review does not approve training use.")
+            if rights.get("privacy_and_sensitive_content_review") not in {"passed", "approved", "cleared"}:
+                errors.append(f"Source {source_id!r} rights_review has no passed privacy review.")
+            attribution = rights.get("attribution_requirements")
+            if not isinstance(attribution, str) or not attribution.strip() or attribution.strip().lower() in {"required", "unknown", "tbd"}:
+                errors.append(f"Source {source_id!r} rights_review has no reviewed attribution requirements/plan.")
         scope = source.get("training_scope")
         if scope not in {"internal_nonredistributable", "redistributable"}:
             errors.append(

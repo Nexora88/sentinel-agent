@@ -51,6 +51,47 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def model_manifest_summary(path: Path | None) -> dict[str, Any] | None:
+    """Expose allowlisted, non-sensitive model provenance from a supplied manifest."""
+    if path is None or not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return {"parse_status": "invalid_or_unreadable"}
+    if not isinstance(data, dict):
+        return {"parse_status": "not_an_object"}
+    architecture = data.get("architecture")
+    if not isinstance(architecture, dict):
+        architecture = {}
+    result = {"parse_status": "parsed"}
+    for key in ("model_id", "revision", "parameter_count", "precision", "quantization",
+                "context_length", "max_sequence_len", "checkpoint_sha256", "tokenizer_sha256"):
+        value = data.get(key)
+        if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+            result[key] = value
+    result["architecture"] = {
+        key: architecture[key] for key in ("family", "type", "kind", "layers", "num_layers",
+                                           "hidden_size", "vocab_size", "query_heads", "attention_heads",
+                                           "kv_heads", "intermediate_size")
+        if isinstance(architecture.get(key), (str, int, float)) and not isinstance(architecture.get(key), bool)
+    }
+    return result
+
+
+def sample_vram_mib() -> float | None:
+    """Sample total used NVIDIA VRAM; return None when the backend is unavailable."""
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
+            check=True, capture_output=True, text=True, timeout=2,
+        )
+        values = [float(line.strip()) for line in result.stdout.splitlines() if line.strip()]
+        return round(sum(values), 3) if values else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
 def machine_metadata() -> dict[str, Any]:
     result: dict[str, Any] = {
         "platform": platform.platform(),
@@ -246,6 +287,7 @@ def main() -> int:
                 "tokens_per_second": response.get("tokens_per_second"),
                 "model_load_ms": (float(response.get("load_duration", 0) or 0) / 1e6),
                 "server_rss_mib_after_first_request": sample_rss_mib(process.pid),
+                "system_vram_used_mib_after_first_request": sample_vram_mib(),
                 "response_text": response.get("response", ""),
             })
         except Exception as exc:
@@ -261,6 +303,7 @@ def main() -> int:
         for index in range(args.warm_runs):
             prompt = prompts[index % len(prompts)]
             rss_samples: list[float] = []
+            vram_samples: list[float] = []
             stop_sample = threading.Event()
 
             def sample_loop() -> None:
@@ -268,6 +311,9 @@ def main() -> int:
                     value = sample_rss_mib(resident.pid)
                     if value is not None:
                         rss_samples.append(value)
+                    vram = sample_vram_mib()
+                    if vram is not None:
+                        vram_samples.append(vram)
                     stop_sample.wait(0.05)
 
             sampler = threading.Thread(target=sample_loop, daemon=True)
@@ -285,6 +331,7 @@ def main() -> int:
                 "tokens_per_second": response.get("tokens_per_second"),
                 "model_load_ms": float(response.get("load_duration", 0) or 0) / 1e6,
                 "peak_sampled_server_rss_mib": max(rss_samples) if rss_samples else sample_rss_mib(resident.pid),
+                "peak_sampled_system_vram_used_mib": max(vram_samples) if vram_samples else sample_vram_mib(),
                 "response_text": response.get("response", ""),
             })
     except Exception as exc:
@@ -311,6 +358,7 @@ def main() -> int:
             "tokenizer_sha256": sha256_file(args.tokenizer_file) if args.tokenizer_file and args.tokenizer_file.is_file() else None,
             "rustflags": env.get("RUSTFLAGS"), "cargo_profile": env.get("CARGO_PROFILE"),
         },
+        "model_configuration": model_manifest_summary(args.model_manifest),
         "cold_start": {
             "summary": {
                 "startup_to_healthy_ms": summarize(cold_rows, "startup_to_healthy_ms"),

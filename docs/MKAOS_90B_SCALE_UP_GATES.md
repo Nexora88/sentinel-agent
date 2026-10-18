@@ -38,6 +38,8 @@ Every capacity report should state whether the number is measured or calculated,
 
 Use a frozen, versioned evaluation suite with separate Turkish QA, professional code generation, code repair/debugging, factual/source attribution, and safety subsets. Keep prompts, scoring rules, and test examples fixed for a report; disclose sample sizes and evaluator agreement. Report task-level results and common failures alongside aggregate scores.
 
+`tools/evaluate_mkaos_turkish_tasks.py` accepts `coding`, `debugging`, and `source_accuracy` as task categories. Each such case must include `automated_checks: [{"name": "...", "passed": true}]`. A coding/debugging harness must execute generated code in an isolated environment; a separately reviewed citation checker must provide source-accuracy checks. The evaluator records pass rates and prediction hashes but does not execute code or independently verify citations. Reports must retain the exact checkpoint, harness/checker version, and benchmark revision. Do not count an absent check as a pass.
+
 For every real-model performance run record:
 
 - model and tokenizer identifiers and SHA-256 hashes, model architecture/parameter-count definition, and base-model/license details;
@@ -53,8 +55,8 @@ Synthetic weights test engine correctness only. A fallback model's score is not 
 Treat local image understanding, video-frame analysis, and text-to-video generation as separate capabilities and model integrations:
 
 1. Image understanding: document supported formats, maximum input size, local processing behavior, model/license, and image-task evaluation.
-2. Video understanding: define deterministic frame sampling, timestamps, duration/size limits, and frame-to-answer attribution; test on a separate video set. Frame analysis is not full temporal understanding.
-3. Text-to-video: integrate a distinct generation model only after its weights, license, hardware requirements, safety behavior, storage, and offline operation are reviewed. Do not describe slideshow, animation, or image sequences as genuine text-to-video generation.
+2. Video understanding: `analyze_video_frames` is a separate optional adapter that samples deterministic timestamps from a local file and invokes the local image model per frame. It has explicit file-size, duration, frame-count, and frame-size limits. Frame analysis is not full temporal understanding; test on a separate video set.
+3. Text-to-video: `text_to_video` is a distinct adapter contract and accepts only an explicitly marked local backend. No neural text-to-video model is bundled or claimed. Integrate a concrete model only after its weights, license, hardware requirements, safety behavior, storage, and offline operation are reviewed. Do not describe slideshow, animation, or image sequences as genuine text-to-video generation.
 4. Keep each adapter optional and resource-gated; report download/storage requirements and whether any external service is contacted.
 
 ## CI and operating rules

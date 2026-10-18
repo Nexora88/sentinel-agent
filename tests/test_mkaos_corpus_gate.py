@@ -18,6 +18,13 @@ def sample_registry(scope="redistributable", distribution_review="approved"):
             "permitted_use_now": True,
             "approved_revision": "release-1",
             "approval_evidence": "docs/approval-record.md",
+            "rights_review": {
+                "reviewer": "reviewer-1", "review_date_utc": "2026-10-16",
+                "evidence_urls": ["https://example.org/license"],
+                "training_use_decision": "approved",
+                "privacy_and_sensitive_content_review": "passed",
+                "attribution_requirements": "Retain author and source URL in record metadata.",
+            },
             "training_scope": scope,
             "weight_distribution_review": distribution_review,
         }],
@@ -81,6 +88,13 @@ class MkaosCorpusGateTests(unittest.TestCase):
             "permitted_use_now": True,
             "approved_revision": "release-2",
             "approval_evidence": "docs/approval-record-2.md",
+            "rights_review": {
+                "reviewer": "reviewer-2", "review_date_utc": "2026-10-16",
+                "evidence_urls": ["https://example.org/license-2"],
+                "training_use_decision": "approved",
+                "privacy_and_sensitive_content_review": "passed",
+                "attribution_requirements": "No attribution requirement; evidence reviewed.",
+            },
             "training_scope": "redistributable",
             "weight_distribution_review": "approved",
         })
@@ -98,6 +112,16 @@ class MkaosCorpusGateTests(unittest.TestCase):
         self.assertEqual(len(messages), 1)
         self.assertTrue(messages[0].startswith("Source register checks passed"))
         self.assertIn("does not replace independent legal", messages[0])
+
+    def test_approved_source_requires_privacy_attribution_and_rights_evidence(self):
+        registry = sample_registry()
+        registry["sources"][0]["rights_review"]["privacy_and_sensitive_content_review"] = "pending"
+        registry["sources"][0]["rights_review"]["attribution_requirements"] = "unknown"
+        registry["sources"][0]["rights_review"]["evidence_urls"] = []
+        messages = validate_source_registry(sample_manifest(), registry)
+        self.assertTrue(any("no passed privacy review" in error for error in messages))
+        self.assertTrue(any("no reviewed attribution" in error for error in messages))
+        self.assertTrue(any("needs evidence references" in error for error in messages))
 
     def test_owner_authorized_local_experiment_is_explicit_and_nonredistributable(self):
         from core.mkaos_corpus_gate import validate_experimental_local_manifest

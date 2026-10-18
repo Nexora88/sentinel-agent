@@ -1,6 +1,9 @@
 import unittest
+import json
+import tempfile
+from pathlib import Path
 
-from tools.benchmark_mkaos_device import percentile, summarize
+from tools.benchmark_mkaos_device import model_manifest_summary, percentile, summarize
 
 
 class DeviceBenchmarkStatisticsTests(unittest.TestCase):
@@ -19,6 +22,20 @@ class DeviceBenchmarkStatisticsTests(unittest.TestCase):
         self.assertEqual(result["count"], 2)
         self.assertEqual(result["median_ms"], 15)
         self.assertEqual(result["p95_ms"], 19.5)
+
+    def test_model_manifest_summary_includes_parameter_and_runtime_provenance(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            path = Path(directory) / "manifest.json"
+            path.write_text(json.dumps({
+                "model_id": "mkaos-test", "revision": "abc123", "parameter_count": 133194752,
+                "precision": "bf16", "architecture": {"family": "gqa", "layers": 12,
+                                                            "hidden_size": 1024, "vocab_size": 257},
+                "private_path": "must-not-be-copied",
+            }), encoding="utf-8")
+            result = model_manifest_summary(path)
+        self.assertEqual(result["parameter_count"], 133194752)
+        self.assertEqual(result["architecture"]["layers"], 12)
+        self.assertNotIn("private_path", result)
 
 
 if __name__ == "__main__":

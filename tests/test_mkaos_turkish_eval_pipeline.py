@@ -66,6 +66,25 @@ class TurkishTaskEvaluationTests(unittest.TestCase):
                 checkpoint_sha256="b" * 64,
             )
 
+    def test_coding_debugging_and_source_accuracy_need_external_checks(self):
+        rows = [
+            {**self.row("code", "s1", "g1", "coding"),
+             "automated_checks": [{"name": "unit-tests", "passed": True},
+                                  {"name": "lint", "passed": False}]},
+            {**self.row("debug", "s2", "g2", "debugging"),
+             "automated_checks": [{"name": "regression-tests", "passed": True}]},
+            {**self.row("source", "s3", "g3", "source_accuracy"),
+             "automated_checks": [{"name": "citation-match", "passed": True}]},
+        ]
+        report = evaluate(rows, checkpoint_sha256="c" * 64)
+        self.assertEqual(report["automated_checks"], 4)
+        self.assertEqual(report["automated_checks_passed"], 3)
+        self.assertEqual(report["tasks"]["coding"]["automated_check_pass_rate"], 0.5)
+
+    def test_rejects_unverified_code_or_citation_task(self):
+        with self.assertRaisesRegex(ValueError, "requires at least one automated check"):
+            evaluate([self.row("code", "s1", "g1", "coding")], checkpoint_sha256="d" * 64)
+
 
 if __name__ == "__main__":
     unittest.main()

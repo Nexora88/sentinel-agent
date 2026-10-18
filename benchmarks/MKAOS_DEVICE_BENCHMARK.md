@@ -1,6 +1,6 @@
 # MKAOS same-device cold/warm benchmark
 
-Use `tools/benchmark_mkaos_device.py` on the physical machine that will run MKAOS. The script launches a fresh server for each cold trial, then starts one resident server for warm requests. It writes raw outputs, latency samples, sampled RSS, artifact hashes, hardware details and the Git revision into a JSON report.
+Use `tools/benchmark_mkaos_device.py` on the physical machine that will run MKAOS. The script launches a fresh server for each cold trial, then starts one resident server for warm requests. It writes raw outputs, latency samples, sampled RSS/available NVIDIA VRAM, artifact hashes, selected model configuration fields (including parameter count when present), hardware details and the Git revision into a JSON report. VRAM is sampled system-wide and may include other GPU workloads; a missing sample is reported as unavailable, never as zero.
 
 ## Example
 

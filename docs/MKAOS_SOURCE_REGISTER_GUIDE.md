@@ -13,9 +13,13 @@ Copy this file outside the repository for working records if source URLs, review
 - `acquired_at_utc`: ISO-8601 UTC acquisition time.
 - `license_id`: exact licence identifier/version; use `UNKNOWN` until verified.
 - `license_evidence_uri`: link or local evidence reference to the actual licence/terms.
+- `attribution_requirement`: `required`, `not-required`, or `unknown`; approved records cannot leave this undecided.
+- `attribution_evidence_uri`: evidence for the attribution decision and the retained attribution plan/records.
 - `training_permission`: `yes`, `no`, or `unknown` based on reviewed evidence, not guesswork.
 - `redistribution_permission`: `yes`, `no`, or `unknown`; separate from training permission.
 - `privacy_review`: `passed`, `blocked`, or `not-reviewed`.
+- `privacy_evidence_uri`: evidence for the source-specific privacy review; required for approval.
+- JSON source-registry approvals also require a nested `rights_review` with reviewer, date, evidence references, an affirmative training decision, a passed privacy review, and a concrete attribution requirement/plan. Missing evidence fails closed in the training gate.
 - `reviewer_id`: human reviewer reference, not a public person's full details.
 - `review_date`: ISO date.
 - `decision`: `approved`, `quarantine`, or `rejected`.
@@ -24,7 +28,7 @@ Copy this file outside the repository for working records if source URLs, review
 ## Review rules
 
 1. Review the exact version acquired. A paper's hosting platform does not automatically license its text, cited dataset, code, or figures for model training.
-2. For Turkish-language material, assess the specific collection's terms, copyright status, personal-data risks, and any archive access restrictions. “Publicly accessible” is not the same as “public domain.”
+2. For Turkish-language material, assess the specific collection's terms, copyright status, attribution obligations, personal-data risks, and any archive access restrictions. “Publicly accessible” is not the same as “public domain.”
 3. Record training and redistribution permission separately. Do not infer either from an SPDX label alone.
 4. Keep ambiguous records in quarantine and out of the training manifest.
 5. The reviewer records the decision and evidence; scripts can validate fields but cannot provide legal advice or sign off on behalf of a rights holder.
