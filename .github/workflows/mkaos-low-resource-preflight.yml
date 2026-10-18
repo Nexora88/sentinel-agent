@@ -21,4 +21,4 @@ jobs:
       - name: Compile preflight
         run: python -m py_compile tools/mkaos_local_preflight.py tests/test_mkaos_local_preflight.py
       - name: Test read-only preflight and checkpoint integrity reporting
-        run: python -m unittest tests.test_mkaos_local_preflight -v
+        run: python -m unittest discover -s tests -p test_mkaos_local_preflight.py -v
