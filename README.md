@@ -261,3 +261,13 @@ Read the current evidence and contribution policy in [MKAOS Open-Source Readines
 ## MKAOS yerel sembolik akıl yürütme başlangıcı
 
 Önceden eğitilmiş ağırlık veya ağ çağrısı olmadan çalışan küçük Rust başlangıç çekirdeği `engine/mkaos-inference/LOCAL_REASONING.md` içinde belgelenmiştir. `mkaos-reason` komutu temel aritmetik ve açık `A ise B. A` kuralından tek adımlı çıkarım yapar; genel amaçlı LLM değildir. Test etmek için `cargo test --manifest-path engine/mkaos-inference/Cargo.toml` komutunu çalıştır. Bu yeni çekirdek uygulama sohbet API'sinin model tabanlı yolunu değiştirmez.
+
+## Low-resource local bring-up (new)
+
+Before starting a model or training run, collect a read-only local setup report:
+
+```powershell
+python tools/mkaos_local_preflight.py
+```
+
+This checks disk/RAM visibility, Rust tooling, and configured local checkpoint integrity without downloading data, starting inference, or changing training approval. See [MKAOS low-resource bring-up](docs/MKAOS_LOW_RESOURCE_BRINGUP.md). A passing preflight is not proof of Turkish quality, performance, or network isolation.
