@@ -1,5 +1,9 @@
 import importlib.util
+import json
+import subprocess
+import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -13,11 +17,45 @@ SPEC.loader.exec_module(PLANNER)
 
 
 class MkaosScalePlannerTests(unittest.TestCase):
-    def test_default_target_rounds_to_a_measured_architecture_count(self):
-        target = 50_000_000_000
-        width = 10240
-        actual = PLANNER.parameter_count(257, width, 48, 80, 10, int(width * 2.6667))
-        self.assertLess(abs(actual - target), target * 0.05)
+    def test_10b_target_matches_checked_in_profile_exactly(self):
+        import json
+
+        profile = json.loads((ROOT / "configs" / "mkaos" / "train-10b.json").read_text(encoding="utf-8"))
+        model = profile["model"]
+        actual = PLANNER.parameter_count(
+            257, model["hidden_size"], model["layers"], model["heads"],
+            model["kv_heads"], model["intermediate_size"],
+        )
+        self.assertEqual(actual, 10_068_848_640)
+        self.assertEqual(actual, profile["expected_parameter_count"])
+        self.assertTrue(profile["execution_status"]["planning_only"])
+        self.assertTrue(profile["execution_status"]["blocked"])
+        self.assertFalse(profile["governance"]["default_training_enabled"])
+
+    def test_training_runner_rejects_blocked_10b_profile(self):
+        import json
+        from tools.train_mkaos_profile import load_profile
+
+        profile = json.loads((ROOT / "configs" / "mkaos" / "train-10b.json").read_text(encoding="utf-8"))
+        actual = PLANNER.parameter_count(
+            257, profile["model"]["hidden_size"], profile["model"]["layers"],
+            profile["model"]["heads"], profile["model"]["kv_heads"],
+            profile["model"]["intermediate_size"],
+        )
+        profile["expected_parameter_count"] = actual
+        with patch("pathlib.Path.read_text", return_value=json.dumps(profile)):
+            with self.assertRaisesRegex(ValueError, "planning-only and blocked"):
+                load_profile(ROOT / "configs" / "mkaos" / "train-10b.json")
+
+    def test_default_scale_target_is_10b(self):
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "plan_mkaos_scale.py")],
+            check=True, capture_output=True, text=True,
+        )
+        report = json.loads(result.stdout)
+        self.assertEqual(report["architecture"]["profile"], "mkaos-10b-scratch-target")
+        self.assertEqual(report["exact_parameter_count_for_current_implementation"], 10_068_848_640)
+        self.assertIn("training was not started", report["mode"])
 
     def test_estimator_rejects_invalid_architecture(self):
         with self.assertRaises(ValueError):

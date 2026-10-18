@@ -22,7 +22,7 @@ MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik t
 
 Yol haritası: [docs/MKAOS_INDEPENDENCE_MILESTONES.md](docs/MKAOS_INDEPENDENCE_MILESTONES.md). Günlük kalite döngüsü, çevrimdışı dayanıklılık ve donanım sürümleri: [MKAOS_DAILY_IMPROVEMENT_AND_EDITIONS.md](docs/MKAOS_DAILY_IMPROVEMENT_AND_EDITIONS.md).
 
-50B mimari hedefi, lisanslı temel model entegrasyonu ve bulut ölçek kapıları: [docs/MKAOS_50B_SCALE_UP_GATES.md](docs/MKAOS_50B_SCALE_UP_GATES.md). Bu hedef eğitilmiş model iddiası değildir; kaynak kayıt defteri eğitim ve model indirme kapılarını kapalı tutar.
+10B hedefi ve bulut eğitimine hazır olma kapıları: [docs/MKAOS_10B_SCALE_UP_GATES.md](docs/MKAOS_10B_SCALE_UP_GATES.md). Tam parametre sayımlı profil [configs/mkaos/train-10b.json](configs/mkaos/train-10b.json) içindedir; planlama için kilitli ve eğitime kapalıdır. Önceki 50B ve 90B belgeleri tarihsel yol haritasıdır.
 
 ## Native Rust chat integration status
 

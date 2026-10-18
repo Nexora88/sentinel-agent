@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "profile_id": "mkaos-tr-10b-from-scratch-v1",
+  "purpose": "Planning profile only. This is not an executable training job and no 10B checkpoint exists.",
+  "expected_parameter_count": 10068848640,
+  "tokenizer": {
+    "contract": "spec/mkaos-tokenizer-v1.json",
+    "format": "mkaos-byte-v1",
+    "vocab_size": 257,
+    "warning": "Byte-level tokenization is an inefficient temporary prototype for Turkish. A reviewed production subword tokenizer and matching inference runtime are prerequisites."
+  },
+  "model": {
+    "hidden_size": 4096,
+    "layers": 50,
+    "heads": 32,
+    "kv_heads": 4,
+    "intermediate_size": 13312
+  },
+  "training": {
+    "epochs": 1,
+    "batch_size": 1,
+    "sequence_length": 1024,
+    "gradient_accumulation_steps": 256,
+    "learning_rate": 0.00005,
+    "warmup_steps": 2000,
+    "min_learning_rate_ratio": 0.1,
+    "precision": "bf16",
+    "seed": 20261018,
+    "optimizer": "AdamW",
+    "gradient_checkpointing": true,
+    "distributed": true,
+    "optimizer_state_sharding": true,
+    "processes_per_node": 16
+  },
+  "governance": {
+    "source_register": "data/mkaos/source-register.json",
+    "legal_review_required": true,
+    "weight_distribution_review_required": true,
+    "corpus_sha256_required": true,
+    "privacy_review_required": true,
+    "independent_test_required": true,
+    "default_training_enabled": false,
+    "checkpoint_distribution_allowed": false
+  },
+  "execution_status": {
+    "planning_only": true,
+    "blocked": true,
+    "blockers": [
+      "No production source is approved and model_training_allowed remains false.",
+      "The current trainer's memory preflight does not compute safe per-rank memory for a 10B DDP plus optimizer-sharded run.",
+      "No named cloud GPU topology, price cap, data retention plan, or private runner is configured.",
+      "The production tokenizer and a 10B-scale throughput/recovery benchmark are not validated."
+    ]
+  },
+  "hardware": {
+    "accelerator_memory_gib_minimum_per_gpu": 80,
+    "accelerator_count_minimum_planning": 16,
+    "accelerator_memory_gib_recommended_per_gpu": 80,
+    "accelerator_count_recommended": 32,
+    "system_ram_gib_minimum_planning": 1024,
+    "system_ram_gib_recommended": 2048,
+    "persistent_checkpoint_storage_gib_minimum_planning": 2048,
+    "note": "Conservative capacity-planning placeholders, not a validated fit or price estimate. Confirm with a small measured distributed pilot and provider quote."
+  },
+  "caveats": [
+    "The exact count is calculated from the current decoder dimensions; it is not a trained model or a quality claim.",
+    "BF16 weights alone require about 20.1 GB decimal (18.8 GiB); the trainer's simple 16-byte-per-parameter state estimate is about 161.1 GB decimal (150 GiB), before activation/communication/workspace overhead.",
+    "DDP replicates model weights and gradients on each rank. Optimizer-state sharding alone is not FSDP/ZeRO-3 and does not shard model parameters.",
+    "A 20-tokens-per-parameter planning heuristic implies about 201 billion training tokens; it is not a guarantee, corpus-size estimate, or approved data requirement.",
+    "The configured profile is deliberately blocked and must not be used to start training until every named blocker is independently resolved and reviewed."
+  ]
+}
+
