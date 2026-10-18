@@ -69,7 +69,7 @@ jobs:
           }
           with open("artifacts/mkaos-daily-quality-report.json", "w", encoding="utf-8") as f:
               json.dump(report, f, ensure_ascii=False, indent=2)
-              f.write("\n")
+              f.write("\\n")
           PY
       - name: Upload report
         if: always()
@@ -87,15 +87,14 @@ jobs:
             const { owner, repo } = context.repo;
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
             const open = await github.rest.issues.listForRepo({
-              owner, repo, state: 'open', per_page: 100, labels: 'mkaos-daily-quality'
+              owner, repo, state: 'open', per_page: 100
             });
-            if (open.data.some(issue => issue.title === title)) {
+            if (open.data.some(issue => issue.title === title && !issue.pull_request)) {
               core.info('An open daily-quality issue already tracks failures; avoiding duplicates.');
               return;
             }
             await github.rest.issues.create({
               owner, repo, title,
-              labels: ['mkaos-daily-quality'],
               body: [
                 'Daily MKAOS quality/security checks failed.',
                 '',
@@ -104,5 +103,5 @@ jobs:
                 '',
                 'Inspect the failing step and logs, reproduce locally, add a regression test, and propose a reviewed fix in a pull request.',
                 'This automation does not change source files, train a model, bypass source approvals, or merge code automatically.'
-              ].join('\n')
+              ].join('\\n')
             });
