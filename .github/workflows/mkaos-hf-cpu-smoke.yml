@@ -1,12 +1,15 @@
-name: MKAOS Hugging Face CPU reference smoke
+name: MKAOS Hugging Face CPU reference and Rust parity
 
 on:
   workflow_dispatch:
   pull_request:
     paths:
       - "tools/mkaos_hf_cpu_smoke.py"
+      - "tools/mkaos_hf_rust_parity.py"
       - "tools/mkaos_numerical_parity.py"
       - "tests/test_mkaos_numerical_parity.py"
+      - "engine/mkaos-inference/**"
+      - "engine/mkaos-hf-adapter/**"
       - "docs/MKAOS_HF_COMPATIBILITY_MATRIX.md"
       - ".github/workflows/mkaos-hf-cpu-smoke.yml"
 
@@ -16,17 +19,18 @@ permissions:
 jobs:
   hf-reference-cpu:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
       - name: Install pinned CPU inference dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
-          python -m pip install transformers==4.49.0 safetensors==0.5.3
+          python -m pip install transformers==4.49.0 safetensors==0.5.3 numpy==2.1.3
       - name: Test numerical comparison utility
         run: python -m unittest discover -s tests -p test_mkaos_numerical_parity.py -v
       - name: Load pinned model, compare repeat logits, and save reference fixture
@@ -34,11 +38,35 @@ jobs:
           python tools/mkaos_hf_cpu_smoke.py \
             --output artifacts/mkaos-hf-cpu-smoke.json \
             --logits-output artifacts/mkaos-hf-reference-logits.npz
-      - name: Publish metrics and reference logits
+      - name: Download immutable model files for Rust adapter
+        run: |
+          python - <<'PY'
+          from huggingface_hub import snapshot_download
+          snapshot_download(
+              repo_id="HuggingFaceTB/SmolLM2-135M-Instruct",
+              revision="12fd25f77366fa6b3b4b768ec3050bf629380bac",
+              local_dir="artifacts/hf-model",
+              allow_patterns=[
+                  "config.json", "model.safetensors", "tokenizer.json",
+                  "tokenizer_config.json", "special_tokens_map.json",
+                  "generation_config.json", "README.md", "LICENSE",
+              ],
+          )
+          PY
+      - name: Run Rust adapter against identical HF token IDs
+        run: |
+          python tools/mkaos_hf_rust_parity.py \
+            --reference artifacts/mkaos-hf-reference-logits.npz \
+            --model-dir artifacts/hf-model \
+            --report artifacts/mkaos-hf-rust-parity.json \
+            --candidate-output artifacts/mkaos-rust-candidate-logits.npz
+      - name: Publish metrics, reference logits, and Rust candidate logits
         uses: actions/upload-artifact@v4
         with:
-          name: mkaos-hf-cpu-reference-smoke
+          name: mkaos-hf-cpu-reference-and-rust-parity
           path: |
             artifacts/mkaos-hf-cpu-smoke.json
             artifacts/mkaos-hf-reference-logits.npz
+            artifacts/mkaos-hf-rust-parity.json
+            artifacts/mkaos-rust-candidate-logits.npz
           if-no-files-found: error
