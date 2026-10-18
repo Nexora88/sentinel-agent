@@ -63,6 +63,8 @@ jobs:
         run: python -m unittest discover -s tests -p test_mkaos_diagnostics.py -v
       - name: Test native MKAOS Rust inference engine and CLI
         run: cargo test --manifest-path engine/mkaos-inference/Cargo.toml --all-targets
+      - name: Smoke-test reproducible MKAOS release CPU benchmark
+        run: cargo run --release --manifest-path engine/mkaos-inference/Cargo.toml --example mkaos_cpu_bench -- 1 3
       - name: Validate source register fail-closed policy
         run: python tools/validate_mkaos_source_register.py
       - name: Test MKAOS tokenizer contract and artifact hash verification
