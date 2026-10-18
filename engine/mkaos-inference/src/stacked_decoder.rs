@@ -320,6 +320,19 @@ mod tests {
         GqaDecoder::new(GqaConfig{query_heads:q_heads,kv_heads,rms_epsilon:1e-5,rope_theta:10000.0,max_sequence_len:64},weights).unwrap()
     }
     #[test]
+    fn cached_rope_matches_reference_rotation() {
+        let m = model();
+        for pos in 0..8 {
+            let x = Tensor2::new(1, 8, (0..8).map(|i| (i as f32 - 3.0) * 0.17).collect()).unwrap();
+            let expected = apply_rope(&x, m.head_dim, pos, m.config.rope_theta).unwrap();
+            let actual = m.apply_cached_rope(&x, pos).unwrap();
+            for (a, b) in actual.as_slice().iter().zip(expected.as_slice()) {
+                assert!((a - b).abs() < 1e-6, "cached RoPE mismatch at position {pos}: {a} vs {b}");
+            }
+        }
+    }
+
+    #[test]
     fn multi_layer_gqa_cache_advances_once_per_token() {
         let m=model(); let mut cache=KvCache::new(2);
         let first=m.step(1,&mut cache).unwrap();
