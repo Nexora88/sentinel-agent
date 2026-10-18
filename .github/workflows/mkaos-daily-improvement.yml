@@ -69,7 +69,7 @@ jobs:
           }
           with open("artifacts/mkaos-daily-quality-report.json", "w", encoding="utf-8") as f:
               json.dump(report, f, ensure_ascii=False, indent=2)
-              f.write("\\n")
+              f.write("\n")
           PY
       - name: Upload report
         if: always()
@@ -103,5 +103,5 @@ jobs:
                 '',
                 'Inspect the failing step and logs, reproduce locally, add a regression test, and propose a reviewed fix in a pull request.',
                 'This automation does not change source files, train a model, bypass source approvals, or merge code automatically.'
-              ].join('\\n')
+              ].join('\n')
             });
