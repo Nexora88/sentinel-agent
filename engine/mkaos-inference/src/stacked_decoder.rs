@@ -207,12 +207,14 @@ impl GqaDecoder {
             kv.values.extend_from_slice(v.as_slice());
             let mut joined = vec![0.0_f32; self.hidden_size];
             let cached_len = pos + 1;
+            let scale = (self.head_dim as f32).sqrt().recip();
+            // Reuse one score buffer across heads to avoid a heap allocation per head/token.
+            let mut scores = Vec::with_capacity(cached_len);
             for q_head in 0..self.config.query_heads {
                 let kv_head = q_head / (self.config.query_heads / self.config.kv_heads);
                 let q_offset = q_head * self.head_dim;
                 let kv_offset = kv_head * self.head_dim;
-                let mut scores = Vec::with_capacity(cached_len);
-                let scale = (self.head_dim as f32).sqrt().recip();
+                scores.clear();
                 for t in 0..cached_len {
                     let mut dot = 0.0;
                     for j in 0..self.head_dim {
