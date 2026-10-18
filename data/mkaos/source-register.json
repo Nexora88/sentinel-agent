@@ -72,6 +72,50 @@
       "evidence_note": "Candidate only. Do not download the full 426.16 GB package into Git or treat its packaging licence as clearance for all underlying content."
     }
   ],
+  "model_registry": [
+    {
+      "model_id": "Qwen/Qwen3-32B",
+      "publisher": "Qwen",
+      "canonical_url": "https://huggingface.co/Qwen/Qwen3-32B",
+      "revision": null,
+      "declared_license": "Apache-2.0",
+      "parameter_count": 32800000000,
+      "parameter_count_source": "official model card",
+      "status": "candidate_pending_immutable_revision_artifact_hash_and_license_review",
+      "permitted_download_now": false,
+      "permitted_inference_now": false,
+      "permitted_finetuning_now": false,
+      "permitted_redistribution_now": false,
+      "review_required": [
+        "pin an immutable publisher revision and hash the exact config, tokenizer, weights and notices",
+        "review complete license text, notices, model-card terms and applicable restrictions",
+        "confirm the intended private inference or fine-tuning use and any base-weight/adapter redistribution policy",
+        "measure Turkish QA, coding, debugging and source-grounding quality before adoption"
+      ],
+      "evidence_note": "Candidate only; public metadata and a declared license are not a completed project approval."
+    },
+    {
+      "model_id": "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+      "publisher": "Mistral AI",
+      "canonical_url": "https://huggingface.co/mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+      "revision": null,
+      "declared_license": "Apache-2.0",
+      "parameter_count": 24000000000,
+      "parameter_count_source": "official model family/name and published params.json; exact config and revision must be verified",
+      "status": "candidate_pending_immutable_revision_artifact_hash_and_license_review",
+      "permitted_download_now": false,
+      "permitted_inference_now": false,
+      "permitted_finetuning_now": false,
+      "permitted_redistribution_now": false,
+      "review_required": [
+        "pin an immutable publisher revision and hash the exact config, tokenizer, weights and notices",
+        "review complete license text, notices, model-card terms and applicable restrictions",
+        "confirm the intended private inference or fine-tuning use and any base-weight/adapter redistribution policy",
+        "measure Turkish QA, coding, debugging and source-grounding quality before adoption"
+      ],
+      "evidence_note": "Candidate only; public metadata and a declared license are not a completed project approval."
+    }
+  ],
   "current_approved_sources": [],
   "corpus_ready": false,
   "model_training_allowed": false,
@@ -83,3 +127,4 @@
     "training_gate_effect": "no_change_until_source_specific_evidence_is_recorded"
   }
 }
+

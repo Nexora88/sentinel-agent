@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan (but do not launch) an MKAOS 90B-from-scratch training run.
+"""Plan (but do not launch) an MKAOS 50B-from-scratch training run.
 
 This tool performs estimates only. It never downloads data, loads a corpus into RAM,
 starts training, or bypasses the source/provenance gate in train_mkaos_from_scratch.py.
@@ -77,6 +77,8 @@ def gib(n: int | None) -> float | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--target-billions", type=float, default=50.0,
+                        help="Architectural target in billions of parameters (planning only; default 50).")
     parser.add_argument("--corpus", type=Path, help="Optional existing corpus path; only its file size is read.")
     parser.add_argument("--sequence-length", type=int, default=4096)
     parser.add_argument("--micro-batch-size", type=int, default=1)
@@ -85,20 +87,37 @@ def main() -> int:
     parser.add_argument("--tokens-per-parameter", type=float, default=20.0,
                         help="Planning heuristic only, not a guarantee or hard requirement.")
     args = parser.parse_args()
+    if not 1 <= args.target_billions <= 200:
+        parser.error("target-billions must be between 1 and 200")
     if min(args.sequence_length, args.micro_batch_size, args.shards) < 1:
         parser.error("sequence length, micro-batch size, and shards must be positive")
     if args.tokens_per_parameter <= 0:
         parser.error("tokens-per-parameter must be positive")
 
-    # Explicit 90B target profile using the repository's current 257-token byte tokenizer.
+    # 50B is the default architectural target only; this tool does not create or train it.
+    # Keep vocab fixed to current byte tokenizer to make this estimate comparable.
+    # Approximate width scaling preserves the existing 48-layer shape and rounds
+    # to head multiples; reported count is recomputed from the actual dimensions.
+    raw_width = max(1024, int((args.target_billions * 1_000_000_000 / (48 * 10)) ** 0.5))
+    lower_width = max(1024, (raw_width // 1024) * 1024)
+    width_candidates = (lower_width, lower_width + 1024)
+    width = min(
+        width_candidates,
+        key=lambda candidate: abs(
+            parameter_count(257, candidate, 48, candidate // 128,
+                            max(1, candidate // 1024), int(candidate * 2.6667))
+            - args.target_billions * 1_000_000_000
+        ),
+    )
+    intermediate = int(width * 2.6667)
     config = {
-        "profile": "mkaos-90b-scratch-target",
+        "profile": f"mkaos-{args.target_billions:g}b-scratch-target",
         "vocab_size": 257,
-        "hidden_size": 12288,
-        "layers": 59,
-        "heads": 96,
-        "kv_heads": 8,
-        "intermediate_size": 32768,
+        "hidden_size": width,
+        "layers": 48,
+        "heads": width // 128,
+        "kv_heads": max(1, width // 1024),
+        "intermediate_size": intermediate,
         "sequence_length": args.sequence_length,
         "micro_batch_size": args.micro_batch_size,
         "effective_optimizer_shards": args.shards,
@@ -108,6 +127,8 @@ def main() -> int:
         config["vocab_size"], config["hidden_size"], config["layers"],
         config["heads"], config["kv_heads"], config["intermediate_size"],
     )
+    if not 0.8 * args.target_billions <= params / 1e9 <= 1.2 * args.target_billions:
+        parser.error("rounded architecture is outside 20% of target; adjust the planner profile")
     # Baseline full-training-state estimate: weights + gradients + AdamW moments/master state.
     training_state_bytes = params * 16
     per_shard_state_bytes = (training_state_bytes + args.shards - 1) // args.shards
@@ -124,6 +145,7 @@ def main() -> int:
         "mode": "estimate-only; training was not started",
         "architecture": config,
         "exact_parameter_count_for_current_implementation": params,
+        "status": f"architecture_target_only; no {args.target_billions:g}B checkpoint exists or was trained",
         "parameter_count_billions": round(params / 1e9, 4),
         "estimated_f32_checkpoint_gib": gib(f32_checkpoint_bytes),
         "estimated_bf16_weights_gib": gib(bf16_weights_bytes),
@@ -136,11 +158,13 @@ def main() -> int:
         "limitations": [
             "Memory values are planning estimates, not a fit guarantee; real peak memory can be higher.",
             "Sharding estimate assumes ideal even sharding and does not model communication or replicated state.",
-            "A 90B model needs a distributed-training implementation and substantial accelerator capacity.",
+            "A 50B model needs a distributed-training implementation and substantial accelerator capacity; this repository trainer is not distributed.",
+            "For the requested target, BF16 weights alone at exactly 50B are about 93 GiB (46.6 GiB at 4-bit before scales/runtime); the actual rounded profile above reports memory for its computed parameter count. Full Adam-style training state at exactly 50B is about 745 GiB before activations and sharding.",
             "The 200 GB file size is not the same as usable, deduplicated training tokens.",
             "Current byte tokenizer means UTF-8 byte count is only a rough upper-bound proxy, not a measured tokenizer token count.",
             "This planner does not read or download corpus contents and does not approve sources or manifests.",
             "Training remains blocked unless the existing provenance and source-register gates pass.",
+            "Cloud compute, model downloads, and paid services are never provisioned by this planner.",
         ],
     }
     if args.corpus:
@@ -162,3 +186,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

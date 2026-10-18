@@ -16,6 +16,15 @@ class TurkishCorpusSourceRegisterTests(unittest.TestCase):
         self.assertFalse(registry["corpus_ready"])
         self.assertFalse(registry["model_training_allowed"])
         self.assertGreaterEqual(len(registry["sources"]), 3)
+        self.assertEqual(len(registry["model_registry"]), 2)
+        for model in registry["model_registry"]:
+            with self.subTest(model=model["model_id"]):
+                self.assertIsNone(model["revision"])
+                self.assertFalse(model["permitted_download_now"])
+                self.assertFalse(model["permitted_inference_now"])
+                self.assertFalse(model["permitted_finetuning_now"])
+                self.assertFalse(model["permitted_redistribution_now"])
+                self.assertNotEqual(model["status"], "approved")
 
         for source in registry["sources"]:
             with self.subTest(source=source["source_id"]):
@@ -36,3 +45,4 @@ class TurkishCorpusSourceRegisterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
