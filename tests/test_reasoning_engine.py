@@ -5,12 +5,13 @@ from core.reasoning_engine import LocalReasoningEngine
 class FakeModel:
     model_name = "local-test-model"
 
-    def __init__(self):
+    def __init__(self, response_prefix="response"):
         self.calls = []
+        self.response_prefix = response_prefix
 
     def chat(self, prompt, system=None, temperature=None):
         self.calls.append((prompt, system, temperature))
-        return f"response-{len(self.calls)}"
+        return f"{self.response_prefix}-{len(self.calls)}"
 
 
 class ReasoningEngineTests(unittest.TestCase):
@@ -55,6 +56,12 @@ class ReasoningEngineTests(unittest.TestCase):
     def test_empty_task_rejected(self):
         with self.assertRaises(ValueError):
             LocalReasoningEngine(FakeModel()).run("  ")
+
+    def test_final_user_visible_answer_redacts_token_shaped_secret(self):
+        model = FakeModel("ghp_" + "A" * 30)
+        result = LocalReasoningEngine(model, max_passes=1).run("A task")
+        self.assertIn("[REDACTED: possible secret]", result.answer)
+        self.assertIn("github_token:1", result.guard_findings)
 
 
 if __name__ == "__main__":

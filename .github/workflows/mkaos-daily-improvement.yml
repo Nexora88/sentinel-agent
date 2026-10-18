@@ -1,0 +1,120 @@
+name: MKAOS Daily Improvement Loop
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/mkaos-daily-improvement.yml"
+      - "agents/**"
+      - "core/**"
+      - "engine/**"
+      - "scripts/**"
+      - "tests/**"
+      - "tools/**"
+      - "requirements.txt"
+      - "data/mkaos-source-register.template.tsv"
+      - "docs/model-provenance.template.json"
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: mkaos-daily-improvement-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  daily-quality:
+    name: Daily offline, security and runtime checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile project modules
+        run: python -m compileall -q agents core scripts tools web
+      - name: Run offline and hardware profile contracts
+        run: |
+          python -m unittest discover -s tests -p test_runtime_profile.py -v
+          python -m unittest discover -s tests -p test_hardware_backends.py -v
+          python -m unittest discover -s tests -p test_offline_egress_contract.py -v
+          python -m unittest discover -s tests -p test_turkish_quality_contract.py -v
+          python tools/validate_mkaos_source_register.py
+      - name: Run Rust tests and reproducible synthetic CPU benchmark
+        run: |
+          cargo test --manifest-path engine/mkaos-inference/Cargo.toml --all-targets
+          cargo run --release --manifest-path engine/mkaos-inference/Cargo.toml --example mkaos_cpu_bench -- 1 3
+      - name: Run security regression tests
+        run: python -m unittest discover -s tests -v
+      - name: Record daily quality report
+        if: always()
+        env:
+          GH_SHA: ${{ github.sha }}
+          GH_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_EVENT: ${{ github.event_name }}
+          GH_REF: ${{ github.ref }}
+        run: |
+          mkdir -p artifacts
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          report = {
+              "project": "MKAOS",
+              "report_type": "daily-quality-loop",
+              "created_at_utc": datetime.now(timezone.utc).isoformat(),
+              "commit_sha": os.environ.get("GH_SHA"),
+              "workflow_run": os.environ.get("GH_RUN"),
+              "event": os.environ.get("GH_EVENT"),
+              "ref": os.environ.get("GH_REF"),
+              "policy": "checks only; no automatic source edits, model training, or PR merges",
+              "quality_claim": "not established by CI alone"
+          }
+          with open("artifacts/mkaos-daily-quality-report.json", "w", encoding="utf-8") as f:
+              json.dump(report, f, ensure_ascii=False, indent=2)
+              f.write("\n")
+          PY
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkaos-daily-quality-report
+          path: artifacts/mkaos-daily-quality-report.json
+          if-no-files-found: error
+      - name: Open a deduplicated issue if checks fail
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '[MKAOS daily] Quality/security check failed';
+            const { owner, repo } = context.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const open = await github.rest.issues.listForRepo({
+              owner, repo, state: 'open', per_page: 100
+            });
+            if (open.data.some(issue => issue.title === title && !issue.pull_request)) {
+              core.info('An open daily-quality issue already tracks failures; avoiding duplicates.');
+              return;
+            }
+            await github.rest.issues.create({
+              owner, repo, title,
+              body: [
+                'Daily MKAOS quality/security checks failed.',
+                '',
+                `- Commit: ${context.sha}`,
+                `- Run: ${runUrl}`,
+                '',
+                'Inspect the failing step and logs, reproduce locally, add a regression test, and propose a reviewed fix in a pull request.',
+                'This automation does not change source files, train a model, bypass source approvals, or merge code automatically.'
+              ].join('\n')
+            });

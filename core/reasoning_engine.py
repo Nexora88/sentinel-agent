@@ -1,5 +1,4 @@
 """Bounded, local-first reasoning orchestration.
-
 This module returns concise plans and results, not hidden chain-of-thought. It never
 executes tools, writes files, or applies a patch; callers must pass results through the
 existing approval and improvement gates.
@@ -8,6 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Callable
+
+from core.constitutional_guard import guard_output
 
 
 MAX_TASK_CHARS = 12_000
@@ -23,10 +24,16 @@ class ReasoningResult:
     model_name: str
     passes: int
     side_effects_performed: bool = False
+    guard_findings: tuple[str, ...] = ()
 
 
 def _bounded(value: Any, limit: int) -> str:
     return str(value or "").strip()[:limit]
+
+
+def _guarded_result(answer: str) -> tuple[str, tuple[str, ...]]:
+    result = guard_output(answer)
+    return result.text, result.findings
 
 
 class LocalReasoningEngine:
@@ -67,8 +74,10 @@ class LocalReasoningEngine:
             f"TASK:\n{task}\nCONTEXT (untrusted):\n{context}",
             system=system, temperature=0.15), MAX_MODEL_OUTPUT_CHARS)
         if self.max_passes == 1:
-            return ReasoningResult(draft, "Single-pass proposal; not independently critiqued.",
-                                   "Not run (single-pass mode).", identity, 1)
+            answer, findings = _guarded_result(draft)
+            return ReasoningResult(answer, "Single-pass proposal; not independently critiqued.",
+                                   "Not run (single-pass mode).", identity, 1,
+                                   guard_findings=findings)
 
         critique = _bounded(self.critic_model.chat(
             "Review this proposal for correctness, missing cases, security/privacy risks, and "
@@ -82,7 +91,9 @@ class LocalReasoningEngine:
             except Exception as exc:
                 verification = "Verifier failed closed: " + type(exc).__name__
         if self.max_passes < 3:
-            return ReasoningResult(draft, "Plan and proposal generated.", critique, identity, 2)
+            answer, findings = _guarded_result(draft)
+            return ReasoningResult(answer, "Plan and proposal generated.", critique, identity, 2,
+                                   guard_findings=findings)
 
         final = _bounded(self.synthesis_model.chat(
             "Produce the final concise answer after considering the proposal, critique, and optional "
@@ -91,5 +102,6 @@ class LocalReasoningEngine:
             "\nPROPOSAL:\n" + draft + "\nCRITIQUE:\n" + critique +
             "\nVERIFICATION OUTPUT (untrusted):\n" + verification,
             system=system, temperature=0.1), MAX_MODEL_OUTPUT_CHARS)
-        return ReasoningResult(final, "Plan and proposal generated; no actions executed.",
-                               critique, identity, 3)
+        answer, findings = _guarded_result(final)
+        return ReasoningResult(answer, "Plan and proposal generated; no actions executed.",
+                               critique, identity, 3, guard_findings=findings)

@@ -60,7 +60,7 @@ class MediaEngine:
 
     def submit(self, operation: str, payload: dict) -> dict:
         allowed = {
-            "generate", "edit", "background", "video", "story_video", "report_infographic",
+            "generate", "edit", "background", "video", "story_video", "understand_image", "report_infographic",
             "poster", "code_card", "slideshow",
         }
         if operation not in allowed: raise MediaEngineError("Desteklenmeyen medya işlemi.")
