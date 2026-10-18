@@ -10,7 +10,11 @@ class ConstitutionalGuardTests(unittest.TestCase):
         self.assertIn("github_token:1", result.findings)
 
     def test_redacts_private_key_block(self):
-        value = "-----BEGIN PRIVATE KEY-----\nsecret-material\n-----END PRIVATE KEY-----"
+        # Assemble the sentinel at runtime so repository secret scanners do not
+        # mistake this synthetic regression fixture for a committed private key.
+        begin = "-----BEGIN " + "PRIVATE KEY-----"
+        end = "-----END " + "PRIVATE KEY-----"
+        value = begin + "\nsecret-material\n" + end
         result = guard_output(value)
         self.assertNotIn("secret-material", result.text)
         self.assertIn("private_key_block:1", result.findings)
