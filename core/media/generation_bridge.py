@@ -13,6 +13,10 @@ class GenerationBridge:
         # Always offer offline canvas if nothing else configured
         if not any(getattr(a, "name", "") == "local-canvas" for a in self.adapters):
             self.adapters.append(LocalCanvasAdapter())
+        if not any(getattr(a, "name", "") == LocalVideoFrameAnalysisAdapter.name for a in self.adapters):
+            self.adapters.append(LocalVideoFrameAnalysisAdapter())
+        if not any(getattr(a, "name", "") == TextToVideoAdapter.name for a in self.adapters):
+            self.adapters.append(TextToVideoAdapter())
 
     def capabilities(self) -> dict:
         return {
@@ -150,6 +154,100 @@ class LocalCanvasAdapter:
         if operation == "report_infographic":
             return canvas.poster("Rapor", payload.get("report_text") or payload.get("body", ""))
         raise RuntimeError("local-canvas bu işlemi desteklemiyor.")
+
+
+class LocalVideoFrameAnalysisAdapter:
+    """Analyze bounded, deterministically sampled frames with the local vision adapter."""
+    name = "local-video-frame-analysis"
+
+    def __init__(self, vision: LocalVisionAdapter | None = None, *, ffmpeg: str | None = None,
+                 ffprobe: str | None = None):
+        import shutil
+        self.vision = vision or LocalVisionAdapter()
+        self.ffmpeg = ffmpeg or shutil.which("ffmpeg")
+        self.ffprobe = ffprobe or shutil.which("ffprobe")
+
+    def capabilities(self) -> dict:
+        enabled = bool(self.ffmpeg and self.ffprobe and self.vision.capabilities().get("enabled"))
+        return {"name": self.name, "enabled": enabled,
+                "operations": ["analyze_video_frames"] if enabled else [],
+                "mode": "sampled_frames_only" if enabled else "unavailable",
+                "policy": "local video file, ffmpeg, and explicitly configured local vision model; no public fallback"}
+
+    def execute(self, operation: str, payload: dict) -> dict:
+        import subprocess
+        from pathlib import Path
+        if operation != "analyze_video_frames" or not self.capabilities()["enabled"]:
+            raise RuntimeError("Yerel video-kare analiz adaptörü hazır değil.")
+        video = Path(str(payload.get("video_path", ""))).resolve()
+        allowed_roots = [Path("./memory/uploads").resolve(), Path("./memory/videos").resolve()]
+        if not video.is_file() or not any(root == video or root in video.parents for root in allowed_roots):
+            raise RuntimeError("Video yalnızca izin verilen yerel medya dizinlerinden okunabilir.")
+        if video.stat().st_size > 100 * 1024 * 1024:
+            raise RuntimeError("Video 100 MB sınırını aşıyor.")
+        try:
+            probe = subprocess.run([self.ffprobe, "-v", "error", "-show_entries", "format=duration",
+                                    "-of", "default=noprint_wrappers=1:nokey=1", str(video)],
+                                   capture_output=True, text=True, timeout=10, check=True)
+            duration = float(probe.stdout.strip())
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            raise RuntimeError("Video süresi okunamadı.") from exc
+        if not 0 < duration <= 300:
+            raise RuntimeError("Video süresi 0 ile 300 saniye arasında olmalıdır.")
+        try:
+            count = int(payload.get("frame_count", 6))
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("frame_count 1 ile 12 arasında tam sayı olmalıdır.") from exc
+        if not 1 <= count <= 12:
+            raise RuntimeError("frame_count 1 ile 12 arasında olmalıdır.")
+        timestamps = [duration * (i + 0.5) / count for i in range(count)]
+        frames = []
+        for timestamp in timestamps:
+            try:
+                result = subprocess.run([self.ffmpeg, "-v", "error", "-ss", f"{timestamp:.3f}",
+                                         "-i", str(video), "-frames:v", "1", "-f", "image2pipe",
+                                         "-vcodec", "png", "pipe:1"], capture_output=True, timeout=20, check=True)
+            except (OSError, subprocess.SubprocessError) as exc:
+                raise RuntimeError("Yerel video karesi çıkarılamadı.") from exc
+            if not result.stdout or len(result.stdout) > 12 * 1024 * 1024:
+                raise RuntimeError("Video karesi boş veya 12 MB sınırını aşıyor.")
+            answer = self.vision.execute("understand_image", {
+                "image_bytes": result.stdout,
+                "prompt": f"Bu video karesini Türkçe açıkla. Zaman damgası {timestamp:.2f} saniye. "
+                          "Yalnızca karede görülenleri belirt; video boyunca hareket hakkında çıkarım yapma. "
+                          + str(payload.get("prompt", "") or "")[:1000],
+            })
+            frames.append({"timestamp_seconds": round(timestamp, 3), "analysis": answer.get("text", "")})
+        return {"success": True, "mode": "sampled_frame_analysis_not_full_temporal_understanding",
+                "frame_count": len(frames), "duration_seconds": round(duration, 3), "frames": frames,
+                "model": self.vision.model}
+
+
+class TextToVideoAdapter:
+    """Contract for a separately installed, explicitly local text-to-video model."""
+    name = "self-hosted-text-to-video"
+
+    def __init__(self, backend=None):
+        self.backend = backend
+
+    def capabilities(self) -> dict:
+        available = bool(self.backend and getattr(self.backend, "local_only", False)
+                         and callable(getattr(self.backend, "generate_video", None)))
+        return {"name": self.name, "enabled": available,
+                "operations": ["text_to_video"] if available else [],
+                "mode": "neural_text_to_video" if available else "unavailable",
+                "policy": "separate local model integration; storyboard/slideshow is not text-to-video"}
+
+    def execute(self, operation: str, payload: dict) -> dict:
+        if operation != "text_to_video" or not self.capabilities()["enabled"]:
+            raise RuntimeError("Ayrı yerel metinden video modeli yapılandırılmamış.")
+        prompt = str(payload.get("prompt", "")).strip()
+        if not prompt or len(prompt) > 2000:
+            raise RuntimeError("Video istemi 1 ile 2000 karakter arasında olmalıdır.")
+        duration = float(payload.get("duration_seconds", 4))
+        if not 1 <= duration <= 20:
+            raise RuntimeError("Video süresi 1 ile 20 saniye arasında olmalıdır.")
+        return self.backend.generate_video(prompt=prompt, duration_seconds=duration)
 
 
 class ImageGeneratorAdapter:

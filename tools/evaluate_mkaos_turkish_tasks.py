@@ -20,7 +20,9 @@ from typing import Any
 REQUIRED = ("case_id", "task", "prompt", "reference", "prediction",
             "source_id", "document_group", "human_review", "split")
 ALLOWED_TASKS = {"instruction_following", "reading_comprehension", "summarization",
-                 "grammar", "factuality", "safety", "general_knowledge"}
+                 "grammar", "factuality", "safety", "general_knowledge",
+                 "coding", "debugging", "source_accuracy"}
+CHECKED_TASKS = {"coding", "debugging", "source_accuracy"}
 
 
 def norm(value: str) -> str:
@@ -42,6 +44,8 @@ def evaluate(rows: list[dict[str, Any]], *, checkpoint_sha256: str) -> dict[str,
     exact = nonempty = 0
     human_scores: list[int] = []
     output_hashes: list[str] = []
+    automated_checks = 0
+    automated_checks_passed = 0
     for i, row in enumerate(rows, 1):
         missing = [key for key in REQUIRED if not isinstance(row.get(key), str) or not row[key].strip()]
         if missing:
@@ -56,6 +60,21 @@ def evaluate(rows: list[dict[str, Any]], *, checkpoint_sha256: str) -> dict[str,
             errors.append(f"row {i}: human_review must be approved")
         if row["task"] not in ALLOWED_TASKS:
             errors.append(f"row {i}: unsupported task category")
+        checks = row.get("automated_checks", [])
+        if not isinstance(checks, list):
+            errors.append(f"row {i}: automated_checks must be a list")
+            checks = []
+        valid_checks = []
+        for check_index, check in enumerate(checks, 1):
+            if (not isinstance(check, dict) or not isinstance(check.get("name"), str)
+                    or not check["name"].strip() or not isinstance(check.get("passed"), bool)):
+                errors.append(f"row {i}: automated_checks[{check_index}] requires a name and boolean passed")
+                continue
+            valid_checks.append(check)
+            automated_checks += 1
+            automated_checks_passed += int(check["passed"])
+        if row["task"] in CHECKED_TASKS and not valid_checks:
+            errors.append(f"row {i}: {row['task']} requires at least one automated check result")
         if not row["prediction"].strip():
             errors.append(f"row {i}: empty prediction")
         source_splits[row["source_id"]].add(row["split"])
@@ -64,7 +83,11 @@ def evaluate(rows: list[dict[str, Any]], *, checkpoint_sha256: str) -> dict[str,
         is_exact = bool(ref) and ref == pred
         exact += int(is_exact)
         nonempty += int(bool(pred))
-        item: dict[str, Any] = {"exact_match": is_exact, "prediction_nonempty": bool(pred)}
+        item: dict[str, Any] = {
+            "exact_match": is_exact, "prediction_nonempty": bool(pred),
+            "automated_checks": len(valid_checks),
+            "automated_checks_passed": sum(int(check["passed"]) for check in valid_checks),
+        }
         score = row.get("human_score")
         if score is not None:
             if not isinstance(score, int) or isinstance(score, bool) or not 0 <= score <= 4:
@@ -91,6 +114,13 @@ def evaluate(rows: list[dict[str, Any]], *, checkpoint_sha256: str) -> dict[str,
             "nonempty_prediction_rate": sum(v["prediction_nonempty"] for v in values) / len(values),
             "human_scored_cases": len(scores),
             "human_score_mean_0_to_4": sum(scores) / len(scores) if scores else None,
+            "automated_checks": sum(v["automated_checks"] for v in values),
+            "automated_checks_passed": sum(v["automated_checks_passed"] for v in values),
+            "automated_check_pass_rate": (
+                sum(v["automated_checks_passed"] for v in values)
+                / sum(v["automated_checks"] for v in values)
+                if sum(v["automated_checks"] for v in values) else None
+            ),
         }
     return {
         "schema_version": 1,
@@ -100,6 +130,9 @@ def evaluate(rows: list[dict[str, Any]], *, checkpoint_sha256: str) -> dict[str,
         "nonempty_prediction_rate": nonempty / len(rows),
         "human_scored_cases": len(human_scores),
         "human_score_mean_0_to_4": sum(human_scores) / len(human_scores) if human_scores else None,
+        "automated_checks": automated_checks,
+        "automated_checks_passed": automated_checks_passed,
+        "automated_check_pass_rate": automated_checks_passed / automated_checks if automated_checks else None,
         "tasks": task_summary,
         "prediction_sha256": output_hashes,
         "raw_prompts_references_predictions_in_report": False,
@@ -108,6 +141,7 @@ def evaluate(rows: list[dict[str, Any]], *, checkpoint_sha256: str) -> dict[str,
             "Exact match is unsuitable as a sole measure for open-ended generation.",
             "Human scores require independent reviewers and the published rubric in docs/MKAOS_HUMAN_EVALUATION_PROTOCOL.md.",
             "This script validates supplied labels and split metadata; it cannot establish that a checkpoint actually produced predictions.",
+            "Coding/debugging check results must come from a sandboxed test harness; source_accuracy checks must come from a separately reviewed citation verifier. This evaluator scores the supplied booleans and does not execute code or verify sources itself.",
             "Record Rust runtime version, checkpoint SHA-256, decoding parameters and evaluator identity alongside this report.",
         ],
     }

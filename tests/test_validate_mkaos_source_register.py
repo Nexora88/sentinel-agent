@@ -27,9 +27,12 @@ class SourceRegisterTests(unittest.TestCase):
             "acquired_at_utc": "2026-10-15T12:00:00Z",
             "license_id": "CC-BY-4.0",
             "license_evidence_uri": "https://example.org/license",
+            "attribution_requirement": "required",
+            "attribution_evidence_uri": "https://example.org/attribution-review",
             "training_permission": "yes",
             "redistribution_permission": "no",
             "privacy_review": "passed",
+            "privacy_evidence_uri": "local-archive://reviews/privacy/src-001",
             "reviewer_id": "reviewer-1",
             "review_date": "2026-10-16",
             "decision": "approved",
@@ -81,6 +84,18 @@ class SourceRegisterTests(unittest.TestCase):
             path = self.write_rows(Path(temp), [row])
             errors, _, _ = validate_register(path)
         self.assertTrue(any("missing license_evidence_uri" in error for error in errors))
+
+    def test_approved_source_requires_attribution_and_privacy_evidence(self) -> None:
+        row = self.valid_row()
+        row["attribution_requirement"] = "unknown"
+        row["attribution_evidence_uri"] = ""
+        row["privacy_evidence_uri"] = ""
+        with tempfile.TemporaryDirectory() as temp:
+            path = self.write_rows(Path(temp), [row])
+            errors, _, _ = validate_register(path)
+        self.assertTrue(any("attribution decision" in error for error in errors))
+        self.assertTrue(any("attribution evidence" in error for error in errors))
+        self.assertTrue(any("privacy review evidence" in error for error in errors))
 
 
 if __name__ == "__main__":

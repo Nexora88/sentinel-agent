@@ -17,11 +17,13 @@ from urllib.parse import urlparse
 FIELDS = (
     "source_id", "source_uri", "source_type", "version_or_snapshot",
     "acquired_at_utc", "license_id", "license_evidence_uri",
+    "attribution_requirement", "attribution_evidence_uri", "privacy_evidence_uri",
     "training_permission", "redistribution_permission", "privacy_review",
     "reviewer_id", "review_date", "decision", "notes",
 )
 PERMISSIONS = {"yes", "no", "unknown"}
 PRIVACY = {"passed", "blocked", "not-reviewed"}
+ATTRIBUTION = {"required", "not-required", "unknown"}
 DECISIONS = {"approved", "quarantine", "rejected"}
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -69,12 +71,17 @@ def validate_register(path: Path) -> tuple[list[str], int, int]:
                     errors.append(f"{prefix}: source_uri must be http(s):// or local-archive://")
                 if row["license_evidence_uri"] and not _valid_uri(row["license_evidence_uri"]):
                     errors.append(f"{prefix}: license_evidence_uri must point to evidence using http(s):// or local-archive://")
+                for evidence_field in ("attribution_evidence_uri", "privacy_evidence_uri"):
+                    if row[evidence_field] and not _valid_uri(row[evidence_field]):
+                        errors.append(f"{prefix}: {evidence_field} must point to evidence using http(s):// or local-archive://")
                 if row["training_permission"] not in PERMISSIONS:
                     errors.append(f"{prefix}: invalid training_permission")
                 if row["redistribution_permission"] not in PERMISSIONS:
                     errors.append(f"{prefix}: invalid redistribution_permission")
                 if row["privacy_review"] not in PRIVACY:
                     errors.append(f"{prefix}: invalid privacy_review")
+                if row["attribution_requirement"] not in ATTRIBUTION:
+                    errors.append(f"{prefix}: invalid attribution_requirement")
                 if row["decision"] not in DECISIONS:
                     errors.append(f"{prefix}: invalid decision")
                 if row["acquired_at_utc"] and not _valid_date(row["acquired_at_utc"], datetime_utc=True):
@@ -90,6 +97,12 @@ def validate_register(path: Path) -> tuple[list[str], int, int]:
                         errors.append(f"{prefix}: approved source requires a reviewed license_id")
                     if not row["license_evidence_uri"]:
                         errors.append(f"{prefix}: approved source requires license evidence")
+                    if row["attribution_requirement"] == "unknown":
+                        errors.append(f"{prefix}: approved source requires an attribution decision")
+                    if not row["attribution_evidence_uri"]:
+                        errors.append(f"{prefix}: approved source requires attribution evidence or a documented not-required decision")
+                    if not row["privacy_evidence_uri"]:
+                        errors.append(f"{prefix}: approved source requires privacy review evidence")
                     if not row["reviewer_id"] or not row["review_date"]:
                         errors.append(f"{prefix}: approved source requires human reviewer and review date")
     except (OSError, UnicodeError, csv.Error) as exc:
@@ -119,3 +132,4 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

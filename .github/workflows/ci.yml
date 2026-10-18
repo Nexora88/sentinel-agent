@@ -37,6 +37,7 @@ jobs:
           python -m unittest discover -s tests -p test_offline_egress_contract.py -v
           python -m unittest discover -s tests -p test_turkish_quality_contract.py -v
           python -m unittest discover -s tests -p test_validate_mkaos_source_register.py -v
+          python -m unittest discover -s tests -p test_mkaos_corpus_gate.py -v
 
   test:
     runs-on: ubuntu-latest
@@ -67,6 +68,13 @@ jobs:
         run: cargo run --release --manifest-path engine/mkaos-inference/Cargo.toml --example mkaos_cpu_bench -- 1 3
       - name: Validate source register fail-closed policy
         run: python tools/validate_mkaos_source_register.py
+      - name: Test MKAOS data audit, Turkish evaluation, and media adapters
+        run: |
+          python -m unittest discover -s tests -p 'test_audit_mkaos_corpus.py' -v
+          python -m unittest discover -s tests -p 'test_mkaos_turkish_eval_pipeline.py' -v
+          python -m unittest discover -s tests -p 'test_local_vision_adapter.py' -v
+          python -m unittest discover -s tests -p 'test_local_video_adapters.py' -v
+          python -m unittest discover -s tests -p 'test_mkaos_device_benchmark.py' -v
       - name: Test MKAOS tokenizer contract and artifact hash verification
         run: |
           python -m unittest discover -s tests -p 'test_mkaos_tokenizer_contract.py' -v
