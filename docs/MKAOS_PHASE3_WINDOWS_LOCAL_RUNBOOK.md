@@ -86,3 +86,27 @@ For every proposed source, preserve its exact revision/URL, acquisition date, li
 ## Exit criteria
 
 Phase 3 is complete only when the native engine runs on the target Windows machine without remote inference, a reproducible baseline evaluation is saved, egress/privacy checks pass with evidence, and all model/checkpoint provenance is recorded. Training remains disabled until the independent source-approval gate is satisfied.
+
+
+## Base-model decision — avoid a false compatibility promise
+
+The first integration target is the smallest real checkpoint already validated against the repository's Rust engine, not an arbitrary model converted by renaming its file. The repository's independence milestone records a pinned SmolLM2-135M reference-parity smoke test; confirm the current lock file, measured hashes, tokenizer/template, and exact tested revision before reusing it. This is a bring-up baseline, not a claim of strong Turkish assistant quality.
+
+Do not label Qwen2.5-Coder-1.5B or Llama-3.2-1B as drop-in MKAOSW models. Model-format conversion alone does not translate architecture or tokenizer. The current native engine uses the MKAOS byte-tokenizer/decoder contract; a different base model requires an explicit architecture and tokenizer implementation, a converter, reference-logit/token-ID parity tests, and end-to-end tests before it can be selected. If the immediate goal is a useful answer on the target PC, compare a separately installed local runner only as a temporary, opt-in baseline; it must not become a hosted API or hidden default dependency.
+
+### Honest performance and hardware target
+
+- Do not promise 1,700 tokens/second. No target-PC measurement currently supports that number; CPU generation speed depends on the exact processor, model, quantization, context, and implementation.
+- The first acceptance target is successful local generation, correct tokenizer/checkpoint loading, no network inference, bounded RAM, and a reproducible Turkish evaluation report—not a marketing speed claim.
+- On 8 GB RAM, begin with a small inference checkpoint and short context. Fine-tuning a 1B–1.5B model on CPU may be impractically slow and memory-constrained; 200 GB disk space does not provide compute or RAM. Do not promise “a few days” without a measured pilot.
+- A 474,498-document count is not sufficient evidence that the corpus is clean or legally usable. Require the exact corpus manifest, SHA-256s, source/revision, license and redistribution terms, privacy/content review, attribution requirements, and human-reviewed samples. Military/cybersecurity material must be assessed source-by-source; do not assume public availability grants training rights.
+
+### Staged implementation
+
+1. **Boot without 503:** verify the already-supported real checkpoint path and Windows executable path. Add a smoke test that distinguishes missing configuration from a genuinely successful local response. Never silently fall back to a remote service.
+2. **Prove the base:** run tokenizer parity, checkpoint hash/shape validation, deterministic generation, RAM/latency/token-per-second measurements, and a held-out Turkish prompt suite. Publish measured results with hardware and revision.
+3. **Expand model compatibility only with evidence:** choose one candidate, implement its actual architecture/tokenizer, and require reference parity before converting it to MKAOSW. Keep model license and redistribution review separate from code compatibility.
+4. **Fine-tune only after approvals:** first run a tiny LoRA/adapter feasibility pilot on a rights-cleared, deduplicated subset and measure peak RAM, time per step, and validation quality. The 474,498-document corpus remains blocked until its source and contents are approved. Keep current_approved_sources empty, corpus_ready false, and model_training_allowed false until that evidence exists.
+5. **Keep safety outside model weights:** use core/reasoning_engine.py for bounded draft/critique/synthesis and deterministic local policy checks for enforceable rules. Treat model outputs as untrusted; test prompt injection, false claims, refusal behavior, and filter bypasses. A reasoning prompt is not a security boundary, and symbolic filters cannot guarantee removal of all bias or manipulation.
+
+**Independence principle:** using an openly licensed pretrained model locally is a practical starting point, not surrendering operational independence. MKAOS still owns the runtime integration, policy enforcement, evaluation, data approvals, and deployment. The long-term fully native path remains viable, but model compatibility and measured performance must be earned by tests—not assumed.
