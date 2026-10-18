@@ -29,11 +29,16 @@ jobs:
           python -m pip install transformers==4.49.0 safetensors==0.5.3
       - name: Test numerical comparison utility
         run: python -m unittest discover -s tests -p test_mkaos_numerical_parity.py -v
-      - name: Load pinned Apache-2.0 metadata model and compare repeat logits on CPU
-        run: python tools/mkaos_hf_cpu_smoke.py --output artifacts/mkaos-hf-cpu-smoke.json
-      - name: Publish metrics only
+      - name: Load pinned model, compare repeat logits, and save reference fixture
+        run: |
+          python tools/mkaos_hf_cpu_smoke.py \
+            --output artifacts/mkaos-hf-cpu-smoke.json \
+            --logits-output artifacts/mkaos-hf-reference-logits.npz
+      - name: Publish metrics and reference logits
         uses: actions/upload-artifact@v4
         with:
           name: mkaos-hf-cpu-reference-smoke
-          path: artifacts/mkaos-hf-cpu-smoke.json
+          path: |
+            artifacts/mkaos-hf-cpu-smoke.json
+            artifacts/mkaos-hf-reference-logits.npz
           if-no-files-found: error
