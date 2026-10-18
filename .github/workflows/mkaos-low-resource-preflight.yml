@@ -1,0 +1,24 @@
+name: MKAOS low-resource preflight tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight-unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile preflight
+        run: python -m py_compile tools/mkaos_local_preflight.py tests/test_mkaos_local_preflight.py
+      - name: Test read-only preflight and checkpoint integrity reporting
+        run: python -m unittest discover -s tests -p test_mkaos_local_preflight.py -v
