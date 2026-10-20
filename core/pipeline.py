@@ -230,7 +230,7 @@ class SentinelPipeline:
             security_findings.append(self.static_code_scanner.format_report(static_result))
         except Exception as e:
             logger.exception("Static analysis failed")
-            security_findings.append(f"## Static analysis (Semgrep)\\nStatus: error\\nNotice: {type(e).__name__}")
+            security_findings.append(f"## Static analysis (Semgrep)\nStatus: error\nNotice: {type(e).__name__}")
 
         report = self.reporter.create_report(
             code_reviews=code_reviews, security_findings=security_findings, repo=repo_name
@@ -248,10 +248,10 @@ class SentinelPipeline:
         self.learner.learn_from_review(review, str(path))
         try:
             static_result = self.static_code_scanner.scan_path(path)
-            security = f"{security}\\n\\n{self.static_code_scanner.format_report(static_result)}"
+            security = f"{security}\n\n{self.static_code_scanner.format_report(static_result)}"
         except Exception as e:
             logger.exception("Static analysis failed for local file")
-            security = f"{security}\\n\\nStatic analysis unavailable: {type(e).__name__}"
+            security = f"{security}\n\nStatic analysis unavailable: {type(e).__name__}"
         report = self.reporter.create_report(
             code_reviews=[review], security_findings=[security], repo="local"
         )
