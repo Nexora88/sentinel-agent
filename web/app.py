@@ -37,6 +37,7 @@ from core.mkaos_native_chat import NativeMkaosUnavailable, generate_native_reply
 from core.tenant_storage import tenant_root, tenant_storage_id
 from core.auth import AuthManager
 from core.billing import BillingError, StripeBilling
+from core.location_data_adapters import (ConsentRequired, Location, ProviderUnavailable, open_meteo_weather_adapter, tomtom_traffic_adapter)
 from core.webauthn_auth import WebAuthnManager, WebAuthnError
 from core.energy_policy import policy_status
 from core.job_bus import job_bus
@@ -215,6 +216,11 @@ class AccountRegistrationRequest(BaseModel):
 class BillingCheckoutRequest(BaseModel):
     email: str
 
+class LocationDataRequest(BaseModel):
+    latitude: float
+    longitude: float
+    location_consent: bool = False
+
 class PasskeyOptionsRequest(BaseModel):
     username: str
 
@@ -372,6 +378,42 @@ async def billing_webhook(request: Request, stripe_signature: Optional[str] = He
         return billing.process_event(event)
     except BillingError as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/location/weather")
+async def location_weather(req: LocationDataRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    if not req.location_consent:
+        raise HTTPException(403, "Hava durumu için konum izni açıkça verilmelidir.")
+    adapter = open_meteo_weather_adapter()
+    try:
+        envelope = await asyncio.to_thread(
+            adapter.get, Location(req.latitude, req.longitude), location_consent=req.location_consent
+        )
+    except ConsentRequired as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except (ProviderUnavailable, ValueError) as exc:
+        raise HTTPException(503, "Hava durumu sağlayıcısı şu anda kullanılamıyor.") from exc
+    return {"kind": envelope.kind, "provider": envelope.provider, "observed_at_utc": envelope.observed_at_utc,
+            "fetched_at_utc": envelope.fetched_at_utc, "freshness": envelope.freshness, "data": envelope.data}
+
+
+@app.post("/api/location/traffic")
+async def location_traffic(req: LocationDataRequest, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    if not req.location_consent:
+        raise HTTPException(403, "Trafik verisi için konum izni açıkça verilmelidir.")
+    adapter = tomtom_traffic_adapter()
+    try:
+        envelope = await asyncio.to_thread(
+            adapter.get, Location(req.latitude, req.longitude), location_consent=req.location_consent
+        )
+    except ConsentRequired as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except (ProviderUnavailable, ValueError) as exc:
+        raise HTTPException(503, "Trafik sağlayıcısı şu anda kullanılamıyor; API anahtarını ve sağlayıcı erişimini kontrol et.") from exc
+    return {"kind": envelope.kind, "provider": envelope.provider, "observed_at_utc": envelope.observed_at_utc,
+            "fetched_at_utc": envelope.fetched_at_utc, "freshness": envelope.freshness, "data": envelope.data}
 
 
 @app.get("/api/webauthn/capabilities")
