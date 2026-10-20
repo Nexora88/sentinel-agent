@@ -17,8 +17,8 @@ class LocalVoiceSafetyTests(unittest.TestCase):
             _model_path("cat")
 
     def test_voice_profiles_have_turkish_display_names_and_style_targets(self):
-        self.assertEqual(VOICE_PROFILES["male"]["name"], "Bora")
-        self.assertEqual(VOICE_PROFILES["female"]["name"], "Defne")
+        self.assertEqual(VOICE_PROFILES["male"]["name"], "Metehan")
+        self.assertEqual(VOICE_PROFILES["female"]["name"], "Gökçe")
         self.assertIn("tok", VOICE_PROFILES["male"]["style"])
         self.assertIn("akıcı", VOICE_PROFILES["female"]["style"])
         self.assertGreater(VOICE_PROFILES["female"]["default_pace"], VOICE_PROFILES["male"]["default_pace"])
