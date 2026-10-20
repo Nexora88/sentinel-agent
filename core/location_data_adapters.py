@@ -96,3 +96,84 @@ class WeatherAdapter(LocationDataAdapter):
 
 class TrafficAdapter(LocationDataAdapter):
     kind = "traffic"
+
+
+def open_meteo_weather_adapter(*, timeout_seconds: float = 5.0) -> WeatherAdapter:
+    """Create a live Open-Meteo adapter (no API key required for ordinary non-commercial use).
+
+    The caller must still obtain location consent. Provider terms and usage limits apply.
+    """
+    import json
+    from urllib.parse import urlencode
+    from urllib.request import Request, urlopen
+
+    if not 0.2 <= timeout_seconds <= 20:
+        raise ValueError("timeout_seconds must be between 0.2 and 20")
+
+    def fetch(location: Location) -> dict[str, Any]:
+        query = urlencode({
+            "latitude": location.latitude,
+            "longitude": location.longitude,
+            "current": "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m",
+            "timezone": "UTC",
+        })
+        request = Request(
+            "https://api.open-meteo.com/v1/forecast?" + query,
+            headers={"Accept": "application/json", "User-Agent": "MKAOS/1.0 location-adapter"},
+        )
+        with urlopen(request, timeout=timeout_seconds) as response:
+            if response.status != 200:
+                raise ProviderUnavailable("Weather provider returned a non-success status.")
+            payload = json.loads(response.read(1_000_001).decode("utf-8"))
+        current = payload.get("current")
+        if not isinstance(current, dict) or len(current) > 32:
+            raise ProviderUnavailable("Weather provider response schema was invalid.")
+        return {
+            "timezone": payload.get("timezone", "UTC"),
+            "current": current,
+            "units": payload.get("current_units", {}),
+        }
+
+    return WeatherAdapter("open-meteo", fetch)
+
+
+def tomtom_traffic_adapter(*, api_key: str | None = None,
+                           timeout_seconds: float = 5.0) -> TrafficAdapter:
+    """Create a live TomTom flow adapter. API key is read at call time and never returned."""
+    import json
+    import os
+    from urllib.parse import urlencode
+    from urllib.request import Request, urlopen
+
+    if not 0.2 <= timeout_seconds <= 20:
+        raise ValueError("timeout_seconds must be between 0.2 and 20")
+
+    def fetch(location: Location) -> dict[str, Any]:
+        secret = (api_key or os.getenv("TOMTOM_API_KEY", "")).strip()
+        if not secret or len(secret) > 512:
+            raise ProviderUnavailable("Traffic provider is not configured.")
+        query = urlencode({
+            "point": f"{location.latitude},{location.longitude}",
+            "unit": "KMPH",
+            "key": secret,
+        })
+        request = Request(
+            "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?" + query,
+            headers={"Accept": "application/json", "User-Agent": "MKAOS/1.0 location-adapter"},
+        )
+        try:
+            with urlopen(request, timeout=timeout_seconds) as response:
+                if response.status != 200:
+                    raise ProviderUnavailable("Traffic provider returned a non-success status.")
+                payload = json.loads(response.read(1_000_001).decode("utf-8"))
+        except Exception as exc:
+            # Do not propagate URLs or provider exception messages: the URL contains the API key.
+            raise ProviderUnavailable("Traffic provider request failed.") from exc
+        flow = payload.get("flowSegmentData")
+        if not isinstance(flow, dict):
+            raise ProviderUnavailable("Traffic provider response schema was invalid.")
+        allowed = ("frc", "currentSpeed", "freeFlowSpeed", "currentTravelTime",
+                   "freeFlowTravelTime", "confidence", "roadClosure")
+        return {key: flow[key] for key in allowed if key in flow}
+
+    return TrafficAdapter("tomtom", fetch)
