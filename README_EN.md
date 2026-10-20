@@ -6,7 +6,8 @@ MKAOS is a standalone project and product identity. Technically, the current imp
 
 ## Core capabilities
 
-- Local chat and coding assistance through a self-hosted Ollama endpoint.
+- Local chat and coding assistance through the native Rust MKAOS CLI; chat remains unavailable (HTTP 503) until a reviewed, trained local checkpoint is supplied. Ollama is not a silent chat fallback.
+- Local semantic RAG through a pre-installed multilingual embedding model with a verified SHA-256 inventory; model weights are never downloaded at runtime.
 - Local knowledge expansion and scheduled research reports with source-oriented review.
 - Security hygiene checks and bounded code/test runs.
 - Improvement proposals and patch drafts; the agent does not silently modify production code or automatically push/merge/deploy changes.
