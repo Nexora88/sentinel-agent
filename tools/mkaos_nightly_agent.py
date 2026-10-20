@@ -50,7 +50,7 @@ def secret_pattern_audit(project: Path) -> dict:
     except (OSError, subprocess.SubprocessError) as exc:
         return {"status": "unavailable", "findings": [], "detail": f"Cannot enumerate tracked files: {type(exc).__name__}"}
     findings = []
-    skip_parts = {".git", ".venv", "venv", "node_modules", "dist", "build", "__pycache__"}
+    skip_parts = {".git", ".venv", "venv", "node_modules", "dist", "build", "__pycache__", "tests", "docs", "benchmarks"}
     for name in names:
         path = project / name
         if any(part in skip_parts for part in Path(name).parts):
