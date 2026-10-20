@@ -236,7 +236,7 @@
           if (data.roadClosure != null) lines.push("Yol kapanışı: " + (data.roadClosure ? "Evet" : "Hayır"));
         }
         lines.push("Gözlem (UTC): " + (payload?.observed_at_utc || "—"));
-        node.textContent = lines.join("\\n");
+        node.textContent = lines.join("\n");
       };
       button.addEventListener("click", () => {
         if (!navigator.geolocation) {
