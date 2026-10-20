@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "default_tier": "local_free",
+  "tiers": {
+    "local_free": {
+      "account_required": false,
+      "remote_model_fallback": false,
+      "local_processing": true,
+      "location_features": "explicit_consent_required",
+      "security_baseline": [
+        "project_allowlist",
+        "least_privilege",
+        "private_security_reports",
+        "no_automatic_main_merge"
+      ]
+    },
+    "team_self_hosted": {
+      "account_required": true,
+      "available_only_when_implemented": true,
+      "features": [
+        "team_roles",
+        "extended_audit_history",
+        "user_controlled_self_hosted_acceleration"
+      ],
+      "may_disable_security_baseline": false,
+      "remote_processing_requires_separate_opt_in": true
+    }
+  },
+  "policy": {
+    "billing_integration_implemented": true,
+    "account_system_implemented": true,
+    "paid_features_are_product_plan_not_runtime_entitlement": true,
+    "do_not_sell_user_data": true
+  }
+}
