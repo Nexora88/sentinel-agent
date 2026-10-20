@@ -277,3 +277,10 @@ The Hugging Face architecture decision table and required parity protocol are in
 
 
 Night Watch zamanlaması, izinli proje denetimi ve gerçek ses/görsel/video motoru durumu: [MKAOS Night Watch, Voice and Media](docs/MKAOS_NIGHT_WATCH_VOICE_MEDIA_STATUS.md).
+
+### Ürün, canlı konum ve otonom onarım aşaması
+
+- [Denetimli kodlama ajanı, hesap/ödeme ve canlı hava durumu-trafik entegrasyonu](docs/MKAOS_SUPERVISED_AGENT_IMPLEMENTATION.md)
+- Hava durumu ve trafik API uçları konum izni ister; veri yanıtında `freshness` alanı `live`, `cached` veya `stale` değerini belirtir.
+- Takım aboneliği isteğe bağlı Stripe yapılandırması gerektirir; yerel/ücretsiz kullanım ve temel güvenlik ücret duvarı arkasına alınmaz.
+- Otomatik onarım döngüsü test kapılarından sonra inceleme PR’ı açabilir; `main` dalına otomatik birleştirme yapmaz.
