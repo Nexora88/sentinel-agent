@@ -27,8 +27,8 @@
     }
   },
   "policy": {
-    "billing_integration_implemented": false,
-    "account_system_implemented": false,
+    "billing_integration_implemented": true,
+    "account_system_implemented": true,
     "paid_features_are_product_plan_not_runtime_entitlement": true,
     "do_not_sell_user_data": true
   }
