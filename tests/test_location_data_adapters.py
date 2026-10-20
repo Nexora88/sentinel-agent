@@ -61,5 +61,26 @@ class LocationDataAdapterTests(unittest.TestCase):
             adapter.get(Location(91, 0), location_consent=True, now=self.now)
 
 
+
+class LiveProviderFactoryTests(unittest.TestCase):
+    def test_weather_factory_uses_consent_contract(self):
+        from core.location_data_adapters import open_meteo_weather_adapter
+        adapter = open_meteo_weather_adapter()
+        with self.assertRaises(ConsentRequired):
+            adapter.get(Location(41.0, 29.0), location_consent=False)
+
+    def test_traffic_factory_does_not_require_key_until_used(self):
+        from core.location_data_adapters import tomtom_traffic_adapter, ProviderUnavailable
+        adapter = tomtom_traffic_adapter(api_key="")
+        with self.assertRaises(ProviderUnavailable):
+            adapter.get(Location(41.0, 29.0), location_consent=True)
+
+    def test_provider_timeout_bounds(self):
+        from core.location_data_adapters import open_meteo_weather_adapter, tomtom_traffic_adapter
+        for factory in (open_meteo_weather_adapter, tomtom_traffic_adapter):
+            with self.subTest(factory=factory.__name__), self.assertRaises(ValueError):
+                factory(timeout_seconds=100)
+
+
 if __name__ == "__main__":
     unittest.main()
