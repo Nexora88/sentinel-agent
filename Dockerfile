@@ -14,8 +14,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt requirements-voice.txt ./
-RUN pip install --no-cache-dir -r requirements-voice.txt
+COPY requirements.txt requirements-voice.txt requirements-media.txt requirements-postgres.txt requirements-semantic.txt ./
+# Resolve every declared feature dependency during image build. Runtime stays offline;
+# model weights remain external, locally supplied artifacts and are never downloaded here.
+RUN pip install --no-cache-dir \
+    -r requirements.txt \
+    -r requirements-voice.txt \
+    -r requirements-media.txt \
+    -r requirements-postgres.txt \
+    -r requirements-semantic.txt
 
 COPY . .
 COPY --from=mkaos-rust-build /src/engine/mkaos-inference/target/release/mkaos-generate /usr/local/bin/mkaos-generate

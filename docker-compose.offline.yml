@@ -4,7 +4,10 @@
 services:
   sentinel:
     environment:
-      SEKA_EMBEDDINGS_PROVIDER: ${SEKA_EMBEDDINGS_PROVIDER:-mkaos-native}
+      SEKA_EMBEDDINGS_PROVIDER: ${SEKA_EMBEDDINGS_PROVIDER:-local-semantic}
+      SEKA_REQUIRE_SEMANTIC_EMBEDDINGS: ${SEKA_REQUIRE_SEMANTIC_EMBEDDINGS:-true}
+      SEKA_LOCAL_EMBEDDING_MODEL_PATH: ${SEKA_LOCAL_EMBEDDING_MODEL_PATH:-/app/models/embeddings/paraphrase-multilingual-MiniLM-L12-v2}
+      SEKA_LOCAL_EMBEDDING_MANIFEST: ${SEKA_LOCAL_EMBEDDING_MANIFEST:-/app/models/embeddings/embedding-manifest.json}
       OLLAMA_BASE_URL: http://ollama:11434
       GITHUB_TOKEN: ""
       GH_TOKEN: ""

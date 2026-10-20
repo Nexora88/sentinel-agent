@@ -1,8 +1,10 @@
 # MKAOS v6.5 — Mustafa Kemal Atatürk Operating System
 
-**Yerel Türkçe ajan işletim sistemi altyapısı.** HTTP sohbet yolu artık varsayılan olarak yerel Rust `mkaos-generate` CLI'ına gider ve onaylı yerel checkpoint yoksa açıkça `503` döndürür; üçüncü taraf SmolLM2'ye sessiz geri dönüş yapılmaz. Ancak henüz onaylı Türkçe korpus, eğitilmiş kullanılabilir MKAOS checkpoint'i veya bağımsız Türkçe kalite kanıtı yoktur. Sentetik CI eğitimi mimari/aktarım testidir; gerçek Türkçe yetenek kanıtı değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
+**MKAOS, bağımsız bir proje ve marka adıdır.** Teknik sınıflandırma açısından mevcut sürüm bir Linux dağıtımı veya işletim sistemi çekirdeği değil; Python/Rust tabanlı, yerel çalışmayı ve insan onayını esas alan ajan, çıkarım, bilgi erişimi ve görev yönetimi platformudur. “Operating System” adı ürün vizyonunu/markasını ifade eder; kernel veya Linux dağıtımı olduğu iddiası değildir.
 
-MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. POST /api/chat varsayılan olarak yerel Rust CLI yolunu kullanır ve model dosyası yoksa hata görünür kalır. RAG varsayılanı çevrimdışı mkaos-native sözcük/karakter n-gram taban çizgisidir. Bu eğitilmiş semantik embedding modeli değildir; eski Ollama embedding sağlayıcısı yalnızca açık opt-in ile kullanılabilir.
+**Yerel Türkçe ajan platformu.** HTTP sohbet yolu artık varsayılan olarak yerel Rust `mkaos-generate` CLI'ına gider ve onaylı yerel checkpoint yoksa açıkça `503` döndürür; üçüncü taraf SmolLM2'ye sessiz geri dönüş yapılmaz. Ancak henüz onaylı Türkçe korpus, eğitilmiş kullanılabilir MKAOS checkpoint'i veya bağımsız Türkçe kalite kanıtı yoktur. Sentetik CI eğitimi mimari/aktarım testidir; gerçek Türkçe yetenek kanıtı değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
+
+MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. POST /api/chat varsayılan olarak yerel Rust CLI yolunu kullanır ve model dosyası yoksa hata görünür kalır. RAG varsayılanı, önceden yerel diske kurulmuş çok dilli semantik embedding modelidir; çalışma sırasında internetten model indirilmez. Model bulunmaz veya SHA-256 envanteri uyuşmazsa semantik RAG başlatılması hata verir; sessizce n-gram veya bulut sağlayıcısına düşmez. N-gram yalnızca açıkça seçilebilen deneysel baseline olarak kalır.
 
 ## Bağımsız çıkarım motoru — aşamalı geçiş
 
@@ -12,17 +14,18 @@ MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik t
 - Docker imajı Rust CLI'ı çok aşamalı derlemeyle paketler. Model ağırlıkları otomatik indirilmez ve depoya dahil edilmez.
 - Şimdilik onaylı Türkçe korpus veya eğitilmiş kullanılabilir checkpoint yoktur. Bu nedenle varsayılan sohbet, checkpoint yapılandırılana kadar açık HTTP 503 döndürür; üçüncü taraf modele sessiz geri dönüş yoktur.
 - Üçüncü taraf SmolLM2 uyumluluk servisi yalnızca açıkça seçilen legacy-third-party-chat Compose profili ile başlatılabilir.
-- RAG varsayılanı çevrimdışı yerel sözcük/karakter n-gram taban çizgisidir; eğitilmiş semantik embedding modeli değildir.
+- RAG varsayılanı, `models/embeddings/paraphrase-multilingual-MiniLM-L12-v2/` altındaki önceden kurulmuş yerel semantik embedding modelidir. Model ağırlıkları depoya eklenmez veya çalışma anında indirilmez; hazırlık adımları için [yerel semantik RAG kurulumu](docs/MKAOS_RAG_SEMANTIC_SETUP.md) belgesine bak.
 
 ### Başlatma
 
-1. .env.example dosyasını .env olarak kopyala.
-2. Onaylı korpusla eğitim ve bağımsız inceleme tamamlandıktan sonra checkpoint'i models/mkaos/model.mkaosw içine yerleştir; eğitim raporundaki SHA-256 değerini MKAOS_NATIVE_SHA256 olarak ayarla. Heads/KV-heads/sequence ayarları checkpoint mimarisiyle eşleşmelidir.
-3. docker compose up --build komutuyla başlat. Checkpoint yokken chat'in 503 dönmesi beklenen fail-closed davranışıdır.
+1. `.env.example` dosyasını `.env` olarak kopyala.
+2. Yerel semantik RAG modelini ve SHA-256 envanterini [kurulum belgesindeki](docs/MKAOS_RAG_SEMANTIC_SETUP.md) adımlarla `models/embeddings/` altına yerleştir. Model yoksa uygulama sessizce n-gram/uzak modele dönmez.
+3. Onaylı korpusla eğitim ve bağımsız inceleme tamamlandıktan sonra checkpoint'i models/mkaos/model.mkaosw içine yerleştir; eğitim raporundaki SHA-256 değerini MKAOS_NATIVE_SHA256 olarak ayarla. Heads/KV-heads/sequence ayarları checkpoint mimarisiyle eşleşmelidir.
+4. `docker compose up --build` komutuyla başlat. Checkpoint yokken sohbetin 503 dönmesi beklenen fail-closed davranışıdır.
 
 Yol haritası: [docs/MKAOS_INDEPENDENCE_MILESTONES.md](docs/MKAOS_INDEPENDENCE_MILESTONES.md). Günlük kalite döngüsü, çevrimdışı dayanıklılık ve donanım sürümleri: [MKAOS_DAILY_IMPROVEMENT_AND_EDITIONS.md](docs/MKAOS_DAILY_IMPROVEMENT_AND_EDITIONS.md).
 
-10B hedefi ve bulut eğitimine hazır olma kapıları: [docs/MKAOS_10B_SCALE_UP_GATES.md](docs/MKAOS_10B_SCALE_UP_GATES.md). Tam parametre sayımlı profil [configs/mkaos/train-10b.json](configs/mkaos/train-10b.json) içindedir; planlama için kilitli ve eğitime kapalıdır. Önceki 50B ve 90B belgeleri tarihsel yol haritasıdır.
+10B sıfırdan eğitim profili yalnızca engelli bir kapasite planıdır; yakın vadeli hedef değildir. Önce küçük model/boru hattı deneyleri ve bağımsız kalite ölçümleri; ihtiyaç ve lisans elverirse sabitlenmiş açık ağırlıklı bir temel model üzerinde LoRA/PEFT denemeleri değerlendirilir. Bu tür bir adaptör, sıfırdan eğitilmiş MKAOS ağırlıkları olarak sunulmaz. 10B hedefi ve bulut eğitimine hazır olma kapıları: [docs/MKAOS_10B_SCALE_UP_GATES.md](docs/MKAOS_10B_SCALE_UP_GATES.md). Tam parametre sayımlı profil [configs/mkaos/train-10b.json](configs/mkaos/train-10b.json) içindedir; planlama için kilitli ve eğitime kapalıdır. Önceki 50B ve 90B belgeleri tarihsel yol haritasıdır.
 
 ## Native Rust chat integration status
 
