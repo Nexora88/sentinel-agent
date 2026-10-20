@@ -92,6 +92,8 @@ pipelines: dict[str, SentinelPipeline] = {}
 night_scheduler: Optional[NightScheduler] = None
 auth = AuthManager()
 billing = StripeBilling()
+_weather_adapter = open_meteo_weather_adapter()
+_traffic_adapter = tomtom_traffic_adapter()
 _encrypt_memory_files = os.getenv("MKAOS_ENCRYPT_MEMORY_FILES", "").strip().lower() in {"1", "true", "yes", "on"}
 CHAT_HISTORY_FILE = Path("./memory/chat_history.enc" if _encrypt_memory_files else "./memory/chat_history.json")
 LEGACY_CHAT_HISTORY_FILE = Path("./memory/chat_history.json")
@@ -385,10 +387,9 @@ async def location_weather(req: LocationDataRequest, authorization: Optional[str
     get_user(authorization)
     if not req.location_consent:
         raise HTTPException(403, "Hava durumu için konum izni açıkça verilmelidir.")
-    adapter = open_meteo_weather_adapter()
     try:
         envelope = await asyncio.to_thread(
-            adapter.get, Location(req.latitude, req.longitude), location_consent=req.location_consent
+            _weather_adapter.get, Location(req.latitude, req.longitude), location_consent=req.location_consent
         )
     except ConsentRequired as exc:
         raise HTTPException(403, str(exc)) from exc
@@ -403,10 +404,9 @@ async def location_traffic(req: LocationDataRequest, authorization: Optional[str
     get_user(authorization)
     if not req.location_consent:
         raise HTTPException(403, "Trafik verisi için konum izni açıkça verilmelidir.")
-    adapter = tomtom_traffic_adapter()
     try:
         envelope = await asyncio.to_thread(
-            adapter.get, Location(req.latitude, req.longitude), location_consent=req.location_consent
+            _traffic_adapter.get, Location(req.latitude, req.longitude), location_consent=req.location_consent
         )
     except ConsentRequired as exc:
         raise HTTPException(403, str(exc)) from exc
