@@ -216,8 +216,27 @@
       const weatherBox = document.getElementById("location-weather-result");
       const trafficBox = document.getElementById("location-traffic-result");
       const render = (node, payload) => {
-        const freshness = payload && payload.freshness ? "[" + payload.freshness.toUpperCase() + "] " : "";
-        node.textContent = freshness + JSON.stringify(payload, null, 2);
+        const labels = { live: "CANLI", cached: "ÖNBELLEK", stale: "ESKİ VERİ" };
+        const freshness = labels[payload?.freshness] || "GÜNCELLİK BİLİNMİYOR";
+        const data = payload?.data || {};
+        const current = data.current || data;
+        const lines = [freshness, "Sağlayıcı: " + (payload?.provider || "—")];
+        if (payload?.kind === "weather") {
+          if (current.temperature_2m != null) lines.push("Sıcaklık: " + current.temperature_2m + " °C");
+          if (current.apparent_temperature != null) lines.push("Hissedilen: " + current.apparent_temperature + " °C");
+          if (current.relative_humidity_2m != null) lines.push("Nem: %" + current.relative_humidity_2m);
+          if (current.wind_speed_10m != null) lines.push("Rüzgâr: " + current.wind_speed_10m + " km/sa");
+          if (current.precipitation != null) lines.push("Yağış: " + current.precipitation + " mm");
+          if (current.weather_code != null) lines.push("Hava kodu: " + current.weather_code);
+        } else {
+          if (data.currentSpeed != null) lines.push("Mevcut hız: " + data.currentSpeed + " km/sa");
+          if (data.freeFlowSpeed != null) lines.push("Akıcı trafik hızı: " + data.freeFlowSpeed + " km/sa");
+          if (data.currentTravelTime != null) lines.push("Tahmini geçiş: " + data.currentTravelTime + " sn");
+          if (data.confidence != null) lines.push("Güven: %" + Math.round(Number(data.confidence) * 100));
+          if (data.roadClosure != null) lines.push("Yol kapanışı: " + (data.roadClosure ? "Evet" : "Hayır"));
+        }
+        lines.push("Gözlem (UTC): " + (payload?.observed_at_utc || "—"));
+        node.textContent = lines.join("\\n");
       };
       button.addEventListener("click", () => {
         if (!navigator.geolocation) {
