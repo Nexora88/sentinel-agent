@@ -2,6 +2,7 @@
 
 ## Implemented in this change
 
+- `web/templates/index.html`: a Hava + Trafik panel requests browser geolocation only after a user click, calls the consent-gated endpoints, and renders human-readable readings with a visible freshness label.
 - `core/location_data_adapters.py`: consent-gated Open-Meteo weather and TomTom traffic adapters. Coordinates are validated; requests have bounded timeouts; responses are timestamped and carry `live`, `cached`, or `stale` freshness. The web API exposes `POST /api/location/weather` and `POST /api/location/traffic`. Weather needs no key for ordinary Open-Meteo usage; traffic requires `TOMTOM_API_KEY`. Review provider terms, quotas and local privacy requirements before deployment.
 - `core/billing.py`: optional Stripe Checkout subscription creation, timestamped HMAC webhook verification, idempotent event handling and a local entitlement ledger. The API exposes `POST /api/billing/checkout`, `POST /api/billing/webhook`, and `GET /api/billing/status`. No card details are stored by MKAOS. Set Stripe keys, price ID and HTTPS return URLs in the deployment environment; no secrets belong in the repository. A valid signed Stripe event is required to update entitlements.
 - `POST /api/accounts/register`: invite-only account creation using `MKAOS_TEAM_INVITE_TOKEN`; passwords must be at least 14 characters. Existing login and passkey paths remain in place. Local/free operation does not require creating a team account.
