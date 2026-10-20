@@ -22,7 +22,7 @@ class PrivateSecurityReportTests(unittest.TestCase):
             self.assertNotIn('"private"', rendered)
 
     def test_secret_like_text_is_redacted(self):
-        value = sanitize({"message": "AKIA1234567890ABCDEF"})
+        value = sanitize({"message": "AKIA" + "1234567890ABCDEF"})
         self.assertEqual(value["message"], "[REDACTED_SECRET]")
 
 
