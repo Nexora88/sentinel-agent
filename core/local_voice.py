@@ -21,6 +21,11 @@ VOICE_MODELS = {
     "male": os.getenv("SEKA_VOICE_MALE_MODEL", "tr_TR-fettah-medium.onnx"),
     "female": os.getenv("SEKA_VOICE_FEMALE_MODEL", "tr_TR-dfki-medium.onnx"),
 }
+# Product display names and style targets; the installed voice model determines the actual timbre.
+VOICE_PROFILES = {
+    "male": {"name": "Bora", "style": "tok, sakin, bilge ve güven veren", "default_pace": 0.96},
+    "female": {"name": "Defne", "style": "sıcak, net, akıcı ve enerjik", "default_pace": 1.04},
+}
 
 
 class LocalVoiceError(RuntimeError):
@@ -49,6 +54,9 @@ def voice_status() -> dict:
         "whisper_available": (shutil.which(WHISPER_BIN) is not None and bool(WHISPER_MODEL and Path(WHISPER_MODEL).is_file())) or (__import__("importlib.util").util.find_spec("faster_whisper") is not None and Path(FASTER_WHISPER_MODEL).is_dir()),
         "voices": {
             key: {
+                "name": VOICE_PROFILES[key]["name"],
+                "style_target": VOICE_PROFILES[key]["style"],
+                "default_pace": VOICE_PROFILES[key]["default_pace"],
                 "configured": (VOICE_DIR / filename).is_file()
                     and (VOICE_DIR / filename).with_suffix(Path(filename).suffix + ".json").is_file(),
                 "file": filename,
