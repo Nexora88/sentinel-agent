@@ -71,8 +71,19 @@ class LocationDataAdapter:
             if not isinstance(payload, dict):
                 raise TypeError("Provider must return a dictionary")
             stamp = current.isoformat()
+            observed = payload.get("observed_at_utc")
+            if not isinstance(observed, str):
+                current_payload = payload.get("current")
+                observed = current_payload.get("time") if isinstance(current_payload, dict) else None
+            if isinstance(observed, str):
+                try:
+                    observed = _parse_timestamp(observed + ("Z" if "T" in observed and "+" not in observed and not observed.endswith("Z") else "")).isoformat()
+                except (TypeError, ValueError):
+                    observed = stamp
+            else:
+                observed = stamp
             envelope = DataEnvelope(
-                kind=self.kind, provider=self.provider_name, observed_at_utc=stamp,
+                kind=self.kind, provider=self.provider_name, observed_at_utc=observed,
                 fetched_at_utc=stamp, freshness="live", data=payload,
             )
             self._cache = envelope
@@ -130,6 +141,7 @@ def open_meteo_weather_adapter(*, timeout_seconds: float = 5.0) -> WeatherAdapte
             raise ProviderUnavailable("Weather provider response schema was invalid.")
         return {
             "timezone": payload.get("timezone", "UTC"),
+            "observed_at_utc": current.get("time"),
             "current": current,
             "units": payload.get("current_units", {}),
         }
