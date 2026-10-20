@@ -27,6 +27,7 @@
         <button class="nav-btn" data-panel="docs">Belgeler</button>
         <button class="nav-btn" data-panel="finance">Finans</button>
         <button class="nav-btn" data-panel="discover">Keşif</button>
+        <button class="nav-btn" data-panel="location">Hava + Trafik</button>
         <button class="nav-btn" data-panel="legacy">Yedek</button>
         <button class="nav-btn" data-panel="image">Medya Stüdyosu</button>
         <button class="nav-btn" data-panel="control">Egemenlik Kontrol Odası</button>
@@ -179,6 +180,21 @@
         <div id="gh-repos" class="gh-repos"></div>
       </section>
 
+      <section id="panel-location" class="panel">
+        <header class="panel-header">
+          <h1>Canlı Hava Durumu + Trafik</h1>
+          <p>Konumun yalnızca butona bastıktan ve tarayıcı izni verdikten sonra bu istekte kullanılır. Veriler canlı değilse durum etiketi gösterilir.</p>
+        </header>
+        <div class="universe-actions">
+          <button id="location-data-load" class="primary" type="button">Konum izni ver ve verileri getir</button>
+        </div>
+        <p id="location-data-status" role="status" aria-live="polite">Henüz konum isteği yapılmadı.</p>
+        <div class="universe-stats">
+          <div class="stat-card"><span class="stat-label">Hava durumu</span><pre id="location-weather-result" class="status-box">Bekleniyor</pre></div>
+          <div class="stat-card"><span class="stat-label">Trafik</span><pre id="location-traffic-result" class="status-box">Bekleniyor</pre></div>
+        </div>
+      </section>
+
       <section id="panel-approvals" class="panel">
         <header class="panel-header"><h1>Onaylar</h1></header>
         <div id="approvals-list" class="approvals-list"><p class="empty">Yok</p></div>
@@ -192,5 +208,63 @@
   </div>
   <script src="/static/app.js"></script>
   <script src="/static/capabilities.js"></script>
+  <script>
+    (() => {
+      const button = document.getElementById("location-data-load");
+      if (!button) return;
+      const status = document.getElementById("location-data-status");
+      const weatherBox = document.getElementById("location-weather-result");
+      const trafficBox = document.getElementById("location-traffic-result");
+      const render = (node, payload) => {
+        const freshness = payload && payload.freshness ? "[" + payload.freshness.toUpperCase() + "] " : "";
+        node.textContent = freshness + JSON.stringify(payload, null, 2);
+      };
+      button.addEventListener("click", () => {
+        if (!navigator.geolocation) {
+          status.textContent = "Bu tarayıcı konum iznini desteklemiyor.";
+          return;
+        }
+        button.disabled = true;
+        status.textContent = "Tarayıcı konum izni bekleniyor…";
+        weatherBox.textContent = "Yükleniyor…";
+        trafficBox.textContent = "Yükleniyor…";
+        navigator.geolocation.getCurrentPosition(async (position) => {
+          const token = sessionStorage.getItem("seka.session") || "";
+          const payload = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            location_consent: true
+          };
+          const call = async (path, node) => {
+            try {
+              const response = await fetch(path, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+                body: JSON.stringify(payload)
+              });
+              const data = await response.json().catch(() => ({}));
+              if (!response.ok) throw new Error(data.detail || "Sağlayıcı isteği başarısız.");
+              render(node, data);
+              return true;
+            } catch (error) {
+              node.textContent = error instanceof Error ? error.message : "Veri alınamadı.";
+              return false;
+            }
+          };
+          const results = await Promise.all([
+            call("/api/location/weather", weatherBox),
+            call("/api/location/traffic", trafficBox)
+          ]);
+          status.textContent = results.every(Boolean)
+            ? "Veriler alındı. Her kartta sağlayıcının güncellik etiketi bulunur."
+            : "Bazı veriler alınamadı. Trafik için TOMTOM_API_KEY ve geçerli oturum gerektiğini kontrol et.";
+          button.disabled = false;
+        }, (error) => {
+          status.textContent = error.code === 1 ? "Konum izni verilmedi; konum isteği yapılmadı." : "Konum alınamadı.";
+          button.disabled = false;
+        }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 });
+      });
+    })();
+  </script>
 </body>
 </html>
