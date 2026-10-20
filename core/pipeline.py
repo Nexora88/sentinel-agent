@@ -26,6 +26,7 @@ from tools.image_gen import ImageGenerator
 from core.media.generation_bridge import GenerationBridge, ImageGeneratorAdapter
 from core.media.engine import MediaEngine
 from tools.secret_scanner import SecretScanner
+from tools.static_code_scanner import StaticCodeScanner
 from tools.document_ingester import DocumentIngester
 from tools.license_checker import LicenseChecker
 from tools.local_discovery import LocalDiscovery
@@ -69,6 +70,7 @@ class SentinelPipeline:
         self.media_bridge = GenerationBridge([ImageGeneratorAdapter(self.image_gen)])
         self.media_engine = MediaEngine(self.media_bridge, state_path=str(self.storage_root / 'media_jobs.json'))
         self.secret_scanner = SecretScanner()
+        self.static_code_scanner = StaticCodeScanner()
         self.doc_ingester = DocumentIngester(ollama=self.ollama, memory=self.memory)
         self.license_checker = LicenseChecker()
         self.local_discovery = LocalDiscovery()
@@ -221,6 +223,15 @@ class SentinelPipeline:
                 self.learner.learn_from_code(file_path, content, repo=repo_name)
             except Exception as e:
                 logger.error(f"Learn failed: {e}")
+        # Add deterministic SAST results with rule IDs, source locations and evidence.
+        # Scanner failures are reported explicitly and do not discard model-based findings.
+        try:
+            static_result = self.static_code_scanner.scan_path(repo_path)
+            security_findings.append(self.static_code_scanner.format_report(static_result))
+        except Exception as e:
+            logger.exception("Static analysis failed")
+            security_findings.append(f"## Static analysis (Semgrep)\\nStatus: error\\nNotice: {type(e).__name__}")
+
         report = self.reporter.create_report(
             code_reviews=code_reviews, security_findings=security_findings, repo=repo_name
         )
@@ -235,6 +246,12 @@ class SentinelPipeline:
         security = self.security.scan_code(str(path), content, language)
         self.learner.learn_from_code(str(path), content)
         self.learner.learn_from_review(review, str(path))
+        try:
+            static_result = self.static_code_scanner.scan_path(path)
+            security = f"{security}\\n\\n{self.static_code_scanner.format_report(static_result)}"
+        except Exception as e:
+            logger.exception("Static analysis failed for local file")
+            security = f"{security}\\n\\nStatic analysis unavailable: {type(e).__name__}"
         report = self.reporter.create_report(
             code_reviews=[review], security_findings=[security], repo="local"
         )
