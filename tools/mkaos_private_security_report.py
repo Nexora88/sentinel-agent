@@ -9,7 +9,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SECRET_RE = re.compile(r"(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)")
-SENSITIVE_KEYS = {"token", "secret", "password", "authorization", "private_key", "credential", "raw_evidence", "source_excerpt"}
+SENSITIVE_KEYS = {
+    "token", "secret", "password", "authorization", "private_key",
+    "credential", "raw_evidence", "evidence", "source_excerpt", "snippet",
+}
 
 
 def sanitize(value, key: str = ""):
@@ -34,7 +37,7 @@ def write_private_report(findings: list[dict], output: Path) -> Path:
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "visibility": "private-local-owner-review",
         "public_issue_created": False,
-        "notice": "Findings are unverified evidence for authorized owner review, not proof of exploitability.",
+        "notice": "Findings are unverified evidence for authorized owner review, not proof of exploitability. Evidence text is redacted by default.",
         "findings": [sanitize(item) for item in findings[:500]],
     }
     temporary = output.with_suffix(output.suffix + ".tmp")
