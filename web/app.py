@@ -36,6 +36,7 @@ from core.pipeline import SentinelPipeline
 from core.mkaos_native_chat import NativeMkaosUnavailable, generate_native_reply
 from core.tenant_storage import tenant_root, tenant_storage_id
 from core.auth import AuthManager
+from core.billing import BillingError, StripeBilling
 from core.webauthn_auth import WebAuthnManager, WebAuthnError
 from core.energy_policy import policy_status
 from core.job_bus import job_bus
@@ -89,6 +90,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 pipelines: dict[str, SentinelPipeline] = {}
 night_scheduler: Optional[NightScheduler] = None
 auth = AuthManager()
+billing = StripeBilling()
 _encrypt_memory_files = os.getenv("MKAOS_ENCRYPT_MEMORY_FILES", "").strip().lower() in {"1", "true", "yes", "on"}
 CHAT_HISTORY_FILE = Path("./memory/chat_history.enc" if _encrypt_memory_files else "./memory/chat_history.json")
 LEGACY_CHAT_HISTORY_FILE = Path("./memory/chat_history.json")
@@ -205,6 +207,14 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+class AccountRegistrationRequest(BaseModel):
+    username: str
+    password: str
+    invite_code: str
+
+class BillingCheckoutRequest(BaseModel):
+    email: str
+
 class PasskeyOptionsRequest(BaseModel):
     username: str
 
@@ -316,6 +326,52 @@ async def login(req: LoginRequest):
     if not token:
         raise HTTPException(401, "Hatalı kullanıcı veya şifre")
     return {"token": token, "user": auth.validate(token)}
+
+
+@app.post("/api/accounts/register")
+async def register_account(req: AccountRegistrationRequest):
+    """Create an optional team account only with an operator-issued invitation."""
+    expected = os.getenv("MKAOS_TEAM_INVITE_TOKEN", "").strip()
+    supplied = req.invite_code.strip()
+    if not expected or not supplied or not __import__("hmac").compare_digest(expected, supplied):
+        raise HTTPException(403, "Takım hesabı için geçerli davet kodu gerekli.")
+    username = req.username.strip().lower()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_.-]{1,63}", username):
+        raise HTTPException(400, "Kullanıcı adı 2–64 karakter olmalı; harf, rakam, nokta, alt çizgi ve tire kullanılabilir.")
+    if len(req.password) < 14 or len(req.password) > 256:
+        raise HTTPException(400, "Parola 14–256 karakter olmalı.")
+    if not auth.create_user(username, req.password, role="user", display_name=username):
+        raise HTTPException(409, "Bu kullanıcı adı zaten kayıtlı.")
+    return {"created": True, "username": username, "tier": "local_free"}
+
+
+@app.post("/api/billing/checkout")
+async def billing_checkout(req: BillingCheckoutRequest, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    try:
+        return billing.create_checkout(username=user["username"], email=req.email)
+    except BillingError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@app.get("/api/billing/status")
+async def billing_status(authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    return billing.status(user["username"])
+
+
+@app.post("/api/billing/webhook")
+async def billing_webhook(request: Request, stripe_signature: Optional[str] = Header(None, alias="Stripe-Signature")):
+    if not stripe_signature:
+        raise HTTPException(400, "Stripe-Signature başlığı gerekli.")
+    raw_body = await request.body()
+    if len(raw_body) > 1_000_000:
+        raise HTTPException(413, "Webhook gövdesi çok büyük.")
+    try:
+        event = billing.verify_signature(raw_body, stripe_signature)
+        return billing.process_event(event)
+    except BillingError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.get("/api/webauthn/capabilities")
