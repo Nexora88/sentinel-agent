@@ -274,3 +274,6 @@ The dependency-free, read-only local checkpoint inspector is `tools/mkaos_hf_ada
 
 The Hugging Face architecture decision table and required parity protocol are in [MKAOS HF compatibility matrix](docs/MKAOS_HF_COMPATIBILITY_MATRIX.md). A pinned SmolLM2-135M-Instruct CPU reference smoke workflow is defined at `.github/workflows/mkaos-hf-cpu-smoke.yml`. Its repeat-logit check validates the reference runtime only; it does not claim MKAOSW1 conversion parity. Numerical comparison metrics are implemented in `tools/mkaos_numerical_parity.py`.
 
+
+
+Night Watch zamanlaması, izinli proje denetimi ve gerçek ses/görsel/video motoru durumu: [MKAOS Night Watch, Voice and Media](docs/MKAOS_NIGHT_WATCH_VOICE_MEDIA_STATUS.md).
