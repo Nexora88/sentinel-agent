@@ -15,7 +15,7 @@ on:
       - "data/mkaos-source-register.template.tsv"
       - "docs/model-provenance.template.json"
   schedule:
-    - cron: "17 3 * * *"
+    - cron: "0 0 * * *"
   workflow_dispatch:
 
 permissions:
@@ -44,6 +44,8 @@ jobs:
           pip install -r requirements.txt
       - name: Compile project modules
         run: python -m compileall -q agents core scripts tools web
+      - name: Run allowlisted Night Watch agent audit
+        run: python tools/mkaos_nightly_agent.py --config config/mkaos-agent-projects.json --output artifacts/mkaos-night-watch-report.json --workspace .
       - name: Run offline and hardware profile contracts
         run: |
           python -m unittest discover -s tests -p test_runtime_profile.py -v
@@ -89,7 +91,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mkaos-daily-quality-report
-          path: artifacts/mkaos-daily-quality-report.json
+          path: |
+            artifacts/mkaos-daily-quality-report.json
+            artifacts/mkaos-night-watch-report.json
           if-no-files-found: error
       - name: Open a deduplicated issue if checks fail
         if: failure()
