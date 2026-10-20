@@ -82,12 +82,16 @@ def speech_length_scale(voice: str, pace: float = 1.0) -> float:
     return round(base_scale / pace_value, 3)
 
 
-def synthesize(text: str, voice: str = "male", cat_mode: bool = False, pace: float = 1.0) -> bytes:
+def synthesize(text: str, voice: str = "male", cat_mode: bool = False, pace: float | None = None) -> bytes:
     clean = " ".join(str(text).split())
     if not clean:
         raise LocalVoiceError("Seslendirilecek metin boş.")
     if len(clean) > 4000:
         raise LocalVoiceError("Tek seferde en fazla 4.000 karakter seslendirilebilir.")
+    if voice not in VOICE_PROFILES:
+        raise LocalVoiceError("Ses seçimi geçersiz.")
+    if pace is None:
+        pace = VOICE_PROFILES[voice]["default_pace"]
     executable = shutil.which(PIPER_BIN)
     if not executable:
         raise LocalVoiceError("Yerel Piper kurulmamış. PIPER_EXECUTABLE ayarını kontrol et.")
