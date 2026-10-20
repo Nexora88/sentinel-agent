@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "policy": "explicit_allowlist; read_only_audit; no_auto_fix; no_push; no_merge",
+  "projects": [
+    {
+      "id": "mkaos-sentinel-agent",
+      "path": ".",
+      "enabled": true,
+      "checks": ["python_compile", "python_tests", "rust_tests", "secret_pattern_audit"]
+    }
+  ]
+}
