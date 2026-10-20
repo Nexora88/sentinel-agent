@@ -2,6 +2,14 @@
 
 **Status: planning profile only; no 10B weights have been initialized or trained.** The exact dimensions in `configs/mkaos/train-10b.json` compute to **10,068,848,640 parameters**. The production source register still has zero approved sources and `model_training_allowed=false`.
 
+## Recommended practical path before 10B scratch training
+
+The near-term goal is a **validated small model and data/evaluation pipeline**, not a 10B scratch run. Keep the existing 133M and 1B profiles as controlled engineering pilots. A parameter count, successful loss reduction, or synthetic CI run is not evidence of useful Turkish assistant capability.
+
+If a capable model is needed before MKAOS's own weights are ready, evaluate a separately registered, immutable-revision open-weight base model. Review its exact license and usage terms, local/offline compatibility, tokenizer, file hashes, and redistribution conditions before use. Only then test LoRA/PEFT fine-tuning as a separate adapter artifact against a frozen Turkish QA, coding, debugging, and source-grounding suite. Keep base-model and adapter provenance separate; never label third-party base weights or an adapter as a model trained from random initialization by MKAOS.
+
+Advance to larger scratch-training profiles only when the small-run evidence demonstrates data quality, stable training, reproducible gains, and a justified hardware budget. Fine-tuning is a practical option, not an automatic license approval or a guarantee of quality.
+
 ## What exists and what is blocked
 
 - The trainer has DDP, gradient checkpointing, epoch-boundary resume and optional optimizer-state sharding.
