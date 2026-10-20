@@ -2,7 +2,6 @@ name: MKAOS Daily Improvement Loop
 
 on:
   pull_request:
-    branches: [main]
     paths:
       - ".github/workflows/mkaos-daily-improvement.yml"
       - "agents/**"
@@ -12,6 +11,7 @@ on:
       - "tests/**"
       - "tools/**"
       - "requirements.txt"
+      - "docs/MKAOS_SUPERVISED_AGENT_IMPLEMENTATION.md"
       - "data/mkaos-source-register.template.tsv"
       - "docs/model-provenance.template.json"
   schedule:
