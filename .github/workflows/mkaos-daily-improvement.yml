@@ -2,7 +2,6 @@ name: MKAOS Daily Improvement Loop
 
 on:
   pull_request:
-    branches: [main]
     paths:
       - ".github/workflows/mkaos-daily-improvement.yml"
       - "agents/**"
@@ -11,11 +10,13 @@ on:
       - "scripts/**"
       - "tests/**"
       - "tools/**"
+      - "web/**"
       - "requirements.txt"
+      - "docs/MKAOS_SUPERVISED_AGENT_IMPLEMENTATION.md"
       - "data/mkaos-source-register.template.tsv"
       - "docs/model-provenance.template.json"
   schedule:
-    - cron: "17 3 * * *"
+    - cron: "0 0 * * *"
   workflow_dispatch:
 
 permissions:
@@ -44,6 +45,22 @@ jobs:
           pip install -r requirements.txt
       - name: Compile project modules
         run: python -m compileall -q agents core scripts tools web
+      - name: Restore Night Watch learning memory
+        uses: actions/cache/restore@v4
+        with:
+          path: artifacts/mkaos-learning-memory.json
+          key: mkaos-learning-memory-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            mkaos-learning-memory-${{ github.ref_name }}-
+            mkaos-learning-memory-main-
+      - name: Run allowlisted Night Watch agent audit
+        id: night_watch
+        continue-on-error: true
+        run: python tools/mkaos_nightly_agent.py --config config/mkaos-agent-projects.json --output artifacts/mkaos-night-watch-report.json --workspace .
+      - name: Update bounded learning memory
+        if: always() && hashFiles('artifacts/mkaos-night-watch-report.json') != ''
+        continue-on-error: true
+        run: python tools/mkaos_learning_memory.py --report artifacts/mkaos-night-watch-report.json --memory artifacts/mkaos-learning-memory.json --output artifacts/mkaos-learning-memory-report.json
       - name: Run offline and hardware profile contracts
         run: |
           python -m unittest discover -s tests -p test_runtime_profile.py -v
@@ -57,6 +74,15 @@ jobs:
           cargo run --release --manifest-path engine/mkaos-inference/Cargo.toml --example mkaos_cpu_bench -- 1 3
       - name: Run security regression tests
         run: python -m unittest discover -s tests -v
+      - name: Save Night Watch learning memory
+        if: always() && hashFiles('artifacts/mkaos-learning-memory.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: artifacts/mkaos-learning-memory.json
+          key: mkaos-learning-memory-${{ github.ref_name }}-${{ github.run_id }}
+      - name: Fail job if Night Watch reported findings
+        if: always() && steps.night_watch.outcome == 'failure'
+        run: exit 1
       - name: Record daily quality report
         if: always()
         env:
@@ -89,8 +115,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mkaos-daily-quality-report
-          path: artifacts/mkaos-daily-quality-report.json
-          if-no-files-found: error
+          path: |
+            artifacts/mkaos-daily-quality-report.json
+            artifacts/mkaos-night-watch-report.json
+            artifacts/mkaos-learning-memory-report.json
+          if-no-files-found: warn
       - name: Open a deduplicated issue if checks fail
         if: failure()
         uses: actions/github-script@v7

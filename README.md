@@ -23,7 +23,7 @@ MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik t
 3. Onaylı korpusla eğitim ve bağımsız inceleme tamamlandıktan sonra checkpoint'i models/mkaos/model.mkaosw içine yerleştir; eğitim raporundaki SHA-256 değerini MKAOS_NATIVE_SHA256 olarak ayarla. Heads/KV-heads/sequence ayarları checkpoint mimarisiyle eşleşmelidir.
 4. `docker compose up --build` komutuyla başlat. Checkpoint yokken sohbetin 503 dönmesi beklenen fail-closed davranışıdır.
 
-Yol haritası: [docs/MKAOS_INDEPENDENCE_MILESTONES.md](docs/MKAOS_INDEPENDENCE_MILESTONES.md). Günlük kalite döngüsü, çevrimdışı dayanıklılık ve donanım sürümleri: [MKAOS_DAILY_IMPROVEMENT_AND_EDITIONS.md](docs/MKAOS_DAILY_IMPROVEMENT_AND_EDITIONS.md).
+Yol haritası: [docs/MKAOS_INDEPENDENCE_MILESTONES.md](docs/MKAOS_INDEPENDENCE_MILESTONES.md). Günlük kalite döngüsü, çevrimdışı dayanıklılık ve donanım sürümleri: [MKAOS_DAILY_IMPROVEMENT_AND_EDITIONS.md](docs/MKAOS_DAILY_IMPROVEMENT_AND_EDITIONS.md). Ajan öğrenme hafızası, gizlilik/şifreleme, Bora-Defne ses profilleri, PC köprüsü ve hesap planı: [MKAOS_AGENT_PRODUCT_AND_SECURITY_ROADMAP.md](docs/MKAOS_AGENT_PRODUCT_AND_SECURITY_ROADMAP.md).
 
 10B sıfırdan eğitim profili yalnızca engelli bir kapasite planıdır; yakın vadeli hedef değildir. Önce küçük model/boru hattı deneyleri ve bağımsız kalite ölçümleri; ihtiyaç ve lisans elverirse sabitlenmiş açık ağırlıklı bir temel model üzerinde LoRA/PEFT denemeleri değerlendirilir. Bu tür bir adaptör, sıfırdan eğitilmiş MKAOS ağırlıkları olarak sunulmaz. 10B hedefi ve bulut eğitimine hazır olma kapıları: [docs/MKAOS_10B_SCALE_UP_GATES.md](docs/MKAOS_10B_SCALE_UP_GATES.md). Tam parametre sayımlı profil [configs/mkaos/train-10b.json](configs/mkaos/train-10b.json) içindedir; planlama için kilitli ve eğitime kapalıdır. Önceki 50B ve 90B belgeleri tarihsel yol haritasıdır.
 
@@ -274,3 +274,6 @@ The dependency-free, read-only local checkpoint inspector is `tools/mkaos_hf_ada
 
 The Hugging Face architecture decision table and required parity protocol are in [MKAOS HF compatibility matrix](docs/MKAOS_HF_COMPATIBILITY_MATRIX.md). A pinned SmolLM2-135M-Instruct CPU reference smoke workflow is defined at `.github/workflows/mkaos-hf-cpu-smoke.yml`. Its repeat-logit check validates the reference runtime only; it does not claim MKAOSW1 conversion parity. Numerical comparison metrics are implemented in `tools/mkaos_numerical_parity.py`.
 
+
+
+Night Watch zamanlaması, izinli proje denetimi ve gerçek ses/görsel/video motoru durumu: [MKAOS Night Watch, Voice and Media](docs/MKAOS_NIGHT_WATCH_VOICE_MEDIA_STATUS.md).

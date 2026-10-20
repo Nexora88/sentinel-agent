@@ -21,6 +21,11 @@ VOICE_MODELS = {
     "male": os.getenv("SEKA_VOICE_MALE_MODEL", "tr_TR-fettah-medium.onnx"),
     "female": os.getenv("SEKA_VOICE_FEMALE_MODEL", "tr_TR-dfki-medium.onnx"),
 }
+# Product display names and style targets; the installed voice model determines the actual timbre.
+VOICE_PROFILES = {
+    "male": {"name": "Bora", "style": "tok, sakin, bilge ve güven veren", "default_pace": 0.96},
+    "female": {"name": "Defne", "style": "sıcak, net, akıcı ve enerjik", "default_pace": 1.04},
+}
 
 
 class LocalVoiceError(RuntimeError):
@@ -49,6 +54,9 @@ def voice_status() -> dict:
         "whisper_available": (shutil.which(WHISPER_BIN) is not None and bool(WHISPER_MODEL and Path(WHISPER_MODEL).is_file())) or (__import__("importlib.util").util.find_spec("faster_whisper") is not None and Path(FASTER_WHISPER_MODEL).is_dir()),
         "voices": {
             key: {
+                "name": VOICE_PROFILES[key]["name"],
+                "style_target": VOICE_PROFILES[key]["style"],
+                "default_pace": VOICE_PROFILES[key]["default_pace"],
                 "configured": (VOICE_DIR / filename).is_file()
                     and (VOICE_DIR / filename).with_suffix(Path(filename).suffix + ".json").is_file(),
                 "file": filename,
@@ -74,12 +82,16 @@ def speech_length_scale(voice: str, pace: float = 1.0) -> float:
     return round(base_scale / pace_value, 3)
 
 
-def synthesize(text: str, voice: str = "male", cat_mode: bool = False, pace: float = 1.0) -> bytes:
+def synthesize(text: str, voice: str = "male", cat_mode: bool = False, pace: float | None = None) -> bytes:
     clean = " ".join(str(text).split())
     if not clean:
         raise LocalVoiceError("Seslendirilecek metin boş.")
     if len(clean) > 4000:
         raise LocalVoiceError("Tek seferde en fazla 4.000 karakter seslendirilebilir.")
+    if voice not in VOICE_PROFILES:
+        raise LocalVoiceError("Ses seçimi geçersiz.")
+    if pace is None:
+        pace = VOICE_PROFILES[voice]["default_pace"]
     executable = shutil.which(PIPER_BIN)
     if not executable:
         raise LocalVoiceError("Yerel Piper kurulmamış. PIPER_EXECUTABLE ayarını kontrol et.")
