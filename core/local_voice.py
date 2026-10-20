@@ -23,8 +23,8 @@ VOICE_MODELS = {
 }
 # Product display names and style targets; the installed voice model determines the actual timbre.
 VOICE_PROFILES = {
-    "male": {"name": "Bora", "style": "tok, sakin, bilge ve güven veren", "default_pace": 0.96},
-    "female": {"name": "Defne", "style": "sıcak, net, akıcı ve enerjik", "default_pace": 1.04},
+    "male": {"name": "Metehan", "style": "tok, sakin, bilge ve güven veren", "default_pace": 0.96},
+    "female": {"name": "Gökçe", "style": "sıcak, net, akıcı ve enerjik", "default_pace": 1.04},
 }
 
 
