@@ -1,6 +1,6 @@
-# Sentinel Agent / MKAOS
+# MKAOS — Mustafa Kemal Atatürk Operating System
 
-A local-first assistant and agent runtime built around local Ollama inference, explicit integration permissions, user-separated memory, local media tools, and review-gated software improvements.
+MKAOS is a standalone project and product identity. Technically, the current implementation is not a Linux distribution or kernel: it is a Python/Rust local-first agent, inference, retrieval, and task-orchestration platform with explicit integration permissions, user-separated memory, local media tools, and review-gated software improvements. “Operating System” is the product name and vision, not a claim that this repository contains a Linux kernel or distribution.
 
 > **Security note:** No single application setting can guarantee that a whole computer is fully secure or air-gapped. Production security depends on deployment configuration, host firewall policy, key custody, backups, reverse-proxy configuration, and the integrations you enable.
 
@@ -24,7 +24,7 @@ The Rust runtime in `engine/mkaos-hf-adapter/` exposes an Ollama-compatible loca
 The application integration is deliberately opt-in:
 - All chat, coding, planning and agent generation is routed exclusively to `MKAOS_BASE_URL`; `MKAOS_ENABLED` no longer changes the provider.
 - A failed MKAOS request is surfaced and never retried against another chat runtime.
-- Ollama remains temporarily only for RAG embeddings. Full Ollama removal is blocked on a native MKAOS embedder plus retrieval-parity and offline integration tests.
+- RAG defaults to a pre-installed local multilingual semantic embedding model. Runtime downloads are disabled and there is no silent fallback to a remote service. Model installation and SHA-256 inventory steps are documented in `docs/MKAOS_RAG_SEMANTIC_SETUP.md`. Ollama embeddings remain an explicit legacy option.
 - The currently pinned weights are third-party SmolLM2-135M-Instruct, not self-trained MKAOS weights. Engine independence and model-weight ownership are separate milestones.
 
 ### Optional Docker Compose deployment
@@ -76,6 +76,8 @@ Kubernetes starter manifests live in `deploy/kubernetes/`. They intentionally de
 See `docs/REASONING_MESH_ACCELERATION.md` for the model-training plan, security boundaries and certification roadmap.
 
 ## Requirements
+
+The main Docker image installs base, voice, media, PostgreSQL-adapter, and semantic-embedding Python dependencies during image build. Optional features remain disabled unless configured, and model weights are separate local artifacts. The image build does not download embedding, voice, or language-model weights.
 
 - Python 3.11 or 3.12.
 - Docker Compose (recommended for service isolation).
