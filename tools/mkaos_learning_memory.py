@@ -108,6 +108,8 @@ def update_memory(previous: dict[str, Any] | None, report: dict[str, Any], now: 
             entry["last_rechecked_utc"] = timestamp
         # Otherwise keep the last status; the check may not have been configured/run.
 
+    previous_fingerprints = {e.get("fingerprint") for e in (previous or {}).get("entries", []) if isinstance(e, dict)}
+    recurring = sum(1 for key in current if key in previous_fingerprints)
     ordered = sorted(entries.values(), key=lambda e: (e.get("last_seen_utc", ""), e.get("fingerprint", "")), reverse=True)
     ordered = ordered[:MAX_ENTRIES]
     return {
@@ -119,7 +121,7 @@ def update_memory(previous: dict[str, Any] | None, report: dict[str, Any], now: 
         "summary": {
             "known_failure_fingerprints": len(ordered),
             "current_failure_fingerprints": len(current),
-            "recurring_failures": sum(1 for key in current if key in (previous or {}).get("_fingerprints", [])),
+            "recurring_failures": recurring,
             "regression_tests_required": sum(1 for e in ordered if e.get("regression_test_required")),
         },
         "rechecked_history": rechecked[:MAX_ENTRIES],
