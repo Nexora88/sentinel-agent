@@ -34,6 +34,7 @@ load_dotenv()
 
 from core.pipeline import SentinelPipeline
 from core.mkaos_native_chat import NativeMkaosUnavailable, generate_native_reply
+from core.model_readiness import native_model_readiness
 from core.tenant_storage import tenant_root, tenant_storage_id
 from core.auth import AuthManager
 from core.webauthn_auth import WebAuthnManager, WebAuthnError
@@ -305,6 +306,12 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/api/model/readiness")
+async def api_model_readiness():
+    """Expose model readiness without leaking local paths or checkpoint digests."""
+    return native_model_readiness()
+
+
 @app.get("/api/manifesto")
 async def api_manifesto():
     return MANIFESTO
@@ -529,8 +536,19 @@ async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)
         if message.lower() in ("/status", "durum", "status"):
             reply = get_pipeline(user["username"]).status()
         elif backend == "native-rust":
-            # No implicit model-provider fallback: an absent/unapproved native checkpoint
-            # returns an actionable 503 rather than silently calling third-party weights.
+            # Never disguise an absent model as generated text or silently call third-party weights.
+            readiness = native_model_readiness()
+            if not readiness["ready"]:
+                return {
+                    "reply": (
+                        "MKAOS yerel sohbet modeli henüz hazır değil. "
+                        + str(readiness["message"])
+                        + " Kurulum adımlarını ve model doğrulama gereksinimlerini README.md içinden kontrol et. "
+                        + "Bu mesaj model tarafından üretilmedi; üçüncü taraf modele veri gönderilmedi."
+                    ),
+                    "status": "setup_required",
+                    "model_readiness": readiness["status"],
+                }
             reply = generate_native_reply(message)
         elif backend == "legacy-smollm":
             # Explicit compatibility escape hatch; enable only when deliberately accepted.
