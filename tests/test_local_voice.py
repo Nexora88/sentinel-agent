@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from core.local_voice import LocalVoiceError, _model_path, speech_length_scale
+from core.local_voice import LocalVoiceError, VOICE_PROFILES, _model_path, speech_length_scale
 
 
 class LocalVoiceSafetyTests(unittest.TestCase):
@@ -15,6 +15,13 @@ class LocalVoiceSafetyTests(unittest.TestCase):
     def test_rejects_unknown_voice(self):
         with self.assertRaises(LocalVoiceError):
             _model_path("cat")
+
+    def test_voice_profiles_have_turkish_display_names_and_style_targets(self):
+        self.assertEqual(VOICE_PROFILES["male"]["name"], "Bora")
+        self.assertEqual(VOICE_PROFILES["female"]["name"], "Defne")
+        self.assertIn("tok", VOICE_PROFILES["male"]["style"])
+        self.assertIn("akıcı", VOICE_PROFILES["female"]["style"])
+        self.assertGreater(VOICE_PROFILES["female"]["default_pace"], VOICE_PROFILES["male"]["default_pace"])
 
     def test_voice_profiles_have_distinct_pacing(self):
         self.assertGreater(speech_length_scale("male", 1.0), speech_length_scale("female", 1.0))
