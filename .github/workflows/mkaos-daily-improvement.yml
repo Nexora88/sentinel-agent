@@ -10,6 +10,7 @@ on:
       - "scripts/**"
       - "tests/**"
       - "tools/**"
+      - "web/**"
       - "requirements.txt"
       - "docs/MKAOS_SUPERVISED_AGENT_IMPLEMENTATION.md"
       - "data/mkaos-source-register.template.tsv"
