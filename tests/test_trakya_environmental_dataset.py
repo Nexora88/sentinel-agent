@@ -63,7 +63,7 @@ class TrakyaDatasetPipelineTests(unittest.TestCase):
         self.assertIn("not approved", result.stderr)
 
     def test_out_of_region_coordinate_is_rejected(self):
-        text = self.input.read_text(encoding="utf-8").replace('"41.2"', '"51.2"', 1)
+        text = self.input.read_text(encoding="utf-8").replace('s1,event-a,2026-06-01T10:00:00Z,41.2,', 's1,event-a,2026-06-01T10:00:00Z,51.2,', 1)
         self.input.write_text(text, encoding="utf-8")
         result = self.run_pipeline()
         self.assertEqual(result.returncode, 2)
