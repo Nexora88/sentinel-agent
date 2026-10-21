@@ -83,3 +83,24 @@ Bu liste mimari kabul ölçütleridir; mevcut uygulamada tüm maddelerin sağlan
 - \`GET /api/live/weather\` ve \`GET /api/live/traffic\` kimlik doğrulamalıdır. Varsayılan Compose profili çevrimdışı kalır. \`docker-compose.networked.yml\` yalnızca ağ yolunu açar; her \`ALLOW_*\` izni ayrıca açıkça etkinleştirilmelidir.
 - \`core/billing.py\` Stripe-hosted Checkout test akışı, imza/zaman damgası doğrulamalı webhook ve SQLite olay tekilleştirmesi ekler. Kart bilgisi MKAOS'a girmez; \`sk_live_\` anahtarları reddedilir. \`POST /api/billing/checkout\`, \`GET /api/billing/status\` ve \`POST /api/billing/webhook\` uç noktaları eklendi.
 - Bu entegrasyonlar kod ve test seviyesinde hazırlanmıştır; gerçek sağlayıcı anahtarları, TomTom lisans/kota doğrulaması, Stripe test hesabı/price/webhook yapılandırması ve uçtan uca canlı bağlantı bu ortamda doğrulanmış değildir. Gerçek tahsilat desteklenmez. Hesap sistemi mevcut kimlik doğrulama/passkey katmanını kullanır; e-posta doğrulama/parola sıfırlama ve üretim ödeme operasyonları ayrı tamamlanmalıdır.
+
+
+## Yeni uygulama dilimi — 2026-10-21
+
+### Yerel modelle CI onarım önerisi
+- .github/workflows/local-model-ci-repair.yml varsayılan dala alındıktan sonra, yalnızca aynı depoda başarısız olan CI çalışmaları için tetiklenir. Varsayılan olarak kapalıdır; MKAOS_REPAIR_ENABLED=true repo değişkeni olmadan iş çalışmaz.
+- İş yalnızca self-hosted, linux, mkaos-repair etiketli, operatörün yönettiği runner'da çalışır. Yerel Ollama modeli ve SHA-256 digest ile sabitlenmiş Docker imajı gerekir. Model adı, endpoint ve imaj MKAOS_REPAIR_MODEL, MKAOS_OLLAMA_URL, MKAOS_REPAIR_SANDBOX_IMAGE repo değişkenleriyle ayarlanır.
+- tools/ci_autorepair_agent.py başarısız run loglarını redakte eder, failed SHA'yı kod olarak host'ta çalıştırmadan veri olarak inceler, yerel modelden ayrı test/düzeltme yamaları ister ve güvenilir ci_repair_executor ile regresyon-önce denemesi yapar. Sadece tüm kabul kapıları geçerse kanıt JSON'u ve taslak PR üretir.
+- Önemli sınır: Bu ortamda self-hosted runner, yerel model ve digest-pinned imaj yapılandırılmadı; gerçek GitHub Actions üzerinde uçtan uca onarım kanıtlanmış değildir. Kurulum yoksa iş çalışmaz veya fail-closed durur. Model yamaları güvenilir kabul edilmez. Otomatik merge/deploy yoktur.
+- Workflow dosyası ancak varsayılan dala birleştirildikten sonra kendi workflow_run tetikleyicisiyle sonraki CI hatalarını yakalayabilir. Fork PR'ları bu akışta otomatik onarılmaz.
+
+### Hesap e-posta doğrulama ve parola sıfırlama
+- core/account_tokens.py süreli, tek kullanımlık tokenları yalnızca SHA-256 özetiyle SQLite'a kaydeder; e-posta SMTP STARTTLS üzerinden gönderilir. Tokenlar 30 dakika geçerlidir ve hesap başına 15 dakikada en fazla üç token isteği sınırı vardır.
+- POST /api/account/email/verification/request oturum açmış kullanıcının e-posta adresini ayarlar ve doğrulama mesajı gönderir; POST /api/account/email/verification/consume tokenı tüketir. POST /api/account/password-reset/request genel yanıt döndürür; POST /api/account/password-reset/consume parolayı değiştirir ve mevcut oturumları iptal eder.
+- SMTP için MKAOS_SMTP_HOST, MKAOS_SMTP_PORT, MKAOS_SMTP_USERNAME, MKAOS_SMTP_PASSWORD, MKAOS_EMAIL_FROM ve HTTPS MKAOS_PUBLIC_BASE_URL gerekir. MKAOS_REQUIRE_VERIFIED_EMAIL=true yalnızca e-posta tanımlı ama doğrulanmamış hesapların parola girişini engeller; mevcut e-postası olmayan ilk sahip hesabı kilitlemez.
+- E-posta bağlantılarının ön yüz akışı henüz oluşturulmadı; şu an token tüketimi API ile yapılabilir. Üretime açmadan önce reverse-proxy/IP rate limiting, SPF/DKIM/DMARC, parola sıfırlama abuse testleri ve HTTPS uçtan uca test gerekir. SMTP sağlayıcısı bu ortamda doğrulanmadı.
+
+### Gerçek deneysel ML-KEM / ML-DSA primitive çağrıları
+- core/post_quantum_crypto.py isteğe bağlı liboqs-python sağlayıcısı varsa ML-KEM-768 anahtar üretimi/kapsülleme/çözme ve ML-DSA-65 anahtar üretimi/imzalama/doğrulama çağrılarını sunar.
+- MKAOS_PQ_PROFILE=experimental açık değilse işlemler reddedilir; klasik kriptografiye sessiz geri dönüş yoktur. Anahtarlar geçici API nesnelerinden dışarı verilir; bu modül uygulama belleğini şifrelemez, anahtar saklama/rotasyon veya protokol müzakeresi sağlamaz.
+- Sağlayıcı bu CI ortamında kurulu olmadığı için gerçek algoritma test vektörleri/birlikte çalışabilirlik çalıştırılmadı. FIPS doğrulaması veya üretime hazır olma iddiası yapılmaz.
