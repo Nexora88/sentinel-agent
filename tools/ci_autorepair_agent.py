@@ -39,7 +39,7 @@ def run(argv: list[str], *, cwd: Path = ROOT, timeout: int = 120, check: bool = 
 
 
 def local_model(prompt: str) -> dict:
-    endpoint = os.environ.get("MKAOS_OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
+    endpoint = (os.environ.get("MKAOS_OLLAMA_URL", "").strip() or "http://127.0.0.1:11434").rstrip("/")
     model = os.environ.get("MKAOS_REPAIR_MODEL", "").strip()
     if not model or not re.fullmatch(r"[A-Za-z0-9_.:/-]{1,120}", model):
         raise RuntimeError("Set MKAOS_REPAIR_MODEL to an installed local Ollama model name.")
