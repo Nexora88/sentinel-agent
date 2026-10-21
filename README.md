@@ -311,3 +311,18 @@ python tools/ci_repair_executor.py \
 `<64-hex-digest>` yer tutucudur; güvenilir kaynaktan alınmış gerçek imaj digest'iyle değiştirilmelidir. Test yaması düzeltmeden önce başarısız olmazsa, düzeltmeden sonraki regresyon testi veya tam test paketi geçmezse yürütücü başarısız olur. Yama yolları izin listesi ve sır dosyası kurallarıyla kontrol edilir.
 
 Bu yürütücü henüz CI logundan otomatik olarak tam hatayı yeniden üretmez, test/düzeltme yamalarını kendi başına üretmez veya taslak PR açmaz. Sadece verdiğin yamaların güvenli yürütme ve test-önce kanıt katmanıdır. Merge ve dağıtım otomatik değildir.
+
+
+## Live weather, traffic, and Stripe test checkout
+
+The following authenticated endpoints use real provider responses; they never fabricate live data:
+
+- \`GET /api/live/weather?latitude=41.0&longitude=29.0\` — Open-Meteo current conditions, observation time, fetch time, source and a five-minute cache.
+- \`GET /api/live/traffic?latitude=41.0&longitude=29.0\` — TomTom flow segment data; requires an authorized \`TOMTOM_API_KEY\`.
+- \`POST /api/billing/checkout\` — creates a Stripe-hosted subscription checkout in **test mode only**.
+- \`GET /api/billing/status\` — reads the authenticated account's subscription state.
+- \`POST /api/billing/webhook\` — verifies Stripe's timestamped HMAC signature and processes events idempotently.
+
+All network integrations are denied by default. For a deliberate online test, set \`MKAOS_NETWORK_MODE=networked\` and separately set \`ALLOW_LIVE_WEATHER=true\`, \`ALLOW_LIVE_TRAFFIC=true\`, or \`ALLOW_BILLING=true\`. Weather uses the public Open-Meteo endpoint; coordinates are sent to the provider. Traffic requires a TomTom key and its usage terms/quota must be reviewed. API keys are server-side only and are not included in response payloads.
+
+Stripe requires a test-mode \`sk_test_\` secret, a test \`price_\` ID, a \`whsec_\` webhook signing secret, and \`MKAOS_PUBLIC_BASE_URL\`. Checkout is hosted by Stripe so MKAOS does not handle card numbers. Webhook events are timestamp-checked, signature-verified and deduplicated in a local SQLite database. This is **not a live payment launch**: live Stripe keys are rejected, and business/legal review, adult account ownership where required, refunds/tax handling, and production monitoring must precede any real transactions.

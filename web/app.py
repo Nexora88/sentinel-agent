@@ -45,6 +45,8 @@ from core.safety.sovereignty import sovereignty_status
 from core.approval_protocol import SignedApprovalProtocol, ApprovalProtocolError
 from core.improvement_gate import ImprovementProposalStore, ImprovementProposalError
 from core.integrations.catalog import integration_status
+from core.live_data import LiveDataError, get_weather, get_traffic
+from core.billing import BillingError, create_checkout_session, get_billing_status, apply_webhook
 from tools.clean_room_audit import scan_code_cleanliness
 
 logging.basicConfig(level=logging.INFO)
@@ -428,6 +430,49 @@ def _ollama_status(p: SentinelPipeline) -> dict:
         }
     finally:
         session.close()
+
+
+
+@app.get("/api/live/weather")
+async def api_live_weather(latitude: float, longitude: float, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    try:
+        return get_weather(latitude, longitude)
+    except LiveDataError as exc:
+        raise HTTPException(503, str(exc)) from None
+
+
+@app.get("/api/live/traffic")
+async def api_live_traffic(latitude: float, longitude: float, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    try:
+        return get_traffic(latitude, longitude)
+    except LiveDataError as exc:
+        raise HTTPException(503, str(exc)) from None
+
+
+@app.post("/api/billing/checkout")
+async def api_billing_checkout(authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    try:
+        return create_checkout_session(user["username"])
+    except BillingError as exc:
+        raise HTTPException(503, str(exc)) from None
+
+
+@app.get("/api/billing/status")
+async def api_billing_status(authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    return get_billing_status(user["username"])
+
+
+@app.post("/api/billing/webhook")
+async def api_billing_webhook(request: Request, stripe_signature: Optional[str] = Header(None)):
+    payload = await request.body()
+    try:
+        return apply_webhook(payload, stripe_signature)
+    except BillingError:
+        raise HTTPException(400, "Stripe test webhook imzası veya yapılandırması geçersiz.") from None
 
 
 @app.get("/api/status")
