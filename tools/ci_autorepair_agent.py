@@ -24,8 +24,8 @@ MAX_MODEL_REPLY = 1_000_000
 
 def redact(value: str) -> str:
     value = re.sub(r"(?i)(github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,})", "[REDACTED_TOKEN]", value)
-    value = re.sub(r"(?i)(authorization\\s*[:=]\\s*bearer\\s+)\\S+", r"\\1[REDACTED]", value)
-    value = re.sub(r"(?i)((?:password|passwd|secret|api[_-]?key|access[_-]?token)\\s*[=:]\\s*)[^\\s,;]+", r"\\1[REDACTED]", value)
+    value = re.sub(r"(?i)(authorization\s*[:=]\s*bearer\s+)\S+", r"\1[REDACTED]", value)
+    value = re.sub(r"(?i)((?:password|passwd|secret|api[_-]?key|access[_-]?token)\s*[=:]\s*)[^\s,;]+", r"\1[REDACTED]", value)
     value = re.sub(r"(?i)(sk_(?:live|test)_[A-Za-z0-9]+|whsec_[A-Za-z0-9]+)", "[REDACTED_STRIPE_SECRET]", value)
     return value
 
