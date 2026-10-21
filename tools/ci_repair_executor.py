@@ -112,6 +112,23 @@ def build_docker_command(
 
 def _apply_patch(workspace: Path, patch_text: str) -> None:
     validate_patch_paths(patch_text)
+    root = workspace.resolve(strict=True)
+    for line in patch_text.splitlines():
+        if not (line.startswith("--- ") or line.startswith("+++ ")):
+            continue
+        raw = line[4:].split("\\t", 1)[0].strip()
+        if raw == "/dev/null":
+            continue
+        if raw.startswith(("a/", "b/")):
+            raw = raw[2:]
+        target = root / PurePosixPath(raw)
+        current = root
+        for part in PurePosixPath(raw).parts:
+            current = current / part
+            if current.is_symlink():
+                raise ValueError("patch may not traverse or replace symbolic links")
+        if not target.resolve(strict=False).is_relative_to(root):
+            raise ValueError("patch target resolves outside the disposable workspace")
     result = subprocess.run(
         ["git", "apply", "--whitespace=error", "-"],
         cwd=workspace,
@@ -188,7 +205,7 @@ def run_trial(
     with tempfile.TemporaryDirectory(prefix="mkaos-ci-repair-") as tmp:
         workspace = Path(tmp) / "workspace"
         shutil.copytree(
-            source_root, workspace,
+            source_root, workspace, symlinks=True,
             ignore=shutil.ignore_patterns(".git", ".env", ".env.*", "memory", "models", ".venv", "node_modules"),
         )
         _apply_patch(workspace, test_text)
