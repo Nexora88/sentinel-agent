@@ -472,7 +472,7 @@ async function loadVoiceStatus() {
     const stt = data.whisper_available;
     const piper = data.piper_available;
     if (voiceStatus) {
-      voiceStatus.textContent = `Piper ${piper ? "hazır" : "eksik"} · Erkek ${male ? "hazır" : "model eksik"} · Kadın ${female ? "hazır" : "model eksik"} · Yerel STT ${stt ? "hazır" : "model eksik"}`;
+      voiceStatus.textContent = `Yerel Piper ${piper ? "hazır" : "eksik"} · Metehan ${male ? "hazır" : "model eksik"} · Gökçe ${female ? "hazır" : "model eksik"} · Yerel STT ${stt ? "hazır" : "model eksik"}`;
       voiceStatus.classList.toggle("is-ready", Boolean(piper && male && female && stt));
     }
     if (voiceBtn && (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder)) {
@@ -541,8 +541,8 @@ $("#voice-test-btn")?.addEventListener("click", () => {
   const text = catDubToggle?.checked
     ? "Merhaba! Ben MKAOS. Bu yerel kedi dublajı denemesidir."
     : voiceSelect?.value === "female"
-      ? "Merhaba, ben MKAOS. Türkçe konuşma kalitemi yerel ses motoruyla test ediyoruz."
-      : "Merhaba. Ben MKAOS. Sakin, tok ve anlaşılır Türkçe ses denemesi.";
+      ? "Merhaba, ben Gökçe. Türkçe konuşmam yerel ses motoruyla üretiliyor."
+      : "Merhaba, ben Metehan. Sakin, tok ve anlaşılır Türkçe ses denemesi.";
   speakText(text);
 });
 
