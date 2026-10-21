@@ -288,3 +288,26 @@ The dependency-free, read-only local checkpoint inspector is `tools/mkaos_hf_ada
 
 The Hugging Face architecture decision table and required parity protocol are in [MKAOS HF compatibility matrix](docs/MKAOS_HF_COMPATIBILITY_MATRIX.md). A pinned SmolLM2-135M-Instruct CPU reference smoke workflow is defined at `.github/workflows/mkaos-hf-cpu-smoke.yml`. Its repeat-logit check validates the reference runtime only; it does not claim MKAOSW1 conversion parity. Numerical comparison metrics are implemented in `tools/mkaos_numerical_parity.py`.
 
+
+
+## CI hatasını test-önce izole doğrulama
+
+`tools/ci_repair_executor.py`, incelemeye hazır iki ayrı yama verildiğinde (önce regresyon testi, sonra düzeltme) bunları geçici çalışma alanında doğrulayan güvenli bir yürütme katmanıdır. Çalışma, ağsız ve kısıtlı Docker konteynerinde testleri çalıştırır; Docker imajının tam SHA-256 digest ile sabitlenmesi gerekir. Komutlar JSON argv dizileridir, shell komut dizeleri değildir.
+
+Örnek kullanım (yama dosyaları ve test komutları gerçek projeye göre hazırlanmalıdır):
+
+```bash
+python tools/ci_repair_executor.py \
+  --source . \
+  --test-patch /tmp/regression-test.patch \
+  --fix-patch /tmp/minimal-fix.patch \
+  --regression-command '["python","-m","unittest","tests.test_regression"]' \
+  --suite-command '["python","-m","unittest","discover","-s","tests"]' \
+  --image 'python:3.12-slim@sha256:<64-hex-digest>' \
+  --timeout 300 \
+  --output /tmp/ci-repair-evidence.json
+```
+
+`<64-hex-digest>` yer tutucudur; güvenilir kaynaktan alınmış gerçek imaj digest'iyle değiştirilmelidir. Test yaması düzeltmeden önce başarısız olmazsa, düzeltmeden sonraki regresyon testi veya tam test paketi geçmezse yürütücü başarısız olur. Yama yolları izin listesi ve sır dosyası kurallarıyla kontrol edilir.
+
+Bu yürütücü henüz CI logundan otomatik olarak tam hatayı yeniden üretmez, test/düzeltme yamalarını kendi başına üretmez veya taslak PR açmaz. Sadece verdiğin yamaların güvenli yürütme ve test-önce kanıt katmanıdır. Merge ve dağıtım otomatik değildir.
