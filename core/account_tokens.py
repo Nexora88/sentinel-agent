@@ -139,14 +139,11 @@ def consume_token(auth: AuthManager, token: str, purpose: str, new_password: str
         # email, but can never leave a reusable token after a password change.
         conn.execute("UPDATE account_tokens SET used_at=? WHERE token_hash=? AND used_at IS NULL", (now, digest))
         conn.commit()
-    finally:
-        conn.close()
-    if purpose == "verify":
-        return bool(auth.mark_email_verified(username))
-    return bool(new_password and auth.set_password(username, new_password))
-
     except Exception:
         conn.rollback()
         raise
     finally:
         conn.close()
+    if purpose == "verify":
+        return bool(auth.mark_email_verified(username))
+    return bool(new_password and auth.set_password(username, new_password))
