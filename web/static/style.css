@@ -610,3 +610,41 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .briefing-strip p { font-size:.76rem; }
 @media(max-width:1000px) { .command-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .command-columns { grid-template-columns:1fr; } }
 @media(max-width:600px) { .command-topline { align-items:flex-start; flex-direction:column; } .network-chip { max-width:100%; } .command-dashboard { padding:13px; border-radius:15px; } .metric-card { padding:12px; } .metric-card strong { font-size:1rem; } .briefing-strip { align-items:flex-start; flex-wrap:wrap; } .briefing-strip .shortcut-btn { margin-left:46px; } .activity-item { grid-template-columns:8px minmax(0,1fr); } .activity-state { grid-column:2; text-align:left; } }
+
+
+/* Local Turkish voice controls: compact, responsive, and visually separate from chat input. */
+.voice-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.45);
+  color: var(--text, #e2e8f0);
+  font-size: 0.85rem;
+}
+.voice-controls select,
+.voice-controls button {
+  max-width: 100%;
+  min-height: 34px;
+}
+.voice-controls input[type="range"] {
+  width: 88px;
+  accent-color: var(--accent, #38bdf8);
+}
+#voice-status {
+  flex-basis: 100%;
+  color: var(--muted, #94a3b8);
+  overflow-wrap: anywhere;
+}
+#voice-status.is-ready {
+  color: var(--success, #34d399);
+}
+@media (max-width: 640px) {
+  .voice-controls { gap: 6px; padding: 8px; }
+  .voice-controls select { flex: 1 1 100%; }
+  #voice-status { font-size: 0.78rem; }
+}
