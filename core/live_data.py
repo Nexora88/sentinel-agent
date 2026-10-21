@@ -16,6 +16,7 @@ import requests
 WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 TRAFFIC_URL = "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
 CACHE_TTL_SECONDS = 300
+MAX_CACHE_ENTRIES = 512
 _lock = threading.Lock()
 _cache: dict[tuple[str, float, float], tuple[float, dict[str, Any]]] = {}
 
@@ -54,7 +55,11 @@ def _cached(provider: str, lat: float, lon: float) -> dict[str, Any] | None:
 
 def _store(provider: str, lat: float, lon: float, payload: dict[str, Any]) -> dict[str, Any]:
     with _lock:
-        _cache[(provider, lat, lon)] = (time.monotonic(), payload)
+        key = (provider, lat, lon)
+        _cache.pop(key, None)
+        while len(_cache) >= MAX_CACHE_ENTRIES:
+            _cache.pop(next(iter(_cache)))
+        _cache[key] = (time.monotonic(), payload)
     return {**payload, "cache": "miss"}
 
 

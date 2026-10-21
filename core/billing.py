@@ -110,7 +110,7 @@ def create_checkout_session(username: str) -> dict:
         data = response.json()
         checkout_url = data.get("url", "")
         checkout_host = urlsplit(checkout_url).hostname
-        if not data.get("id", "").startswith("cs_test_") or checkout_host != "checkout.stripe.com":
+        if data.get("livemode") is not False or not data.get("id", "").startswith("cs_test_") or checkout_host != "checkout.stripe.com":
             raise ValueError("unexpected checkout response")
         return {"status": "checkout_created", "provider": "stripe", "mode": "test", "url": checkout_url}
     except Exception:
@@ -149,6 +149,8 @@ def apply_webhook(payload: bytes, signature_header: str | None) -> dict:
     if not secret.startswith("whsec_"):
         raise BillingError("Stripe test webhook sırrı yapılandırılmalıdır.")
     event = _verify_signature(payload, signature_header or "", secret)
+    if event.get("livemode") is not False:
+        raise BillingError("Only Stripe test-mode webhook events are accepted.")
     event_id = event["id"]
     event_type = event.get("type", "")
     obj = event.get("data", {}).get("object", {})

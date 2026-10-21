@@ -36,7 +36,7 @@ class BillingTests(unittest.TestCase):
 
     def test_checkout_requires_test_mode_and_returns_only_hosted_url(self):
         response = Mock()
-        response.json.return_value = {"id": "cs_test_123", "url": "https://checkout.stripe.com/c/pay/cs_test_123"}
+        response.json.return_value = {"id": "cs_test_123", "url": "https://checkout.stripe.com/c/pay/cs_test_123", "livemode": False}
         response.raise_for_status.return_value = None
         with patch("core.billing.requests.post", return_value=response):
             result = create_checkout_session("tester")
@@ -51,6 +51,7 @@ class BillingTests(unittest.TestCase):
     def test_webhook_signature_is_verified_and_event_is_idempotent(self):
         event = {
             "id": "evt_test_123",
+            "livemode": False,
             "type": "checkout.session.completed",
             "data": {"object": {
                 "client_reference_id": "tester",
@@ -71,6 +72,16 @@ class BillingTests(unittest.TestCase):
         self.assertEqual(first["status"], "processed")
         self.assertEqual(second["status"], "duplicate_ignored")
         self.assertEqual(get_billing_status("tester")["plan_status"], "active")
+
+    def test_live_mode_webhook_is_rejected_even_with_a_valid_signature(self):
+        event = {"id": "evt_live_123", "livemode": True, "type": "ignored", "data": {"object": {}}}
+        payload = json.dumps(event, separators=(",", ":")).encode()
+        timestamp = str(int(time.time()))
+        signed = timestamp.encode() + b"." + payload
+        signature = hmac.new(b"whsec_unit_test_only", signed, hashlib.sha256).hexdigest()
+        with patch("core.billing._network_and_test_key", return_value="sk_test_unit_test_only"):
+            with self.assertRaisesRegex(BillingError, "test-mode"):
+                apply_webhook(payload, f"t={timestamp},v1={signature}")
 
     def test_bad_webhook_signature_is_rejected(self):
         with self.assertRaises(BillingError):
