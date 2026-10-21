@@ -2,6 +2,18 @@
 
 **MKAOS, bağımsız bir proje ve marka adıdır.** Teknik sınıflandırma açısından mevcut sürüm bir Linux dağıtımı veya işletim sistemi çekirdeği değil; Python/Rust tabanlı, yerel çalışmayı ve insan onayını esas alan ajan, çıkarım, bilgi erişimi ve görev yönetimi platformudur. “Operating System” adı ürün vizyonunu/markasını ifade eder; kernel veya Linux dağıtımı olduğu iddiası değildir.
 
+## Model şeffaflığı ve API'siz çalışma
+
+**Bu depo tek başına belirli bir çevrimiçi LLM sağlayıcısını kullanmaz ve GPT/Gemini/Groq gibi bir modelin bu uygulamanın içine gömülü olduğu iddiasında bulunmaz.** Varsayılan sohbet yolu yerel Rust `mkaos-generate` motorudur. Onaylı ve hash'i doğrulanmış `models/mkaos/model.mkaosw` checkpoint'i yapılandırılmadıysa sohbetin HTTP 503 dönmesi beklenir. Bu hata, gizli bir bulut modeline geçmek yerine gerçek kapasite eksikliğini görünür kılar.
+
+- **Varsayılan sohbet motoru:** yerel MKAOS Rust CLI; checkpoint hazır değilse kullanılamaz.
+- **İsteğe bağlı uyumluluk modelleri:** Ollama/Qwen ve legacy SmolLM2 gibi modeller yalnızca açık yapılandırma/profil ile çalıştırılır; MKAOS'un kendi eğitilmiş ağırlıkları sayılmaz.
+- **Modelin sürümü:** model dosyası, tokenizer, mimari parametreleri ve SHA-256 manifesti dağıtımda kaydedilmelidir. Çalışma anında model dosyası yoksa otomatik indirme veya sessiz sağlayıcı yedeği yapılmaz.
+- **API'siz yerel özellikler:** yerel dosya/RAG, yerel kod denetimi, testler, yerel Piper ses üretimi ve yerel STT modelleri uygun dosyalar önceden kurulduğunda dış LLM/TTS API'si olmadan çalışabilir. Yerel model dosyaları depoya eklenmez.
+- **Hava durumu ve trafik:** anahtar gerektirmeyen, açıkça yapılandırılmış kamu veri beslemesi veya önceden indirilmiş veri bulunmadığında canlı durum iddia edilmez. Çevrimdışı modda trafik yoğunluğu ve anlık hava koşulları garanti edilemez; son veri zamanı ve kaynak gösterilmeden tahminler gerçek zamanlı veri diye sunulmamalıdır.
+- **Egemenlik etiketi:** yerel model seçimi tek başına tam egemenlik kanıtı değildir. Firewall/çıkış trafiği, bağımlılık tedarik zinciri, ana bilgisayar ve yedekleme katmanı ayrıca denetlenmelidir.
+
+
 **Yerel Türkçe ajan platformu.** HTTP sohbet yolu artık varsayılan olarak yerel Rust `mkaos-generate` CLI'ına gider ve onaylı yerel checkpoint yoksa açıkça `503` döndürür; üçüncü taraf SmolLM2'ye sessiz geri dönüş yapılmaz. Ancak henüz onaylı Türkçe korpus, eğitilmiş kullanılabilir MKAOS checkpoint'i veya bağımsız Türkçe kalite kanıtı yoktur. Sentetik CI eğitimi mimari/aktarım testidir; gerçek Türkçe yetenek kanıtı değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
 MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. POST /api/chat varsayılan olarak yerel Rust CLI yolunu kullanır ve model dosyası yoksa hata görünür kalır. RAG varsayılanı, önceden yerel diske kurulmuş çok dilli semantik embedding modelidir; çalışma sırasında internetten model indirilmez. Model bulunmaz veya SHA-256 envanteri uyuşmazsa semantik RAG başlatılması hata verir; sessizce n-gram veya bulut sağlayıcısına düşmez. N-gram yalnızca açıkça seçilebilen deneysel baseline olarak kalır.
