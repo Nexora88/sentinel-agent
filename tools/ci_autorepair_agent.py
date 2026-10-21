@@ -22,12 +22,20 @@ MAX_DIFF = 32_000
 MAX_MODEL_REPLY = 1_000_000
 
 
+def redact(value: str) -> str:
+    value = re.sub(r"(?i)(github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,})", "[REDACTED_TOKEN]", value)
+    value = re.sub(r"(?i)(authorization\\s*[:=]\\s*bearer\\s+)\\S+", r"\\1[REDACTED]", value)
+    value = re.sub(r"(?i)((?:password|passwd|secret|api[_-]?key|access[_-]?token)\\s*[=:]\\s*)[^\\s,;]+", r"\\1[REDACTED]", value)
+    value = re.sub(r"(?i)(sk_(?:live|test)_[A-Za-z0-9]+|whsec_[A-Za-z0-9]+)", "[REDACTED_STRIPE_SECRET]", value)
+    return value
+
+
 def run(argv: list[str], *, cwd: Path = ROOT, timeout: int = 120, check: bool = True) -> str:
     result = subprocess.run(argv, cwd=cwd, text=True, capture_output=True,
                             timeout=timeout, shell=False, check=False)
     if check and result.returncode:
         raise RuntimeError(f"command failed ({result.returncode}): {argv[0]}: {result.stderr[-1200:]}")
-    return (result.stdout + ("\n" + result.stderr if result.stderr else ""))[-MAX_LOG:]
+    return redact(result.stdout + ("\n" + result.stderr if result.stderr else ""))[-MAX_LOG:]
 
 
 def local_model(prompt: str) -> dict:
@@ -85,8 +93,7 @@ def main() -> int:
 
     logs = run(["gh", "run", "view", run_id, "--repo", repository, "--log-failed"], timeout=90)
     # Fetch commit objects as data. No failed-commit code is imported or executed on host.
-    run(["git", "fetch", "--no-tags", "origin", failed_sha], timeout=90)
-    base = run(["git", "rev-parse", "origin/main"]).strip()
+    # Load the trusted sandbox executor before switching to the untrusted failed commit.\n    from tools.ci_repair_executor import run_trial\n    run(["git", "fetch", "--no-tags", "origin", failed_sha], timeout=90)\n    base = run(["git", "rev-parse", "origin/main"]).strip()
     diff = run(["git", "diff", "--no-ext-diff", "--unified=2", base, failed_sha],
                timeout=90, check=False)[:MAX_DIFF]
     run(["git", "checkout", "--detach", failed_sha])
