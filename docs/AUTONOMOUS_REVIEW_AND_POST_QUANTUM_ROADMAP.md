@@ -62,3 +62,16 @@ Ajanlar birbirinin talimatlarını güvenilir kabul etmemeli; yalnızca yapılan
 **Etkinleşme notu:** GitHub `workflow_run` tetikleyicisi yalnızca varsayılan dalda bulunan iş akışını çalıştırır. Bu taslak PR birleştirilmeden, bu yeni kanıt iş akışı PR'ın kendi başarısız CI çalışmasını otomatik yakalayamaz; önce insan incelemesi gerekir. Birleştirme sonrası sonraki CI başarısızlıklarında etkinleşir.
 
 Bu liste mimari kabul ölçütleridir; mevcut uygulamada tüm maddelerin sağlandığı anlamına gelmez.
+
+
+## CI düzeltme yürütücüsü — ilk uygulama dilimi
+
+`tools/ci_repair_executor.py` test-önce doğrulama denemelerini bir kerelik çalışma alanında yürütmek için eklendi. Ayrı bir regresyon-test yaması ve düzeltme yaması alır; önce regresyon testinin başarısız olduğunu, sonra düzeltmeden sonra aynı testin ve tam test komutunun başarılı olduğunu kanıtlamadan başarılı rapor üretmez.
+
+- Kaynak geçici bir dizine kopyalanır; `.git`, `.env*`, model ve bellek dizinleri kopyalanmaz.
+- Testler yalnızca SHA-256 özetiyle sabitlenmiş Docker imajında; `--network none`, salt okunur kök dosya sistemi, kapalı Linux yetenekleri, PID/RAM/CPU sınırları ve ayrı geçici alanla çalışır.
+- Komutlar shell metni değil, doğrulanmış argv listeleridir. Yalnızca Python unittest/pytest, Node sözdizimi denetimi ve Cargo test komutları kabul edilir.
+- Yama yolları proje izin listesiyle sınırlandırılır; gizli dosya/anahtar yolları, path traversal ve sembolik bağlantı üzerinden yazma reddedilir.
+- Kanıt raporu komutları, dönüş kodlarını, süreleri ve yama hash'lerini içerir. Bu araç commit, push, PR, merge veya dağıtım yapmaz.
+
+**Sınır:** Bu, güvenli yürütme katmanıdır; henüz başarısız GitHub Actions adımını kendi başına indirip aynen yeniden üretmez, LLM ile test/düzeltme yamalarını otomatik üretmez veya taslak PR açmaz. Yama ve komutları şu an güvenilir bir üst katman sağlamalıdır. Bu sınırlar çözülmeden tam otonom onarım iddiası yapılmamalıdır.
