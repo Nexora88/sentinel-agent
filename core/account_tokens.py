@@ -135,17 +135,16 @@ def consume_token(auth: AuthManager, token: str, purpose: str, new_password: str
             conn.rollback()
             return False
         username = row[0]
-        # Mark single-use before applying mutation; roll back if the mutation fails.
+        # Consume and commit before mutating the auth store. A crash may require a new
+        # email, but can never leave a reusable token after a password change.
         conn.execute("UPDATE account_tokens SET used_at=? WHERE token_hash=? AND used_at IS NULL", (now, digest))
-        if purpose == "verify":
-            ok = auth.mark_email_verified(username)
-        else:
-            ok = bool(new_password and auth.set_password(username, new_password))
-        if not ok:
-            conn.rollback()
-            return False
         conn.commit()
-        return True
+    finally:
+        conn.close()
+    if purpose == "verify":
+        return bool(auth.mark_email_verified(username))
+    return bool(new_password and auth.set_password(username, new_password))
+
     except Exception:
         conn.rollback()
         raise
