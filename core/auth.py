@@ -143,16 +143,51 @@ class AuthManager:
             "salt": salt,
             "role": role,
             "display_name": display_name or username,
+            "email": "",
+            "email_verified": False,
             "created_at": datetime.utcnow().isoformat(),
             "active": True,
         }
         self._save()
         return True
 
+    def set_email(self, username: str, email: str) -> bool:
+        username = username.lower().strip()
+        email = email.strip().lower()
+        if username not in self._users or len(email) > 254 or '@' not in email or email.startswith('@') or email.endswith('@'):
+            return False
+        self._users[username]['email'] = email
+        self._users[username]['email_verified'] = False
+        self._save()
+        return True
+
+    def mark_email_verified(self, username: str) -> bool:
+        username = username.lower().strip()
+        if username not in self._users:
+            return False
+        self._users[username]['email_verified'] = True
+        self._save()
+        return True
+
+    def set_password(self, username: str, password: str) -> bool:
+        username = username.lower().strip()
+        if username not in self._users or len(password) < 12 or len(password) > 1024:
+            return False
+        salt = secrets.token_hex(16)
+        self._users[username]['salt'] = salt
+        self._users[username]['password_hash'] = self._hash(password, salt)
+        self._save()
+        for token, session in list(self.sessions.items()):
+            if session.get('username') == username:
+                self.sessions.pop(token, None)
+        return True
+
     def authenticate(self, username: str, password: str) -> Optional[str]:
         username = username.lower().strip()
         user = self._users.get(username)
         if not user or not user.get("active"):
+            return None
+        if os.getenv("MKAOS_REQUIRE_VERIFIED_EMAIL", "false").strip().lower() in {"1", "true", "yes", "on"} and user.get("email") and not user.get("email_verified"):
             return None
         if not hmac.compare_digest(self._hash(password, user["salt"]), user["password_hash"]):
             return None
