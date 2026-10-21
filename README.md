@@ -146,6 +146,8 @@ MKAOS her gece varsayılan olarak 03:00 (Europe/Istanbul) saatinde yerel bakım 
 
 ## Yerel Türkçe ses
 
+Arayüzde iki profilin görünen adları **Metehan** (erkek, tok/bilge) ve **Gökçe** (kadın, enerjik/net) olarak sunulur. Bunlar marka/gösterim adlarıdır; gerçek ses, yerel Piper model dosyasından gelir. İlgili model kurulu değilse durum paneli eksik olduğunu göstermelidir. Ses seçimi, hız ayarı ve test/durdur kontrolleri dış TTS API'sine gönderim yapmaz.
+
 - **Erkek sesi:** tok ve bilge profil; varsayılan Piper `tr_TR-fettah-medium`.
 - **Kadın sesi:** enerjik ve net profil; varsayılan Piper `tr_TR-dfki-medium`.
 - **Kedi dublajı:** yerel `ffmpeg` ile ses perdesi efekti. Modelin gerçek ses rengi, kurulu Türkçe ses paketinin kalitesine bağlıdır; yayımdan önce gerçek cihazda dinleyerek doğrula.
