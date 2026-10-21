@@ -58,4 +58,7 @@ Ajanlar birbirinin talimatlarını güvenilir kabul etmemeli; yalnızca yapılan
 5. Ajanlar doğrudan `main`e push/merge yapamaz. PR oluşturma için ayrı, dar kapsamlı yetki gerekir; merge, release ve deploy insan onayında kalır.
 6. Her karar, diff hash'i, test komutu/çıkış kodu, model sağlayıcısı-sürümü ve runner imajı değişmez bir kanıt raporuna yazılır.
 
+
+**Etkinleşme notu:** GitHub `workflow_run` tetikleyicisi yalnızca varsayılan dalda bulunan iş akışını çalıştırır. Bu taslak PR birleştirilmeden, bu yeni kanıt iş akışı PR'ın kendi başarısız CI çalışmasını otomatik yakalayamaz; önce insan incelemesi gerekir. Birleştirme sonrası sonraki CI başarısızlıklarında etkinleşir.
+
 Bu liste mimari kabul ölçütleridir; mevcut uygulamada tüm maddelerin sağlandığı anlamına gelmez.
