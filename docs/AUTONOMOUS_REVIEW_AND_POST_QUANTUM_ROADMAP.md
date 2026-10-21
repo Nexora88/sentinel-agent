@@ -75,3 +75,11 @@ Bu liste mimari kabul ölçütleridir; mevcut uygulamada tüm maddelerin sağlan
 - Kanıt raporu komutları, dönüş kodlarını, süreleri ve yama hash'lerini içerir. Bu araç commit, push, PR, merge veya dağıtım yapmaz.
 
 **Sınır:** Bu, güvenli yürütme katmanıdır; henüz başarısız GitHub Actions adımını kendi başına indirip aynen yeniden üretmez, LLM ile test/düzeltme yamalarını otomatik üretmez veya taslak PR açmaz. Yama ve komutları şu an güvenilir bir üst katman sağlamalıdır. Bu sınırlar çözülmeden tam otonom onarım iddiası yapılmamalıdır.
+
+
+## Canlı veri ve ödeme test dilimi — 2026-10-21
+
+- \`core/live_data.py\` gerçek Open-Meteo hava durumu ve TomTom trafik akışı adaptörleri sağlar. Ağ modu ve her özellik için ayrı opt-in zorunludur; koordinatlar doğrulanır, sağlayıcı yanıtı/observation timestamp'i ve çekim zamanı döndürülür, kısa TTL önbelleği vardır. TomTom API anahtarı yoksa trafik başarısız olur; sahte veya tahmini trafik verisi üretilmez.
+- \`GET /api/live/weather\` ve \`GET /api/live/traffic\` kimlik doğrulamalıdır. Varsayılan Compose profili çevrimdışı kalır. \`docker-compose.networked.yml\` yalnızca ağ yolunu açar; her \`ALLOW_*\` izni ayrıca açıkça etkinleştirilmelidir.
+- \`core/billing.py\` Stripe-hosted Checkout test akışı, imza/zaman damgası doğrulamalı webhook ve SQLite olay tekilleştirmesi ekler. Kart bilgisi MKAOS'a girmez; \`sk_live_\` anahtarları reddedilir. \`POST /api/billing/checkout\`, \`GET /api/billing/status\` ve \`POST /api/billing/webhook\` uç noktaları eklendi.
+- Bu entegrasyonlar kod ve test seviyesinde hazırlanmıştır; gerçek sağlayıcı anahtarları, TomTom lisans/kota doğrulaması, Stripe test hesabı/price/webhook yapılandırması ve uçtan uca canlı bağlantı bu ortamda doğrulanmış değildir. Gerçek tahsilat desteklenmez. Hesap sistemi mevcut kimlik doğrulama/passkey katmanını kullanır; e-posta doğrulama/parola sıfırlama ve üretim ödeme operasyonları ayrı tamamlanmalıdır.
