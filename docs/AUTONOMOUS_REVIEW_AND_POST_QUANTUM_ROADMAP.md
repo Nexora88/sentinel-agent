@@ -35,3 +35,27 @@ Arayüzdeki gösterim adları Gökçe (kadın profili) ve Metehan (erkek profili
 
 ## Hesap, ödeme ve canlı sağlayıcılar
 Bunlar yalnızca arayüz ekleyerek tamamlanmış sayılmaz. Hesaplar için oturum güvenliği, parola sıfırlama ve e-posta doğrulama; ödeme için sağlayıcı webhook imzası, idempotency, test modu ve sır yönetimi; hava durumu/trafik için lisans, kota, zaman aşımı, cache, veri zaman damgası ve sağlayıcı kesintisi testleri gerekir. Sağlayıcı anahtarları istemciye gönderilmemelidir.
+
+
+## Uygulama durumu — 2026-10-21
+
+Bu dalda ilk güvenli dilim olarak:
+- CI başarısız olduğunda çalışacak `.github/workflows/ci-failure-evidence.yml` eklendi. Varsayılan dalın güvenilir raporlama aracını kullanır; başarısız PR kodunu checkout edip çalıştırmaz, yalnızca 14 gün saklanan redakte edilmiş hata raporu üretir.
+- `tools/ci_failure_report.py` logları sınırlar ve yaygın token/parola biçimlerini redakte eder; `tests/test_ci_failure_report.py` bu davranışları test eder.
+- Arayüzde yerel Piper profilleri Gökçe (female) ve Metehan (male) olarak görünür. Bunlar yalnızca gösterim adlarıdır; ilgili Türkçe Piper modellerinin yerel olarak kurulması gerekir.
+
+**Henüz tamamlanmamış:** otomatik izole yeniden üretim, yamadan önce başarısız olduğu kanıtlanan regresyon testi üretimi, en küçük yamanın otomatik uygulanması ve tam CI kanıtlarıyla otomatik taslak PR oluşturulması. Raporlama iş akışı bu işleri kendiliğinden yapmaz. Bunları eklemek için sır içermeyen, ağ çıkışı kapalı tek kullanımlık runner ve kısıtlı yerel kod modeli/araç yürütücüsü ayrı ayrı doğrulanmalıdır. Testler bu ortamda henüz çalıştırılmadı; bu nedenle yeşil CI veya başarılı regresyon iddiası yoktur.
+
+## Ajan kafesi ve güvenlik sınırı
+
+Ajanlar birbirinin talimatlarını güvenilir kabul etmemeli; yalnızca yapılandırılmış görev girdisi, kaynak SHA, izin listesi ve boyut/zaman limitleri paylaşmalıdır. Kod, issue metni, log, README ve test çıktıları güvenilmeyen veri kabul edilir; bunlardan gelen komutlar otomatik yürütülmez.
+
+Önerilen üretim sınırları:
+1. Planlayıcı/eleştirmen/uygulayıcı ayrı süreç ve ayrı kimliklerle çalışır; uygulayıcı yalnızca geçici çalışma alanına yazabilir.
+2. Runner varsayılan olarak ağsız, sır erişimsiz, salt okunur kaynak + ayrı yazılabilir patch alanı ve CPU/RAM/zaman sınırlarıyla çalışır.
+3. Dosya yolları izin listesiyle sınırlandırılır; symlink/path traversal, büyük dosya, binary ve gizli dosya değişimleri reddedilir.
+4. Testler ağ erişimi ve üretim kimlik bilgileri olmadan çalışır; test başarısızlığı otomatik yeniden deneme sayısını sınırlar.
+5. Ajanlar doğrudan `main`e push/merge yapamaz. PR oluşturma için ayrı, dar kapsamlı yetki gerekir; merge, release ve deploy insan onayında kalır.
+6. Her karar, diff hash'i, test komutu/çıkış kodu, model sağlayıcısı-sürümü ve runner imajı değişmez bir kanıt raporuna yazılır.
+
+Bu liste mimari kabul ölçütleridir; mevcut uygulamada tüm maddelerin sağlandığı anlamına gelmez.
