@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 
 from tools.ci_repair_executor import (
@@ -34,12 +35,13 @@ class CIRepairExecutorPolicyTests(unittest.TestCase):
             )
 
     def test_docker_command_has_no_network_or_host_privileges(self):
-        command = build_docker_command(
-            workspace="/tmp/mkaos-worktree",
-            image="python:3.12-slim@sha256:" + "a" * 64,
-            argv=["python", "-m", "unittest", "tests.test_example"],
-            timeout_seconds=120,
-        )
+        with tempfile.TemporaryDirectory() as workspace:
+            command = build_docker_command(
+                workspace=workspace,
+                image="python:3.12-slim@sha256:" + "a" * 64,
+                argv=["python", "-m", "unittest", "tests.test_example"],
+                timeout_seconds=120,
+            )
         self.assertIn("--network", command)
         self.assertIn("none", command)
         self.assertIn("--read-only", command)
