@@ -206,6 +206,8 @@ class AuthManager:
         user = self._users.get(username)
         if not user or not user.get("active"):
             return None
+        if os.getenv("MKAOS_REQUIRE_VERIFIED_EMAIL", "false").strip().lower() in {"1", "true", "yes", "on"} and user.get("email") and not user.get("email_verified"):
+            return None
         token = secrets.token_urlsafe(32)
         self.sessions[token] = {
             "username": username,
