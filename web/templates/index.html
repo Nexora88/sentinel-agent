@@ -51,7 +51,10 @@
         <p class="panel-lead">Operasyon panelleri sol menüde. Yetenekler sekmesinde matris ve yerel poster vardır.</p>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="chat-input-area">
-          <button id="voice-btn" title="Yerel Türkçe sesli komut" class="icon-btn">🎤</button>
+          <textarea id="chat-input" placeholder="Emir veya hedef yaz... (plan için: planla: ...)" rows="2"></textarea>
+          <button id="send-btn">Gönder</button>
+        </div>
+        <div class="voice-controls" aria-label="Yerel ses kontrolleri">
           <label class="voice-picker-label" for="voice-select">Yerel ses</label>
           <select id="voice-select" aria-label="Yerel Türkçe ses profili">
             <option value="male">Metehan · Erkek sesi</option>
@@ -62,10 +65,8 @@
           <label for="voice-pace" class="voice-picker-label">Hız</label>
           <input id="voice-pace" type="range" min="0.85" max="1.15" step="0.05" value="1" aria-label="Ses hızı" />
           <span id="voice-pace-value">1×</span>
-          <span id="voice-status" role="status" aria-live="polite">Yerel ses durumu yükleniyor…</span>
           <label><input id="cat-dub-toggle" type="checkbox" /> Kedi dublajı</label>
-          <textarea id="chat-input" placeholder="Emir veya hedef yaz... (plan için: planla: ...)" rows="2"></textarea>
-          <button id="send-btn">Gönder</button>
+          <span id="voice-status" role="status" aria-live="polite">Yerel ses durumu yükleniyor…</span>
         </div>
       </section>
 
