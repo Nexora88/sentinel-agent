@@ -54,7 +54,15 @@ def main() -> int:
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--head-sha", required=True)
     args = parser.parse_args()
-    report = build_report(args.run_id, args.head_sha, sys.stdin.read(MAX_INPUT_CHARS + 1))
+    # Read only a bounded prefix, but drain the pipe so the upstream gh process
+    # does not fail with SIGPIPE when logs exceed the report limit.
+    raw_log = sys.stdin.read(MAX_INPUT_CHARS + 1)
+    truncated = len(raw_log) > MAX_INPUT_CHARS
+    while sys.stdin.read(64 * 1024):
+        truncated = True
+    report = build_report(args.run_id, args.head_sha, raw_log)
+    if truncated and "- Log truncated: yes" not in report:
+        report = report.replace("- Log truncated: no", "- Log truncated: yes")
     sys.stdout.write(report)
     return 0
 
