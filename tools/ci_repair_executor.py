@@ -19,8 +19,13 @@ import time
 from typing import Sequence
 
 ALLOWED_ROOTS = {
-    ".github/workflows", "agents", "config", "core", "docs",
+    ".github/workflows", "agents", "config", "core", "docs", "engine",
     "scripts", "tests", "tools", "web",
+}
+ALLOWED_ROOT_FILES = {
+    "Cargo.toml", "Cargo.lock", "Makefile", "package.json", "package-lock.json",
+    "pyproject.toml", "pytest.ini", "requirements.txt", "requirements-dev.txt",
+    "setup.cfg", "tox.ini",
 }
 DENIED_NAMES = {
     ".env", ".env.local", ".env.production", "id_rsa", "id_ed25519",
@@ -69,7 +74,9 @@ def validate_patch_paths(patch_text: str) -> None:
             raise ValueError("absolute paths and path traversal are forbidden")
         if any(part.lower() in DENIED_NAMES or part.lower().startswith(".env.") for part in path.parts):
             raise ValueError("patch touches a secret/configuration credential path")
-        if path.parts[0] not in ALLOWED_ROOTS:
+        if path.parts[0] not in ALLOWED_ROOTS and not (
+            len(path.parts) == 1 and path.name in ALLOWED_ROOT_FILES
+        ):
             raise ValueError("patch path is outside approved project roots")
         if path.suffix.lower() in {".pem", ".key", ".p12", ".pfx"}:
             raise ValueError("patch may not touch private-key material")
@@ -116,7 +123,7 @@ def _apply_patch(workspace: Path, patch_text: str) -> None:
     for line in patch_text.splitlines():
         if not (line.startswith("--- ") or line.startswith("+++ ")):
             continue
-        raw = line[4:].split("\\t", 1)[0].strip()
+        raw = line[4:].split("\t", 1)[0].strip()
         if raw == "/dev/null":
             continue
         if raw.startswith(("a/", "b/")):
@@ -206,7 +213,11 @@ def run_trial(
         workspace = Path(tmp) / "workspace"
         shutil.copytree(
             source_root, workspace, symlinks=True,
-            ignore=shutil.ignore_patterns(".git", ".env", ".env.*", "memory", "models", ".venv", "node_modules"),
+            ignore=shutil.ignore_patterns(
+                ".git", ".env", ".env.*", "memory", "models", ".venv", "node_modules",
+                ".aws", ".ssh", ".git-credentials", "credentials*", "secrets*",
+                "*.pem", "*.key", "*.p12", "*.pfx", "id_rsa", "id_ed25519",
+            ),
         )
         _apply_patch(workspace, test_text)
         before = _run_sandbox(workspace, image, regression, timeout_seconds)

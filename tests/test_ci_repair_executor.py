@@ -25,6 +25,8 @@ class CIRepairExecutorPolicyTests(unittest.TestCase):
 
     def test_patch_paths_reject_secrets_and_traversal(self):
         validate_patch_paths(PATCH)
+        validate_patch_paths("--- a/engine/mkaos-inference/src/lib.rs\n+++ b/engine/mkaos-inference/src/lib.rs\n@@ -1 +1 @@\n-a\n+b\n")
+        validate_patch_paths("--- a/Cargo.toml\n+++ b/Cargo.toml\n@@ -1 +1 @@\n-a\n+b\n")
         with self.assertRaises(ValueError):
             validate_patch_paths("--- a/.env\n+++ b/.env\n@@ -1 +1 @@\n-a\n+b\n")
         with self.assertRaises(ValueError):
