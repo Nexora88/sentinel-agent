@@ -75,20 +75,50 @@ class EncryptedVectorStore:
 
     def upsert(self, *, record_id: str, embedding: Iterable[float], document: str,
                metadata: dict[str, Any] | None = None) -> None:
-        if not isinstance(record_id, str) or not record_id or len(record_id) > 256:
-            raise CryptoRAGError("record_id must be a non-empty string of at most 256 chars.")
-        if not isinstance(document, str) or len(document.encode("utf-8")) > _MAX_RECORD_BYTES:
-            raise CryptoRAGError("Document must be UTF-8 text under 2 MiB.")
-        if metadata is not None and not isinstance(metadata, dict):
-            raise CryptoRAGError("Metadata must be an object.")
-        payload = json.dumps({"embedding": _finite_vector(embedding), "document": document,
-            "metadata": metadata or {}}, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
-        if len(payload) > _MAX_RECORD_BYTES:
-            raise CryptoRAGError("Encrypted record exceeds the 2 MiB limit.")
-        nonce = secrets.token_bytes(12)
-        ciphertext = self._cipher.encrypt(nonce, payload, _AAD + record_id.encode("utf-8"))
+        self.upsert_many([{
+            "record_id": record_id,
+            "embedding": embedding,
+            "document": document,
+            "metadata": metadata,
+        }])
+
+    def upsert_many(self, records: Iterable[dict[str, Any]]) -> None:
+        """Validate/encrypt a bounded batch before committing it atomically."""
+        batch = list(records)
+        if len(batch) > 10000:
+            raise CryptoRAGError("At most 10,000 records can be written in one batch.")
+        prepared = []
+        for record in batch:
+            if not isinstance(record, dict):
+                raise CryptoRAGError("Each encrypted record must be an object.")
+            record_id = record.get("record_id")
+            embedding = record.get("embedding")
+            document = record.get("document")
+            metadata = record.get("metadata")
+            if not isinstance(record_id, str) or not record_id or len(record_id) > 256:
+                raise CryptoRAGError("record_id must be a non-empty string of at most 256 chars.")
+            if not isinstance(document, str) or len(document.encode("utf-8")) > _MAX_RECORD_BYTES:
+                raise CryptoRAGError("Document must be UTF-8 text under 2 MiB.")
+            if metadata is not None and not isinstance(metadata, dict):
+                raise CryptoRAGError("Metadata must be an object.")
+            payload = json.dumps({
+                "embedding": _finite_vector(embedding),
+                "document": document,
+                "metadata": metadata or {},
+            }, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
+            if len(payload) > _MAX_RECORD_BYTES:
+                raise CryptoRAGError("Encrypted record exceeds the 2 MiB limit.")
+            nonce = secrets.token_bytes(12)
+            ciphertext = self._cipher.encrypt(nonce, payload, _AAD + record_id.encode("utf-8"))
+            prepared.append((record_id, nonce, ciphertext))
+        if not prepared:
+            return
         with self._connect() as db:
-            db.execute("INSERT INTO encrypted_vectors(record_id, nonce, ciphertext) VALUES (?, ?, ?) ON CONFLICT(record_id) DO UPDATE SET nonce=excluded.nonce, ciphertext=excluded.ciphertext", (record_id, nonce, ciphertext))
+            db.executemany(
+                "INSERT INTO encrypted_vectors(record_id, nonce, ciphertext) VALUES (?, ?, ?) "
+                "ON CONFLICT(record_id) DO UPDATE SET nonce=excluded.nonce, ciphertext=excluded.ciphertext",
+                prepared,
+            )
 
     def get(self, record_id: str) -> dict[str, Any] | None:
         """Return one authenticated record for migration and integrity checks."""
@@ -123,8 +153,30 @@ class EncryptedVectorStore:
             cur = db.execute("DELETE FROM encrypted_vectors WHERE record_id=?", (record_id,))
             return cur.rowcount > 0
 
-    def search(self, query_embedding: Iterable[float], *, limit: int = 5) -> list[dict[str, Any]]:
+    def list_records(self) -> list[dict[str, Any]]:
+        """Return all authenticated records for bounded pruning and offline audits."""
+        with self._connect() as db:
+            rows = db.execute("SELECT record_id, nonce, ciphertext FROM encrypted_vectors").fetchall()
+        records = []
+        for record_id, nonce, ciphertext in rows:
+            try:
+                raw = self._cipher.decrypt(nonce, ciphertext, _AAD + record_id.encode("utf-8"))
+                item = json.loads(raw.decode("utf-8"))
+                vector = _finite_vector(item.get("embedding", []))
+                document = item.get("document")
+                metadata = item.get("metadata", {})
+                if not isinstance(document, str) or not isinstance(metadata, dict):
+                    raise ValueError("Invalid encrypted record payload.")
+            except Exception as exc:
+                raise CryptoRAGError("Encrypted record failed authentication or validation.") from exc
+            records.append({"id": record_id, "embedding": vector, "document": document, "metadata": metadata})
+        return records
+
+    def search(self, query_embedding: Iterable[float], *, limit: int = 5,
+               metadata_filter: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         query = _finite_vector(query_embedding)
+        if metadata_filter is not None and not isinstance(metadata_filter, dict):
+            raise CryptoRAGError("metadata_filter must be an object.")
         if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 100:
             raise CryptoRAGError("limit must be an integer between 1 and 100.")
         with self._connect() as db:
@@ -137,6 +189,9 @@ class EncryptedVectorStore:
                 item = json.loads(raw.decode("utf-8"))
             except Exception as exc:
                 raise CryptoRAGError("Encrypted record failed authentication; refusing to skip it.") from exc
+            metadata = item.get("metadata", {})
+            if metadata_filter and any(metadata.get(key) != value for key, value in metadata_filter.items()):
+                continue
             vector = _finite_vector(item.get("embedding", []))
             if len(vector) != len(query):
                 continue
