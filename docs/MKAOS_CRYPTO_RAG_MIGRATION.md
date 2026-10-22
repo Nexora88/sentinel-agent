@@ -47,6 +47,22 @@ verification report and does not delete or rewrite source records.
 5. Review privacy, latency, capacity, key recovery, and restore procedures before
    changing the app to use the encrypted store.
 
+## Opt in to the encrypted MemoryStore backend
+
+Only after the report is verified and the encrypted file can be reopened with the key, set:
+
+    SEKA_RAG_STORAGE_BACKEND=crypto-sqlite
+    SEKA_CRYPTO_RAG_PATH=/app/crypto-rag/encrypted-vectors.sqlite3
+    MKAOS_CRYPTO_RAG_KEY=<Base64 key from your local secret store>
+
+The Docker Compose configuration now has a separate persistent crypto-rag volume. The
+backend remains opt-in; the default is still Chroma. Crypto-RAG currently supports the
+local mkaos-native and local-semantic embedding providers; it refuses the Ollama provider
+rather than silently crossing the local-only boundary. The database path must be outside
+the Chroma directory. Verify retrieval, tenant isolation, stats, restart, and restore in a
+staging copy before switching a live instance. Never put the key literal into a committed
+.env file or source control.
+
 A failed or interrupted migration intentionally leaves the plaintext source untouched.
 Do not delete the old directory automatically. Removal requires a separately verified
 restorable backup, a documented retention decision, and explicit human approval. The
