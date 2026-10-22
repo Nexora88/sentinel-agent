@@ -88,6 +88,7 @@ jobs:
           docker compose -f docker-compose.yml -f docker-compose.offline.yml config --quiet
           docker compose -f docker-compose.yml -f docker-compose.networked.yml config --quiet
           docker compose -f docker-compose.bootstrap.yml config --quiet
+          docker compose -f docker-compose.browser.yml --profile browser-lab config --quiet
       - name: Build container image
         run: docker build --tag seka-agent-ci .
       - name: Smoke-test web startup without Ollama
