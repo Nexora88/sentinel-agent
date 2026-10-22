@@ -48,10 +48,16 @@ class EncryptedVectorStore:
         if not isinstance(key, bytes) or len(key) != 32:
             raise CryptoRAGError("A 32-byte AES-256 key is required.")
         self.path = Path(path)
+        if self.path.is_symlink():
+            raise CryptoRAGError("Encrypted store path must not be a symlink.")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._cipher = AESGCM(key)
         with self._connect() as db:
             db.execute("CREATE TABLE IF NOT EXISTS encrypted_vectors (record_id TEXT PRIMARY KEY, nonce BLOB NOT NULL, ciphertext BLOB NOT NULL)")
+        try:
+            self.path.chmod(0o600)
+        except OSError as exc:
+            raise CryptoRAGError("Could not restrict encrypted database file permissions.") from exc
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
