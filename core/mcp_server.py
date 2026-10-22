@@ -11,8 +11,20 @@ from typing import Any
 MAX_LINE_BYTES = 1024 * 1024
 MAX_READ_BYTES = 128 * 1024
 _ALLOWED_ROOTS = ("docs", "core", "agents", "tools", "tests", "config")
-_BLOCKED_PARTS = {".git", "__pycache__", "node_modules", ".venv", "venv"}
-_BLOCKED_NAMES = {".env", ".env.local", ".env.production", "secrets.json", "credentials.json"}
+_BLOCKED_PARTS = {".git", "__pycache__", "node_modules", ".venv", "venv", ".ssh", ".aws", ".gnupg"}
+_BLOCKED_NAMES = {".env", "secrets", "credentials", "token", "id_rsa", "id_ecdsa", "id_ed25519", "authorized_keys"}
+_SECRET_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".secret", ".sqlite", ".sqlite3", ".db")
+
+def _is_secret_name(name: str) -> bool:
+    lowered = name.lower()
+    return (
+        lowered in _BLOCKED_NAMES
+        or lowered.startswith(".env")
+        or lowered.endswith(".env")
+        or ".env." in lowered
+        or lowered.startswith(("secrets.", "credentials.", "token."))
+        or lowered.endswith(_SECRET_SUFFIXES)
+    )
 
 def _workspace() -> Path:
     return Path(os.environ.get("MKAOS_MCP_WORKSPACE", ".")).resolve()
@@ -27,8 +39,8 @@ def read_workspace_text(relative_path: str) -> str:
         raise ValueError("Path is outside the MCP read-only allowlist.")
     if any(part in _BLOCKED_PARTS for part in candidate_path.parts):
         raise ValueError("Path contains a blocked directory.")
-    if candidate_path.name.lower() in _BLOCKED_NAMES or candidate_path.name.lower().endswith((".pem", ".key", ".p12", ".pfx")):
-        raise ValueError("Secret and private-key files are not exposed over MCP.")
+    if _is_secret_name(candidate_path.name):
+        raise ValueError("Secret, database, and private-key files are not exposed over MCP.")
     root = _workspace()
     cursor = root
     for part in candidate_path.parts:
