@@ -189,7 +189,7 @@ class MemoryStore:
         ids = [self._document_id(doc) for doc in docs]
         with self._lock:
             # Stable IDs prevent the same source/chunk from inflating the collection.
-            if self.crypto_store is not None:
+            if getattr(self, "crypto_store", None) is not None:
                 vectors = self.embedding_function.embed_documents([doc.page_content for doc in docs])
                 if len(vectors) != len(docs):
                     raise ValueError("Embedding provider returned a mismatched vector count.")
@@ -215,7 +215,7 @@ class MemoryStore:
         }])
 
     def _prune_if_needed(self) -> None:
-        if self.crypto_store is not None:
+        if getattr(self, "crypto_store", None) is not None:
             count = self.crypto_store.count()
             excess = count - self.max_documents
             if excess <= 0:
@@ -275,7 +275,7 @@ class MemoryStore:
         candidate_k = min(100, max(safe_k, safe_k * 4))
         try:
             bounded_query = query.strip()[:4000]
-            if self.crypto_store is not None:
+            if getattr(self, "crypto_store", None) is not None:
                 rows = self.crypto_store.search(
                     self.embedding_function.embed_query(bounded_query),
                     limit=candidate_k,
@@ -298,7 +298,7 @@ class MemoryStore:
         candidate_k = min(100, max(safe_k, safe_k * 4))
         try:
             bounded_query = query.strip()[:4000]
-            if self.crypto_store is not None:
+            if getattr(self, "crypto_store", None) is not None:
                 rows = self.crypto_store.search(
                     self.embedding_function.embed_query(bounded_query),
                     limit=candidate_k,
@@ -334,13 +334,13 @@ class MemoryStore:
     def stats(self) -> dict:
         collection = getattr(self.vectorstore, "_collection", None)
         try:
-            count = self.crypto_store.count() if self.crypto_store is not None else (int(collection.count()) if collection is not None else 0)
+            count = self.crypto_store.count() if getattr(self, "crypto_store", None) is not None else (int(collection.count()) if collection is not None else 0)
         except Exception:
             count = 0
         disk_bytes = 0
         try:
             disk_paths = {p for p in self.persist_directory.rglob("*") if p.is_file()}
-            if self.crypto_store is not None:
+            if getattr(self, "crypto_store", None) is not None:
                 disk_paths.update(p for p in (
                     self.crypto_store.path,
                     Path(str(self.crypto_store.path) + "-wal"),
