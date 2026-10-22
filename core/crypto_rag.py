@@ -60,6 +60,10 @@ class EncryptedVectorStore:
             db.execute("PRAGMA journal_mode=WAL")
             db.execute("PRAGMA secure_delete=ON")
             yield db
+            db.commit()
+        except BaseException:
+            db.rollback()
+            raise
         finally:
             db.close()
 
