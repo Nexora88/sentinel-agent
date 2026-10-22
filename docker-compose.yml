@@ -39,6 +39,9 @@ services:
       - SEKA_RAG_MAX_DOCUMENTS=${SEKA_RAG_MAX_DOCUMENTS:-10000}
       - SEKA_RAG_MAX_CHUNKS_PER_INGEST=${SEKA_RAG_MAX_CHUNKS_PER_INGEST:-500}
       - SEKA_RAG_MAX_CHARS_PER_INGEST=${SEKA_RAG_MAX_CHARS_PER_INGEST:-1000000}
+      - SEKA_RAG_STORAGE_BACKEND=${SEKA_RAG_STORAGE_BACKEND:-chroma}
+      - SEKA_CRYPTO_RAG_PATH=${SEKA_CRYPTO_RAG_PATH:-/app/crypto-rag/encrypted-vectors.sqlite3}
+      - MKAOS_CRYPTO_RAG_KEY=${MKAOS_CRYPTO_RAG_KEY:-}
       - SEKA_NIGHT_AUTORUN=${SEKA_NIGHT_AUTORUN:-true}
       - SEKA_NIGHT_HOUR=${SEKA_NIGHT_HOUR:-3}
       - SEKA_NIGHT_MINUTE=${SEKA_NIGHT_MINUTE:-0}
@@ -62,6 +65,7 @@ services:
       - U2NET_HOME=${U2NET_HOME:-/app/models/u2net}
     volumes:
       - sentinel_memory:/app/memory
+      - crypto_rag_data:/app/crypto-rag
       - ./models:/app/models:ro
       - ./config:/app/config:ro
     networks:
@@ -120,4 +124,6 @@ volumes:
   ollama_models:
     name: seka_ollama_models
   sentinel_memory:
+    driver: local
+  crypto_rag_data:
     driver: local
