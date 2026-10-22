@@ -1,0 +1,50 @@
+services:
+  browser-fixture:
+    image: nginx:1.28-alpine
+    container_name: mkaos-browser-fixture
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    volumes:
+      - ./tests/browser-fixture:/usr/share/nginx/html:ro
+    networks: [browser_lab]
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 64
+    restart: "no"
+
+  browser-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.browser
+    container_name: mkaos-playwright-worker
+    environment:
+      MKAOS_BROWSER_ALLOWED_HOSTS: browser-fixture
+    depends_on:
+      - browser-fixture
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
+    tmpfs:
+      - /tmp:size=128m,noexec,nosuid
+    volumes:
+      - ./artifacts/browser:/screenshots:rw
+    networks: [browser_lab]
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 128
+    shm_size: 256m
+    restart: "no"
+    # No host ports, secrets, Docker socket, or external network.
+    profiles: ["browser-lab"]
+
+networks:
+  browser_lab:
+    internal: true
