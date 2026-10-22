@@ -1,13 +1,13 @@
 :root {
-  --bg: #070b14;
-  --bg-panel: #0d1320;
-  --bg-card: #151d2e;
-  --border: #243049;
+  --bg: #05040b;
+  --bg-panel: #0b0914;
+  --bg-card: #110d1d;
+  --border: #2a2140;
   --text: #e8eef8;
   --text-muted: #8b9bb4;
-  --accent: #5eead4;
-  --accent-2: #38bdf8;
-  --accent-dim: #2dd4bf;
+  --accent: #a66aff;
+  --accent-2: #d8deea;
+  --accent-dim: #792cff;
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #f87171;
@@ -610,3 +610,15 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .briefing-strip p { font-size:.76rem; }
 @media(max-width:1000px) { .command-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .command-columns { grid-template-columns:1fr; } }
 @media(max-width:600px) { .command-topline { align-items:flex-start; flex-direction:column; } .network-chip { max-width:100%; } .command-dashboard { padding:13px; border-radius:15px; } .metric-card { padding:12px; } .metric-card strong { font-size:1rem; } .briefing-strip { align-items:flex-start; flex-wrap:wrap; } .briefing-strip .shortcut-btn { margin-left:46px; } .activity-item { grid-template-columns:8px minmax(0,1fr); } .activity-state { grid-column:2; text-align:left; } }
+
+
+/* MKAOS visual identity: obsidian, brushed silver and electric violet. */
+.logo { gap: 10px; }
+.logo-emblem { display:block; flex:0 0 48px; width:48px; height:48px; filter: drop-shadow(0 0 10px rgba(139,66,255,.28)); }
+.logo .brand { color:#f1f2f8; letter-spacing:.12em; }
+.logo .brand::first-letter { color:#a66aff; }
+.logo .tag { letter-spacing:.08em; }
+.logo .brand-motto { color:#b18aff; font-size:.64rem; letter-spacing:.035em; }
+.nav-btn.active { background:linear-gradient(90deg,rgba(139,66,255,.22),rgba(139,66,255,.05)); color:#c5a4ff; box-shadow:inset 2px 0 0 #8b42ff; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline:2px solid #b18aff; outline-offset:2px; }
+@media (max-width: 700px) { .logo-emblem { width:40px; height:40px; flex-basis:40px; } .logo { gap:8px; } .logo .brand { font-size:1.05rem; } }
