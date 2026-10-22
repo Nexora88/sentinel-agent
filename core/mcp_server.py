@@ -30,6 +30,11 @@ def read_workspace_text(relative_path: str) -> str:
     if candidate_path.name.lower() in _BLOCKED_NAMES or candidate_path.name.lower().endswith((".pem", ".key", ".p12", ".pfx")):
         raise ValueError("Secret and private-key files are not exposed over MCP.")
     root = _workspace()
+    cursor = root
+    for part in candidate_path.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            raise ValueError("Symlink paths are not exposed over MCP.")
     resolved = (root / candidate_path).resolve()
     if not resolved.is_relative_to(root):
         raise ValueError("Resolved path escapes the workspace.")
