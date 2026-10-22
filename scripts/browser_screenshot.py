@@ -13,7 +13,6 @@ import socket
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from playwright.sync_api import Error as PlaywrightError, sync_playwright
 
 
 def _allowed_hosts() -> set[str]:
@@ -62,6 +61,9 @@ def main() -> int:
     if Path("/screenshots") not in output.parents:
         parser.error("--output must be a child of /screenshots.")
     output.parent.mkdir(parents=True, exist_ok=True)
+
+    # Playwright is installed only in the isolated browser image, not in the main app/CI runner.
+    from playwright.sync_api import Error as PlaywrightError, sync_playwright
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=["--disable-background-networking", "--disable-component-update"])
