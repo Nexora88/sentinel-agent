@@ -25,6 +25,25 @@ class MCPServerTests(unittest.TestCase):
         self.assertEqual(result["result"]["tools"][0]["name"], "workspace_read_text")
         result = handle_message({"jsonrpc":"2.0","id":2,"method":"nope"})
         self.assertEqual(result["error"]["code"], -32601)
+    def test_symlink_escape_is_rejected(self):
+        outside = self.root.parent / (self.root.name + "-outside.txt")
+        outside.write_text("not for MCP", encoding="utf-8")
+        link = self.root / "docs" / "linked.txt"
+        try:
+            link.symlink_to(outside)
+        except (OSError, NotImplementedError):
+            outside.unlink(missing_ok=True)
+            self.skipTest("Symlink creation is unavailable on this runner.")
+        try:
+            with self.assertRaises(ValueError):
+                read_workspace_text("docs/linked.txt")
+        finally:
+            outside.unlink(missing_ok=True)
+
+    def test_tools_call_rejects_malformed_params(self):
+        result = handle_message({"jsonrpc":"2.0","id":3,"method":"tools/call","params":"not-an-object"})
+        self.assertEqual(result["error"]["code"], -32602)
+
     def test_tools_call_returns_error_content(self):
         result = handle_message({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"workspace_read_text","arguments":{"path":"../secret"}}})
         self.assertTrue(result["result"]["isError"])
