@@ -1,0 +1,7 @@
+# Pin this base to a verified image digest before production use.
+FROM mcr.microsoft.com/playwright/python:v1.55.0-noble
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY scripts/browser_screenshot.py /app/browser_screenshot.py
+USER pwuser
+ENTRYPOINT ["python", "/app/browser_screenshot.py"]
