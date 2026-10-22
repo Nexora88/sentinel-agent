@@ -84,6 +84,34 @@ class EncryptedVectorStore:
         with self._connect() as db:
             db.execute("INSERT INTO encrypted_vectors(record_id, nonce, ciphertext) VALUES (?, ?, ?) ON CONFLICT(record_id) DO UPDATE SET nonce=excluded.nonce, ciphertext=excluded.ciphertext", (record_id, nonce, ciphertext))
 
+    def get(self, record_id: str) -> dict[str, Any] | None:
+        """Return one authenticated record for migration and integrity checks."""
+        with self._connect() as db:
+            row = db.execute(
+                "SELECT nonce, ciphertext FROM encrypted_vectors WHERE record_id=?",
+                (record_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        nonce, ciphertext = row
+        try:
+            raw = self._cipher.decrypt(nonce, ciphertext, _AAD + record_id.encode("utf-8"))
+            item = json.loads(raw.decode("utf-8"))
+            vector = _finite_vector(item.get("embedding", []))
+            document = item.get("document")
+            metadata = item.get("metadata", {})
+            if not isinstance(document, str) or not isinstance(metadata, dict):
+                raise ValueError("Invalid encrypted record payload.")
+        except Exception as exc:
+            raise CryptoRAGError("Encrypted record failed authentication or validation.") from exc
+        return {"id": record_id, "embedding": vector, "document": document, "metadata": metadata}
+
+    def count(self) -> int:
+        """Return the number of encrypted records without decrypting payloads."""
+        with self._connect() as db:
+            row = db.execute("SELECT COUNT(*) FROM encrypted_vectors").fetchone()
+        return int(row[0])
+
     def delete(self, record_id: str) -> bool:
         with self._connect() as db:
             cur = db.execute("DELETE FROM encrypted_vectors WHERE record_id=?", (record_id,))
