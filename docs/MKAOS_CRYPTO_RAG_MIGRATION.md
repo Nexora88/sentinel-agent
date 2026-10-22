@@ -22,7 +22,8 @@ copies records into a new AES-256-GCM SQLite store and leaves the source untouch
 
 Example paths are placeholders; substitute the actual local paths and exact collection:
 
-    export MKAOS_CRYPTO_RAG_KEY='BASE64_KEY_STORED_OUTSIDE_THE_DATABASE'
+    read -rsp "Crypto-RAG key: " MKAOS_CRYPTO_RAG_KEY; echo
+    export MKAOS_CRYPTO_RAG_KEY
     python -m tools.migrate_crypto_rag \
       --source-dir ./memory \
       --collection sentinel_memory_native_hash_v1 \
