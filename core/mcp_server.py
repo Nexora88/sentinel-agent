@@ -22,7 +22,8 @@ def _is_secret_name(name: str) -> bool:
         or lowered.startswith(".env")
         or lowered.endswith(".env")
         or ".env." in lowered
-        or lowered.startswith(("secrets.", "credentials.", "token."))
+        or lowered.startswith(("secrets.", "credentials.", "token.", "private_key", "api_key", "access_token", "refresh_token", "client_secret", "service_account"))
+        or lowered.endswith((".credentials", ".token", "_key.json", "_keys.json"))
         or lowered.endswith(_SECRET_SUFFIXES)
     )
 
