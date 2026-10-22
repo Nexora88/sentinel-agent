@@ -53,6 +53,11 @@ class MemoryStore:
         # For semantic retrieval, opt into a pre-installed local model; downloads are disabled.
         require_semantic = os.getenv("SEKA_REQUIRE_SEMANTIC_EMBEDDINGS", "false").strip().lower() in {"1", "true", "yes", "on"}
         requested_provider = os.getenv("SEKA_EMBEDDINGS_PROVIDER", "").strip().lower()
+        requested_storage_backend = os.getenv("SEKA_RAG_STORAGE_BACKEND", "chroma").strip().lower()
+        if requested_storage_backend not in {"chroma", "crypto-sqlite"}:
+            raise ValueError("SEKA_RAG_STORAGE_BACKEND must be chroma or crypto-sqlite.")
+        if requested_storage_backend == "crypto-sqlite" and requested_provider == "ollama":
+            raise ValueError("Crypto-RAG requires local mkaos-native or local-semantic embeddings; Ollama mode is not initialized.")
         local_model_path = os.getenv("SEKA_LOCAL_EMBEDDING_MODEL_PATH", "").strip()
         if require_semantic and requested_provider not in {"", "local-semantic"}:
             raise ValueError("SEKA_REQUIRE_SEMANTIC_EMBEDDINGS is enabled; only local-semantic retrieval is permitted.")
@@ -97,9 +102,7 @@ class MemoryStore:
         )
         self._lock = threading.RLock()
         self.embedding_function = embedding_function
-        self.storage_backend = os.getenv("SEKA_RAG_STORAGE_BACKEND", "chroma").strip().lower()
-        if self.storage_backend not in {"chroma", "crypto-sqlite"}:
-            raise ValueError("SEKA_RAG_STORAGE_BACKEND must be chroma or crypto-sqlite.")
+        self.storage_backend = requested_storage_backend
         if self.storage_backend == "crypto-sqlite":
             if self.embedding_provider == "ollama":
                 raise ValueError("Crypto-RAG currently requires a local embedding object; choose mkaos-native or local-semantic.")
