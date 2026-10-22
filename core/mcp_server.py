@@ -56,7 +56,7 @@ def handle_message(message: dict[str, Any]) -> dict[str, Any] | None:
     if method == "notifications/initialized":
         return None
     if method == "initialize":
-        return _response(request_id, {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "mkaos-readonly-workspace", "version": "0.1.0"}})
+        return _response(request_id, {"protocolVersion": "2025-11-25", "capabilities": {"tools": {}}, "serverInfo": {"name": "mkaos-readonly-workspace", "version": "0.1.0"}})
     if method == "ping":
         return _response(request_id, {})
     if method == "tools/list":
