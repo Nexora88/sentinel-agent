@@ -18,7 +18,7 @@ class MCPServerTests(unittest.TestCase):
     def test_read_allowlisted_file(self):
         self.assertEqual(read_workspace_text("docs/safe.md"), "MKAOS docs")
     def test_reject_traversal_and_secret_files(self):
-        for value in ("../docs/safe.md", ".", "/etc/passwd", "docs/.env", "docs/.env.development", "docs/secrets.yaml", "docs/id_ed25519", "docs/state.sqlite3", "secrets/keys.pem"):
+        for value in ("../docs/safe.md", ".", "/etc/passwd", "docs/.env", "docs/.env.development", "docs/secrets.yaml", "docs/id_ed25519", "docs/state.sqlite3", "docs/api_key.json", "docs/access_token.txt", "secrets/keys.pem"):
             with self.subTest(value=value), self.assertRaises(ValueError): read_workspace_text(value)
     def test_tools_list_and_invalid_method(self):
         result = handle_message({"jsonrpc":"2.0","id":1,"method":"tools/list"})
