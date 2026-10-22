@@ -8,10 +8,15 @@ class CryptoRAGTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "vectors.sqlite3"
             EncryptedVectorStore(path, b"k" * 32).upsert(record_id="r1", embedding=[1.0, 0.0], document="private vulnerability report text", metadata={"source": "private.py"})
-            raw = path.read_bytes()
-            self.assertNotIn(b"private vulnerability report text", raw)
-            self.assertNotIn(b"private.py", raw)
-            result = EncryptedVectorStore(path, b"k" * 32).search([1.0, 0.0])
+            raw_files = [p.read_bytes() for p in Path(tmp).iterdir() if p.is_file()]
+            self.assertTrue(raw_files)
+            for raw in raw_files:
+                self.assertNotIn(b"private vulnerability report text", raw)
+                self.assertNotIn(b"private.py", raw)
+            reopened = EncryptedVectorStore(path, b"k" * 32)
+            self.assertEqual(reopened.count(), 1)
+            self.assertEqual(reopened.get("r1")["embedding"], [1.0, 0.0])
+            result = reopened.search([1.0, 0.0])
             self.assertEqual(result[0]["document"], "private vulnerability report text")
             self.assertEqual(result[0]["metadata"]["source"], "private.py")
     def test_wrong_key_and_tampering_fail_closed(self):
