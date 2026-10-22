@@ -7,7 +7,8 @@ replacement; callers must explicitly opt into this store.
 from __future__ import annotations
 import base64, json, math, os, secrets, sqlite3
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
+from contextlib import contextmanager
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 _MAX_RECORD_BYTES = 2 * 1024 * 1024
@@ -52,11 +53,15 @@ class EncryptedVectorStore:
         with self._connect() as db:
             db.execute("CREATE TABLE IF NOT EXISTS encrypted_vectors (record_id TEXT PRIMARY KEY, nonce BLOB NOT NULL, ciphertext BLOB NOT NULL)")
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         db = sqlite3.connect(self.path, timeout=5)
-        db.execute("PRAGMA journal_mode=WAL")
-        db.execute("PRAGMA secure_delete=ON")
-        return db
+        try:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("PRAGMA secure_delete=ON")
+            yield db
+        finally:
+            db.close()
 
     def upsert(self, *, record_id: str, embedding: Iterable[float], document: str,
                metadata: dict[str, Any] | None = None) -> None:
