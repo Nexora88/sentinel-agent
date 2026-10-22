@@ -33,7 +33,7 @@ def read_workspace_text(relative_path: str) -> str:
     if not isinstance(relative_path, str) or not relative_path or len(relative_path) > 512:
         raise ValueError("A bounded relative path is required.")
     candidate_path = Path(relative_path)
-    if candidate_path.is_absolute() or any(part in ("..", "") for part in candidate_path.parts):
+    if not candidate_path.parts or candidate_path.is_absolute() or any(part in ("..", "") for part in candidate_path.parts):
         raise ValueError("Path traversal and absolute paths are not allowed.")
     if candidate_path.parts[0] not in _ALLOWED_ROOTS:
         raise ValueError("Path is outside the MCP read-only allowlist.")
