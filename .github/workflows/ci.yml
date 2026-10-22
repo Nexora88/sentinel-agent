@@ -171,7 +171,7 @@ jobs:
           subject-path: artifacts/mkaos-sbom.cdx.json
   experimental-owned-model-smoke:
     name: Owner-approved local-only MKAOS training + Rust smoke
-    if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'mkaos-owner-approved-local-training' || github.event.pull_request.head.ref == 'mkaos-scale-rag-hardware' || github.event.pull_request.head.ref == 'feat/mcp-crypto-rag-zero-trust')
+    if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'mkaos-owner-approved-local-training' || github.event.pull_request.head.ref == 'mkaos-scale-rag-hardware')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
