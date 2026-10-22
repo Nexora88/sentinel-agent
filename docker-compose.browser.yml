@@ -25,6 +25,7 @@ services:
     container_name: mkaos-playwright-worker
     environment:
       MKAOS_BROWSER_ALLOWED_HOSTS: browser-fixture
+      MKAOS_BROWSER_ALLOWED_PORTS: "80"
     depends_on:
       - browser-fixture
     read_only: true
