@@ -1,3 +1,15 @@
+> **Gerçekçilik ve yerli teknoloji durumu (22 Ekim 2026):** MKAOS, Türkiye merkezli geliştirilen bir proje hedefidir; mevcut bağımlılıkları, açık kaynak bileşenleri ve donanım/yazılım tedarik zinciri nedeniyle **“%100 yerli” veya bütünüyle bağımsız olduğu iddia edilmez**. Aşağıdaki özellikler birbirinden ayrıdır: MKAOS tarafından yazılan kod, üçüncü taraf açık kaynak bağımlılıkları, yerel çalışan harici model/embedding ağırlıkları ve henüz deneysel olan kendi model altyapısı. Bunlar aynı şey değildir.
+>
+> **Kullanılabilirlik notu:** Gerçek bir onaylı MKAOS dil modeli checkpoint'i bulunmadığında varsayılan yerel sohbet uç noktası bilinçli olarak HTTP 503 döndürür; bu, hazır bir sohbet botu olduğu anlamına gelmez. Uygulamanın diğer görev, RAG, güvenlik ve yönetim özellikleri kendi bağımlılık ve yapılandırmalarına bağlıdır. Sentetik CI modeli Türkçe kalite kanıtı değildir.
+>
+> **Kuantum sonrası kriptografi (PQC):** MKAOS'ta PQC'nin üretimde etkinleştirildiği iddia edilmez. ML-KEM/ML-DSA veya hibrit TLS ancak sabitlenmiş uygulama, lisans/tedarik zinciri incelemesi, protokol uyumluluğu, anahtar/sertifika yaşam döngüsü ve karşılıklı testler başarıyla tamamlanırsa etkinleştirilebilir. WireGuard kendi başına PQC veya uygulama seviyesinde uçtan uca şifreleme sağlamaz.
+>
+> **Güvenlik entegrasyonları:** PR #100; salt okunur MCP temeli, isteğe bağlı AES-GCM Crypto-RAG, veri kaybetmeyen aktarım araçları, izole Playwright ekran görüntüsü laboratuvarı ve mTLS politika yardımcıları ekler. Bunların hepsi otomatik olarak canlı/üretime alınmış değildir. Crypto-RAG aktarımı açıkça çalıştırılıp kayıt/içerik bütünlüğü doğrulanana kadar eski düz metin depolar silinmez. WireGuard gerçek makinelerde ayrıca kurulup doğrulanmalıdır.
+>
+> **CI ve performans:** CI run #948 başarılıdır; fakat “Owner-approved local-only MKAOS training + Rust smoke” işi atlanmıştır, bu nedenle bu çalışmadan gerçek TTFT/üretim model kalitesi sonucu çıkarılamaz. TTFT, token/s, bellek ve Türkçe kalite ölçümleri yalnızca belirtilen model/checkpoint, donanım, test seti ve ölçüm koşullarıyla birlikte raporlanmalıdır.
+>
+> **Arayüz kimliği:** Gösterge paneli MKAOS'un geometrik gümüş-mor amblemini ve koyu obsidyen/mor renk paletini kullanır. Atatürk portreli konsept görseli kurumsal sunum/kapak için ayrı tutulur; küçük arayüz ikonu olarak detayları kaybolduğu için kullanılmaz.
+>
 # MKAOS v6.5 — Mustafa Kemal Atatürk Operating System
 
 **MKAOS, bağımsız bir proje ve marka adıdır.** Teknik sınıflandırma açısından mevcut sürüm bir Linux dağıtımı veya işletim sistemi çekirdeği değil; Python/Rust tabanlı, yerel çalışmayı ve insan onayını esas alan ajan, çıkarım, bilgi erişimi ve görev yönetimi platformudur. “Operating System” adı ürün vizyonunu/markasını ifade eder; kernel veya Linux dağıtımı olduğu iddiası değildir.
