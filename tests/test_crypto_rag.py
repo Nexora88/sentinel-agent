@@ -29,6 +29,19 @@ class CryptoRAGTests(unittest.TestCase):
                 db.execute("UPDATE encrypted_vectors SET ciphertext=? WHERE record_id='r1'", (b"bad",))
             with self.assertRaises(CryptoRAGError):
                 EncryptedVectorStore(path, b"a" * 32).search([0.1, 0.2])
+    def test_symlink_database_path_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "target.sqlite3"
+            target.write_bytes(b"not a database")
+            link = root / "linked.sqlite3"
+            try:
+                link.symlink_to(target)
+            except (OSError, NotImplementedError):
+                self.skipTest("Symlink creation is unavailable on this runner.")
+            with self.assertRaises(CryptoRAGError):
+                EncryptedVectorStore(link, b"k" * 32)
+
     def test_limits_and_key_validation(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = EncryptedVectorStore(Path(tmp) / "vectors.sqlite3", b"k" * 32)
