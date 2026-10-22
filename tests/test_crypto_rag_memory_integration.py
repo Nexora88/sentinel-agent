@@ -54,6 +54,18 @@ class CryptoRAGMemoryIntegrationTests(unittest.TestCase):
                 store.add_texts(["first stored note", "second stored note"], metadatas=[{"source": "one"}, {"source": "two"}])
                 self.assertEqual(store.stats()["documents"], 1)
 
+    def test_crypto_backend_rejects_ollama_before_initializing_client(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "SEKA_EMBEDDINGS_PROVIDER": "ollama",
+                "SEKA_REQUIRE_SEMANTIC_EMBEDDINGS": "false",
+                "SEKA_RAG_STORAGE_BACKEND": "crypto-sqlite",
+            }
+            with patch.dict(os.environ, env, clear=False):
+                with patch("core.rag.OllamaClient", side_effect=AssertionError("must not initialize Ollama")):
+                    with self.assertRaises(ValueError):
+                        MemoryStore(persist_directory=str(Path(tmp) / "chroma"))
+
     def test_crypto_backend_requires_explicit_path_and_key(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {
