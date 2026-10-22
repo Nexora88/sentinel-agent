@@ -45,6 +45,9 @@ from core.safety.sovereignty import sovereignty_status
 from core.approval_protocol import SignedApprovalProtocol, ApprovalProtocolError
 from core.improvement_gate import ImprovementProposalStore, ImprovementProposalError
 from core.integrations.catalog import integration_status
+from core.live_data import LiveDataError, get_weather, get_traffic
+from core.billing import BillingError, create_checkout_session, get_billing_status, apply_webhook
+from core.account_tokens import AccountTokenError, request_verification, request_password_reset, consume_token
 from tools.clean_room_audit import scan_code_cleanliness
 
 logging.basicConfig(level=logging.INFO)
@@ -205,6 +208,19 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+class AccountEmailRequest(BaseModel):
+    email: str
+
+class PasswordResetRequest(BaseModel):
+    username: str
+
+class AccountTokenRequest(BaseModel):
+    token: str
+
+class PasswordResetCompleteRequest(BaseModel):
+    token: str
+    new_password: str
+
 class PasskeyOptionsRequest(BaseModel):
     username: str
 
@@ -318,6 +334,40 @@ async def login(req: LoginRequest):
     return {"token": token, "user": auth.validate(token)}
 
 
+@app.post("/api/account/email/verification/request")
+async def account_email_verification_request(req: AccountEmailRequest, authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    try:
+        request_verification(auth, user["username"], req.email)
+    except AccountTokenError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    return {"status": "verification_email_sent"}
+
+
+@app.post("/api/account/email/verification/consume")
+async def account_email_verification_consume(req: AccountTokenRequest):
+    if not consume_token(auth, req.token, "verify"):
+        raise HTTPException(400, "Doğrulama bağlantısı geçersiz veya süresi dolmuş.")
+    return {"status": "email_verified"}
+
+
+@app.post("/api/account/password-reset/request")
+async def account_password_reset_request(req: PasswordResetRequest):
+    try:
+        request_password_reset(auth, req.username)
+    except AccountTokenError:
+        # Avoid exposing whether an account exists or has an email configured.
+        pass
+    return {"status": "if_account_exists_email_was_sent"}
+
+
+@app.post("/api/account/password-reset/consume")
+async def account_password_reset_consume(req: PasswordResetCompleteRequest):
+    if not consume_token(auth, req.token, "reset", req.new_password):
+        raise HTTPException(400, "Sıfırlama bağlantısı geçersiz, süresi dolmuş veya parola politikası karşılanmadı.")
+    return {"status": "password_reset"}
+
+
 @app.get("/api/webauthn/capabilities")
 async def webauthn_capabilities():
     return webauthn.capabilities()
@@ -428,6 +478,49 @@ def _ollama_status(p: SentinelPipeline) -> dict:
         }
     finally:
         session.close()
+
+
+
+@app.get("/api/live/weather")
+async def api_live_weather(latitude: float, longitude: float, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    try:
+        return get_weather(latitude, longitude)
+    except LiveDataError as exc:
+        raise HTTPException(503, str(exc)) from None
+
+
+@app.get("/api/live/traffic")
+async def api_live_traffic(latitude: float, longitude: float, authorization: Optional[str] = Header(None)):
+    get_user(authorization)
+    try:
+        return get_traffic(latitude, longitude)
+    except LiveDataError as exc:
+        raise HTTPException(503, str(exc)) from None
+
+
+@app.post("/api/billing/checkout")
+async def api_billing_checkout(authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    try:
+        return create_checkout_session(user["username"])
+    except BillingError as exc:
+        raise HTTPException(503, str(exc)) from None
+
+
+@app.get("/api/billing/status")
+async def api_billing_status(authorization: Optional[str] = Header(None)):
+    user = get_user(authorization)
+    return get_billing_status(user["username"])
+
+
+@app.post("/api/billing/webhook")
+async def api_billing_webhook(request: Request, stripe_signature: Optional[str] = Header(None)):
+    payload = await request.body()
+    try:
+        return apply_webhook(payload, stripe_signature)
+    except BillingError:
+        raise HTTPException(400, "Stripe test webhook imzası veya yapılandırması geçersiz.") from None
 
 
 @app.get("/api/status")

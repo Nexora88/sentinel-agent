@@ -2,6 +2,18 @@
 
 **MKAOS, bağımsız bir proje ve marka adıdır.** Teknik sınıflandırma açısından mevcut sürüm bir Linux dağıtımı veya işletim sistemi çekirdeği değil; Python/Rust tabanlı, yerel çalışmayı ve insan onayını esas alan ajan, çıkarım, bilgi erişimi ve görev yönetimi platformudur. “Operating System” adı ürün vizyonunu/markasını ifade eder; kernel veya Linux dağıtımı olduğu iddiası değildir.
 
+## Model şeffaflığı ve API'siz çalışma
+
+**Bu depo tek başına belirli bir çevrimiçi LLM sağlayıcısını kullanmaz ve GPT/Gemini/Groq gibi bir modelin bu uygulamanın içine gömülü olduğu iddiasında bulunmaz.** Varsayılan sohbet yolu yerel Rust `mkaos-generate` motorudur. Onaylı ve hash'i doğrulanmış `models/mkaos/model.mkaosw` checkpoint'i yapılandırılmadıysa sohbetin HTTP 503 dönmesi beklenir. Bu hata, gizli bir bulut modeline geçmek yerine gerçek kapasite eksikliğini görünür kılar.
+
+- **Varsayılan sohbet motoru:** yerel MKAOS Rust CLI; checkpoint hazır değilse kullanılamaz.
+- **İsteğe bağlı uyumluluk modelleri:** Ollama/Qwen ve legacy SmolLM2 gibi modeller yalnızca açık yapılandırma/profil ile çalıştırılır; MKAOS'un kendi eğitilmiş ağırlıkları sayılmaz.
+- **Modelin sürümü:** model dosyası, tokenizer, mimari parametreleri ve SHA-256 manifesti dağıtımda kaydedilmelidir. Çalışma anında model dosyası yoksa otomatik indirme veya sessiz sağlayıcı yedeği yapılmaz.
+- **API'siz yerel özellikler:** yerel dosya/RAG, yerel kod denetimi, testler, yerel Piper ses üretimi ve yerel STT modelleri uygun dosyalar önceden kurulduğunda dış LLM/TTS API'si olmadan çalışabilir. Yerel model dosyaları depoya eklenmez.
+- **Hava durumu ve trafik:** anahtar gerektirmeyen, açıkça yapılandırılmış kamu veri beslemesi veya önceden indirilmiş veri bulunmadığında canlı durum iddia edilmez. Çevrimdışı modda trafik yoğunluğu ve anlık hava koşulları garanti edilemez; son veri zamanı ve kaynak gösterilmeden tahminler gerçek zamanlı veri diye sunulmamalıdır.
+- **Egemenlik etiketi:** yerel model seçimi tek başına tam egemenlik kanıtı değildir. Firewall/çıkış trafiği, bağımlılık tedarik zinciri, ana bilgisayar ve yedekleme katmanı ayrıca denetlenmelidir.
+
+
 **Yerel Türkçe ajan platformu.** HTTP sohbet yolu artık varsayılan olarak yerel Rust `mkaos-generate` CLI'ına gider ve onaylı yerel checkpoint yoksa açıkça `503` döndürür; üçüncü taraf SmolLM2'ye sessiz geri dönüş yapılmaz. Ancak henüz onaylı Türkçe korpus, eğitilmiş kullanılabilir MKAOS checkpoint'i veya bağımsız Türkçe kalite kanıtı yoktur. Sentetik CI eğitimi mimari/aktarım testidir; gerçek Türkçe yetenek kanıtı değildir. Güvenlik, veri sahipliği ve insan onayı temel ilkedir.
 
 MKAOS; görev planlama, yerel bilgi deposu, kod inceleme, savunmacı güvenlik taraması, iş kuyruğu ve isteğe bağlı GitHub araçlarını bir araya getirir. POST /api/chat varsayılan olarak yerel Rust CLI yolunu kullanır ve model dosyası yoksa hata görünür kalır. RAG varsayılanı, önceden yerel diske kurulmuş çok dilli semantik embedding modelidir; çalışma sırasında internetten model indirilmez. Model bulunmaz veya SHA-256 envanteri uyuşmazsa semantik RAG başlatılması hata verir; sessizce n-gram veya bulut sağlayıcısına düşmez. N-gram yalnızca açıkça seçilebilen deneysel baseline olarak kalır.
@@ -133,6 +145,8 @@ MKAOS her gece varsayılan olarak 03:00 (Europe/Istanbul) saatinde yerel bakım 
 **Güvenlik sınırı:** Gece döngüsü kodu kendiliğinden değiştirmez, komut çalıştırıp push yapmaz ve onayları atlamaz; rapor ve öneri hazırlar. Web/finans/site taraması ilgili `ALLOW_*` iznine bağlıdır ve varsayılan kapalıdır. Bilgisayar tamamen kapalıyken görev çalışmaz; MKAOS'un çalıştığı makine açık ve Docker çalışır durumda olmalıdır.
 
 ## Yerel Türkçe ses
+
+Arayüzde iki profilin görünen adları **Metehan** (erkek, tok/bilge) ve **Gökçe** (kadın, enerjik/net) olarak sunulur. Bunlar marka/gösterim adlarıdır; gerçek ses, yerel Piper model dosyasından gelir. İlgili model kurulu değilse durum paneli eksik olduğunu göstermelidir. Ses seçimi, hız ayarı ve test/durdur kontrolleri dış TTS API'sine gönderim yapmaz.
 
 - **Erkek sesi:** tok ve bilge profil; varsayılan Piper `tr_TR-fettah-medium`.
 - **Kadın sesi:** enerjik ve net profil; varsayılan Piper `tr_TR-dfki-medium`.
@@ -274,3 +288,41 @@ The dependency-free, read-only local checkpoint inspector is `tools/mkaos_hf_ada
 
 The Hugging Face architecture decision table and required parity protocol are in [MKAOS HF compatibility matrix](docs/MKAOS_HF_COMPATIBILITY_MATRIX.md). A pinned SmolLM2-135M-Instruct CPU reference smoke workflow is defined at `.github/workflows/mkaos-hf-cpu-smoke.yml`. Its repeat-logit check validates the reference runtime only; it does not claim MKAOSW1 conversion parity. Numerical comparison metrics are implemented in `tools/mkaos_numerical_parity.py`.
 
+
+
+## CI hatasını test-önce izole doğrulama
+
+`tools/ci_repair_executor.py`, incelemeye hazır iki ayrı yama verildiğinde (önce regresyon testi, sonra düzeltme) bunları geçici çalışma alanında doğrulayan güvenli bir yürütme katmanıdır. Çalışma, ağsız ve kısıtlı Docker konteynerinde testleri çalıştırır; Docker imajının tam SHA-256 digest ile sabitlenmesi gerekir. Komutlar JSON argv dizileridir, shell komut dizeleri değildir.
+
+Örnek kullanım (yama dosyaları ve test komutları gerçek projeye göre hazırlanmalıdır):
+
+```bash
+python tools/ci_repair_executor.py \
+  --source . \
+  --test-patch /tmp/regression-test.patch \
+  --fix-patch /tmp/minimal-fix.patch \
+  --regression-command '["python","-m","unittest","tests.test_regression"]' \
+  --suite-command '["python","-m","unittest","discover","-s","tests"]' \
+  --image 'python:3.12-slim@sha256:<64-hex-digest>' \
+  --timeout 300 \
+  --output /tmp/ci-repair-evidence.json
+```
+
+`<64-hex-digest>` yer tutucudur; güvenilir kaynaktan alınmış gerçek imaj digest'iyle değiştirilmelidir. Test yaması düzeltmeden önce başarısız olmazsa, düzeltmeden sonraki regresyon testi veya tam test paketi geçmezse yürütücü başarısız olur. Yama yolları izin listesi ve sır dosyası kurallarıyla kontrol edilir.
+
+Bu yürütücü henüz CI logundan otomatik olarak tam hatayı yeniden üretmez, test/düzeltme yamalarını kendi başına üretmez veya taslak PR açmaz. Sadece verdiğin yamaların güvenli yürütme ve test-önce kanıt katmanıdır. Merge ve dağıtım otomatik değildir.
+
+
+## Live weather, traffic, and Stripe test checkout
+
+The following authenticated endpoints use real provider responses; they never fabricate live data:
+
+- \`GET /api/live/weather?latitude=41.0&longitude=29.0\` — Open-Meteo current conditions, observation time, fetch time, source and a five-minute cache.
+- \`GET /api/live/traffic?latitude=41.0&longitude=29.0\` — TomTom flow segment data; requires an authorized \`TOMTOM_API_KEY\`.
+- \`POST /api/billing/checkout\` — creates a Stripe-hosted subscription checkout in **test mode only**.
+- \`GET /api/billing/status\` — reads the authenticated account's subscription state.
+- \`POST /api/billing/webhook\` — verifies Stripe's timestamped HMAC signature and processes events idempotently.
+
+All network integrations are denied by default. For a deliberate online test, set \`MKAOS_NETWORK_MODE=networked\` and separately set \`ALLOW_LIVE_WEATHER=true\`, \`ALLOW_LIVE_TRAFFIC=true\`, or \`ALLOW_BILLING=true\`. Weather uses the public Open-Meteo endpoint; coordinates are sent to the provider. Traffic requires a TomTom key and its usage terms/quota must be reviewed. API keys are server-side only and are not included in response payloads.
+
+Stripe requires a test-mode \`sk_test_\` secret, a test \`price_\` ID, a \`whsec_\` webhook signing secret, and \`MKAOS_PUBLIC_BASE_URL\`. Checkout is hosted by Stripe so MKAOS does not handle card numbers. Webhook events are timestamp-checked, signature-verified and deduplicated in a local SQLite database. This is **not a live payment launch**: live Stripe keys are rejected, and business/legal review, adult account ownership where required, refunds/tax handling, and production monitoring must precede any real transactions.
