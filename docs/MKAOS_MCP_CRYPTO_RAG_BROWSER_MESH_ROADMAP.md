@@ -16,19 +16,19 @@ This is a minimal foundation, not compatibility with every MCP tool. MCP servers
 
 core/crypto_rag.py provides an opt-in AES-256-GCM encrypted SQLite vector store. It encrypts the embedding, document and metadata together; the database stores only an opaque ID, nonce and ciphertext. Similarity search decrypts bounded records locally and computes cosine similarity in-process.
 
-It is a standalone storage primitive, NOT yet wired as a replacement for the existing Chroma/LangChain RAG pipeline. Do not claim existing Chroma files are encrypted by MKAOS_ENCRYPT_MEMORY_FILES. Migration needs an explicit export/encrypt/import tool, integrity/count comparison, backup and rollback plan, then a reviewed adapter switch. Existing plaintext vector stores remain sensitive.
+It remains a standalone storage primitive, NOT yet wired as a replacement for the existing Chroma/LangChain RAG pipeline. The non-destructive tools/migrate_crypto_rag.py utility now requires stopped writers, creates a new verified backup, copies bounded batches, decrypts and compares every document/metadata/embedding, checks source/destination counts, and never deletes source data. See docs/MKAOS_CRYPTO_RAG_MIGRATION.md. Existing plaintext vector stores remain sensitive until a separately reviewed adapter switch and explicit approved cleanup.
 
 Generate a key locally with Python calling core.crypto_rag.generate_key(), store it outside the database/repository, and set MKAOS_CRYPTO_RAG_KEY to its Base64 value. Never commit the key or paste it into chat. Losing it makes records unrecoverable. AES-GCM protects data at rest, not a compromised running process, memory dumps, backups, filenames, traffic or an attacker who also obtains the key. For stronger database-wide guarantees, consider encrypted volumes or SQLCipher separately. WAL/journal files and backup retention need storage testing too.
 
-## 3. Browser automation: next phase, opt-in only
+## 3. Browser automation: isolated screenshot-only first stage
 
-A Playwright worker should run in a separate digest-pinned container with a non-root user, read-only root filesystem, dropped Linux capabilities, seccomp, CPU/memory/PID/time limits, bounded screenshots, no host Docker socket, no credentials by default, and network egress restricted to an operator-approved target proxy. Browser automation must never be enabled by a generic ALLOW_SITE_SCANNING=true alone.
+Dockerfile.browser, docker-compose.browser.yml, and scripts/browser_screenshot.py add a separate non-root Playwright worker and local static fixture. The browser network is internal-only with no host ports, no Docker socket, no application credentials, read-only root filesystem, dropped capabilities, no-new-privileges, and CPU/memory/PID limits. The worker exposes navigation and screenshot capture only, checks an exact hostname allowlist, and rechecks each request/redirect. See docs/MKAOS_BROWSER_ISOLATION.md.
 
-Before every navigation and redirect, enforce an explicit hostname/port allowlist, resolve and reject loopback/private/link-local/multicast/reserved IPs unless the operator explicitly authorizes a local lab target, and defend against DNS rebinding. Browser pages are untrusted; do not let page content authorize tool calls or leak cookies/secrets into model context. Screenshots and traces can contain sensitive data and need local retention limits. Keep the first release to owner-authorized passive mapping and human-approved interactions; no exploit payloads, credential attacks or destructive testing. The existing HTTP scanner is not equivalent to a browser agent. Playwright/browser-use has not been installed or tested by this change.
+This is a local lab foundation, not a live scanner or production-ready browser agent. The base image is version-tagged but still needs a reviewed immutable digest before production use. DNS rebinding, unusual port, IPv4/IPv6, browser escape, and resource-exhaustion tests remain required. Live scanning and interactions beyond navigation/screenshot stay disabled and require explicit human approval.
 
 ## 4. Zero-trust agent mesh
 
-core/agent_mesh.py currently signs bounded data-only task envelopes; it does not provide a transport, confidentiality, mTLS, peer revocation or a live mesh.
+core/agent_mesh.py signs bounded data-only task envelopes. core/mesh_tls.py now provides TLS 1.3+ client/server context builders and a post-handshake URI-SAN agent-ID allowlist plus SHA-256 fingerprint revocation check. Neither module opens a listener, distributes revocations, or proves a live mesh is deployed. The WireGuard runbook is in docs/MKAOS_WIREGUARD_MESH_ROLLOUT.md.
 
 Recommended order:
 1. WireGuard tunnel with fixed peer public keys, narrow AllowedIPs, explicit firewall rules, and a key rotation/revocation runbook.
@@ -42,7 +42,7 @@ WireGuard is a secure VPN tunnel, not itself a full application-level E2E protoc
 
 - Unit tests cover path traversal, secret-file rejection, MCP JSON-RPC behavior, encryption confidentiality/integrity, wrong-key failure and input limits.
 - MCP client interoperability is tested against a pinned client version.
-- Crypto-RAG migration tests prove every record count/hash matches and plaintext vector files are removed only after verified backup and explicit approval.
-- Browser worker is tested against a local intentionally vulnerable lab only, with network egress and SSRF regression tests.
+- Crypto-RAG migration tests prove record counts and exact decrypted content/metadata/embedding equality. Source plaintext is never removed by the migration utility; any later cleanup requires a verified restorable backup and explicit approval.
+- Browser worker is currently limited to a benign local fixture. Expand only after network-egress, SSRF, DNS rebinding, redirect, timeout, and resource-limit regression tests pass.
 - Mesh tests include invalid/missing/revoked certificates, wrong SAN, replay, expired tasks, blocked routes, key rotation and optional PQ interoperability vectors.
 - No automatic merge, deployment or live scanning; all external effects require human approval.
