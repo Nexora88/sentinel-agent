@@ -28,7 +28,7 @@ Example paths are placeholders; substitute the actual local paths and exact coll
       --source-dir ./memory \
       --collection sentinel_memory_native_hash_v1 \
       --backup-dir ./backups/chroma-pre-crypto-rag \
-      --destination ./memory/encrypted-vectors.sqlite3 \
+      --destination ./crypto-rag/encrypted-vectors.sqlite3 \
       --source-quiesced
 
 The tool refuses to run without --source-quiesced, refuses an existing backup or
