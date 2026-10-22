@@ -15,8 +15,7 @@ The Compose network is internal-only, has no published host ports, and contains 
 fixture and worker. The worker runs non-root, with a read-only root filesystem, dropped
 Linux capabilities, no-new-privileges, memory/CPU/PID limits, no Docker socket, and no
 application credentials. Screenshots are the only writable host-mounted output. The worker
-checks an exact hostname allowlist and rejects public target addresses; each browser request,
-including redirects and subresources, is checked again.
+checks exact hostname and port allowlists, rejects public/reserved target addresses, and rechecks each browser request, including redirects and subresources.
 
 ## Security limits and next gates
 
