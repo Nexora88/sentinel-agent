@@ -25,6 +25,8 @@ class BrowserScreenshotPolicyTests(unittest.TestCase):
         with patch("scripts.browser_screenshot.socket.getaddrinfo", side_effect=private_dns):
             with self.assertRaises(ValueError):
                 _validate_url("http://other-service/", {"browser-fixture"})
+            with self.assertRaises(ValueError):
+                _validate_url("http://browser-fixture:8080/", {"browser-fixture"})
 
     def test_credentials_and_non_http_schemes_are_rejected(self):
         with patch("scripts.browser_screenshot.socket.getaddrinfo", side_effect=private_dns):
