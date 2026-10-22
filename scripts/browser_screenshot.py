@@ -36,11 +36,14 @@ def _validate_url(url: str, allowed: set[str]) -> str:
         port = parts.port or (443 if parts.scheme == "https" else 80)
     except ValueError as exc:
         raise ValueError("Invalid URL port.") from exc
+    allowed_ports = {int(item.strip()) for item in os.getenv("MKAOS_BROWSER_ALLOWED_PORTS", "80").split(",") if item.strip()}
+    if port not in allowed_ports:
+        raise ValueError("Target port is not on the explicit browser allowlist.")
     try:
         addresses = {ipaddress.ip_address(item[4][0].split("%", 1)[0]) for item in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)}
     except OSError as exc:
         raise ValueError("Allowlisted test hostname did not resolve.") from exc
-    if not addresses or any(not (ip.is_private or ip.is_loopback or ip.is_link_local) for ip in addresses):
+    if not addresses or any(ip.is_unspecified or ip.is_multicast or ip.is_reserved or not (ip.is_private or ip.is_loopback or ip.is_link_local) for ip in addresses):
         raise ValueError("Browser worker refuses public or non-private target addresses.")
     return url
 
