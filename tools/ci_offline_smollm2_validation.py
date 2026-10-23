@@ -107,6 +107,36 @@ def generate_once(index: int) -> dict:
     if not text:
         raise RuntimeError("offline model produced an empty answer")
     if "ankara" not in text.casefold():
+        # Persist a diagnostic artifact even when the quality gate fails. Never
+        # turn a failed answer into a passing benchmark or hide the observed output.
+        diagnostic = {
+            "status": "failed",
+            "quality_gate_passed": False,
+            "failure": "Turkish factual acceptance test failed: expected the answer to mention Ankara",
+            "observed_answer": text,
+            "model_id": MODEL_ID,
+            "revision": REVISION,
+            "architecture": model.__class__.__name__,
+            "tokenizer_class": tokenizer.__class__.__name__,
+            "integrity": downloaded,
+            "prompt": prompt,
+            "completed_runs_before_failure": runs,
+            "failed_run": {
+                "run": index,
+                "answer": text,
+                "ttft_ms_observed": round(((first_token_time or finished) - started) * 1000, 2),
+                "total_generation_ms_observed": round((finished - started) * 1000, 2),
+                "process_rss_after_run_mb": round(process.memory_info().rss / (1024 * 1024), 2),
+            },
+            "process_rss_baseline_mb": round(baseline_rss / (1024 * 1024), 2),
+            "torch_version": torch.__version__,
+            "python_version": platform.python_version(),
+            "runner_note": "GitHub-hosted CI CPU runner only; observed timings are diagnostic and are not an accepted performance benchmark because Turkish quality failed.",
+        }
+        Path("offline-model-report.json").write_text(
+            json.dumps(diagnostic, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        print(json.dumps(diagnostic, ensure_ascii=False, indent=2))
         raise RuntimeError(
             "Turkish factual acceptance test failed: expected the answer to mention Ankara; "
             f"received {text!r}"
