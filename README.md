@@ -1,15 +1,173 @@
-> **Gerçekçilik ve yerli teknoloji durumu (22 Ekim 2026):** MKAOS, Türkiye merkezli geliştirilen bir proje hedefidir; mevcut bağımlılıkları, açık kaynak bileşenleri ve donanım/yazılım tedarik zinciri nedeniyle **“%100 yerli” veya bütünüyle bağımsız olduğu iddia edilmez**. Aşağıdaki özellikler birbirinden ayrıdır: MKAOS tarafından yazılan kod, üçüncü taraf açık kaynak bağımlılıkları, yerel çalışan harici model/embedding ağırlıkları ve henüz deneysel olan kendi model altyapısı. Bunlar aynı şey değildir.
->
-> **Kullanılabilirlik notu:** Gerçek bir onaylı MKAOS dil modeli checkpoint'i bulunmadığında varsayılan yerel sohbet uç noktası bilinçli olarak HTTP 503 döndürür; bu, hazır bir sohbet botu olduğu anlamına gelmez. Uygulamanın diğer görev, RAG, güvenlik ve yönetim özellikleri kendi bağımlılık ve yapılandırmalarına bağlıdır. Sentetik CI modeli Türkçe kalite kanıtı değildir.
->
-> **Kuantum sonrası kriptografi (PQC):** MKAOS'ta PQC'nin üretimde etkinleştirildiği iddia edilmez. ML-KEM/ML-DSA veya hibrit TLS ancak sabitlenmiş uygulama, lisans/tedarik zinciri incelemesi, protokol uyumluluğu, anahtar/sertifika yaşam döngüsü ve karşılıklı testler başarıyla tamamlanırsa etkinleştirilebilir. WireGuard kendi başına PQC veya uygulama seviyesinde uçtan uca şifreleme sağlamaz.
->
-> **Güvenlik entegrasyonları:** PR #100; salt okunur MCP temeli, isteğe bağlı AES-GCM Crypto-RAG, veri kaybetmeyen aktarım araçları, izole Playwright ekran görüntüsü laboratuvarı ve mTLS politika yardımcıları ekler. Bunların hepsi otomatik olarak canlı/üretime alınmış değildir. Crypto-RAG aktarımı açıkça çalıştırılıp kayıt/içerik bütünlüğü doğrulanana kadar eski düz metin depolar silinmez. WireGuard gerçek makinelerde ayrıca kurulup doğrulanmalıdır.
->
-> **CI ve performans:** CI run #948 başarılıdır; fakat “Owner-approved local-only MKAOS training + Rust smoke” işi atlanmıştır, bu nedenle bu çalışmadan gerçek TTFT/üretim model kalitesi sonucu çıkarılamaz. TTFT, token/s, bellek ve Türkçe kalite ölçümleri yalnızca belirtilen model/checkpoint, donanım, test seti ve ölçüm koşullarıyla birlikte raporlanmalıdır.
->
-> **Arayüz kimliği:** Gösterge paneli MKAOS'un geometrik gümüş-mor amblemini ve koyu obsidyen/mor renk paletini kullanır. Atatürk portreli konsept görseli kurumsal sunum/kapak için ayrı tutulur; küçük arayüz ikonu olarak detayları kaybolduğu için kullanılmaz.
->
+<div align="center">
+
+<img src="web/static/mkaos-emblem.svg" alt="MKAOS silver and violet emblem" width="120" />
+
+# MKAOS — Sentinel Agent Intelligence
+
+**Yerel öncelikli ajan platformu · Local-first agent platform**
+
+[![CI](https://github.com/Nexora88/sentinel-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Nexora88/sentinel-agent/actions) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+[Türkçe](#türkçe) · [English](#english) · [Issues](https://github.com/Nexora88/sentinel-agent/issues)
+
+</div>
+
+## Türkçe
+
+MKAOS; Python ve Rust ile geliştirilen, **yerel çalışmayı, denetlenebilir araçları ve insan onayını** önceleyen deneysel bir ajan platformudur. Görev yönetimi, yerel bilgi erişimi, araç sınırları ve bağımsız çıkarım altyapısı üzerinde çalışır.
+
+> **Gerçek durum:** MKAOS bugün “%100 yerli”, bağımsız bir temel model veya üretime hazır kuantum güvenli ajan ağı değildir. Onaylanmış, kullanılabilir bir MKAOS dil modeli checkpoint’i ve bağımsız Türkçe kalite skoru henüz mevcut değildir. Checkpoint yokken sohbet uç noktası kasıtlı olarak HTTP 503 verir; bu güvenli hata davranışıdır, çalışan genel amaçlı modelin kanıtı değildir.
+
+### Mevcut yetenekler
+
+- **Python + Rust çıkarım iskeleti:** CPU decoder/KV-cache geliştirme ve yerel CLI adaptörü; kullanılabilir model ağırlıkları ayrıca gerekir.
+- **Yerel RAG:** Yerel semantik embedding modeline dayalı bilgi erişimi; model ve SHA-256 envanteri önceden sağlanmalıdır.
+- **MCP:** Kısıtlı, salt okunur stdio sunucu temeli; genel shell veya sınırsız dosya erişimi sunmaz.
+- **Crypto-RAG:** İsteğe bağlı AES-GCM şifreli SQLite vektör deposu ve kontrollü aktarım/doğrulama; eski depo otomatik silinmez.
+- **İzole tarayıcı laboratuvarı:** İzinli yerel test hedefinde Playwright ekran görüntüsü; canlı tarama varsayılan olarak açık değildir.
+- **Ajan ağı/PQC hazırlığı:** mTLS yardımcıları ve WireGuard yönergeleri; gerçek makinelerde ağ kurulumu ve üretim PQC tamamlanmış değildir.
+- **Arayüz:** Gümüş-mor amblem ve koyu obsidyen/mor tema.
+
+### Eksikler ve ölçüm durumu
+
+- Onaylanmış yerel MKAOS model ağırlıkları ve güvenilir Türkçe benchmark.
+- Checkpoint ve donanım belirtilerek tekrarlanabilir TTFT, token/s ve bellek ölçümleri.
+- Gerçek veriyle doğrulanmış Crypto-RAG aktarımı ve geri yükleme testi.
+- Gerçek makinelerde doğrulanmış WireGuard, mTLS sertifika dağıtımı ve iptal süreçleri.
+- ML-KEM/ML-DSA veya hibrit TLS için sabitlenmiş uygulama ve birlikte çalışabilirlik testleri.
+- Tüm CI işleri ve dağıtım için bağımsız operasyonel doğrulama.
+
+### Hızlı başlangıç
+
+Gereksinimler: Python 3.12; model ağırlıkları ve embedding modeli ayrıca sağlanır.
+
+```bash
+git clone https://github.com/Nexora88/sentinel-agent.git
+cd sentinel-agent
+python -m venv .venv
+# Linux/macOS: source .venv/bin/activate
+# Windows PowerShell: .venv\\Scripts\\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+`.env` içinde güçlü ve benzersiz `OWNER_PASSWORD` belirle. Yerel geliştirme sunucusu:
+
+```bash
+python -m scripts.run web --host 127.0.0.1 --port 8000
+```
+
+[http://127.0.0.1:8000](http://127.0.0.1:8000) adresini aç. Checkpoint yoksa sohbetin 503 dönmesi beklenir. Geliştirme ayarlarını internete açık sunma.
+
+### Testler
+
+```bash
+python -m unittest discover -s tests -v
+node --check web/static/app.js
+```
+
+CI yalnızca GitHub Actions’ta listelenen commit ve işler için geçerlidir. Atlanan eğitim işi başarılı eğitim sayılmaz. TTFT, token/s veya Türkçe kalite iddiaları için checkpoint, donanım, test kümesi ve yöntem yayımlanmalıdır.
+
+### Güvenli veri aktarımı
+
+1. Kaynak depoyu yedekle ve geri yüklemeyi doğrula.
+2. Aktarımı ayrı bir hedef depoya yap.
+3. Kayıt sayısı, içerik, embedding ve bütünlük özetlerini karşılaştır.
+4. Eski düz metin depoyu doğrulanmış yedek ve açık sahip onayı olmadan silme.
+5. Anahtarları, token’ları veya özel verileri Git’e ekleme.
+
+---
+
+## English
+
+MKAOS is an experimental Python/Rust agent platform focused on **local-first operation, auditable tools, and human approval**. It explores task orchestration, local retrieval, bounded tool access, and an independent inference runtime.
+
+> **Honest status:** MKAOS should not currently be described as “100% domestic,” a fully independent foundation model, or a production-ready quantum-secure agent network. There is no approved, usable MKAOS language-model checkpoint or independently validated Turkish quality score yet. Without a checkpoint, the chat endpoint intentionally returns HTTP 503. This is fail-closed behavior, not evidence of a working general-purpose model.
+
+### Available foundations
+
+- **Python + Rust inference scaffolding:** CPU decoder/KV-cache development and local CLI adapter; usable weights are separate.
+- **Local RAG:** Retrieval using a locally provisioned semantic embedding model and verified SHA-256 inventory.
+- **MCP:** Bounded, read-only stdio server foundation; no unrestricted shell or filesystem access.
+- **Crypto-RAG:** Opt-in AES-GCM encrypted SQLite vector store and controlled migration/verification; source data is not automatically deleted.
+- **Isolated browser lab:** Playwright screenshots against an allowlisted local test target; live scanning is not enabled by default.
+- **Agent mesh/PQC preparation:** mTLS policy helpers and WireGuard guidance; production deployment and PQC are not complete.
+- **UI:** Silver/violet emblem and dark obsidian/violet theme.
+
+### Known gaps
+
+- Approved local MKAOS model weights and a reliable Turkish-language benchmark.
+- Reproducible TTFT, tokens/second, and memory measurements tied to a named checkpoint and hardware.
+- A Crypto-RAG migration with verified backup and restore.
+- Verified WireGuard deployment, mTLS certificate distribution, and revocation operations on real hosts.
+- Pinned ML-KEM/ML-DSA or hybrid-TLS implementation with interoperability and key-lifecycle tests.
+- Independent operational verification of all CI jobs and live deployment.
+
+### Quick start
+
+Requirements: Python 3.12. Model weights and the embedding model must be provisioned separately.
+
+```bash
+git clone https://github.com/Nexora88/sentinel-agent.git
+cd sentinel-agent
+python -m venv .venv
+# Linux/macOS: source .venv/bin/activate
+# Windows PowerShell: .venv\\Scripts\\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Set a strong, unique `OWNER_PASSWORD` in `.env`. Start the local development server:
+
+```bash
+python -m scripts.run web --host 127.0.0.1 --port 8000
+```
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). HTTP 503 is expected when no model checkpoint is configured. Do not expose development defaults to the public internet.
+
+### Tests
+
+```bash
+python -m unittest discover -s tests -v
+node --check web/static/app.js
+```
+
+CI results apply only to the commit and jobs shown in GitHub Actions. A skipped training job is not a successful training run. TTFT, tokens/second, and Turkish-quality claims require the checkpoint, hardware, dataset, and measurement procedure to be reported.
+
+### Safe data migration
+
+1. Back up the source store and verify a restore.
+2. Migrate into a separate destination.
+3. Compare record counts, content, embeddings, and integrity hashes.
+4. Keep plaintext source data until backup verification and explicit owner approval.
+5. Never commit secrets or private data.
+
+## Architecture / Mimari
+
+- **Python:** orchestration, APIs, tools, and security policy.
+- **Rust:** experimental local inference runtime.
+- **RAG:** local retrieval with separately provisioned model assets.
+- **Security:** opt-in encrypted storage and bounded tool interfaces; production use requires additional validation.
+
+## Documentation / Belgeler
+
+- [Open-source readiness](docs/MKAOS_OPEN_SOURCE_READINESS.md)
+- [Independence milestones](docs/MKAOS_INDEPENDENCE_MILESTONES.md)
+- [Turkish data governance](docs/MKAOS_TURKISH_DATA_GOVERNANCE.md)
+- [Network privacy guide](docs/NETWORK_PRIVACY.md)
+- [Semantic RAG setup](docs/MKAOS_RAG_SEMANTIC_SETUP.md)
+
+## Contributing / Katkıda bulunma
+
+Reproducible bug reports, tests, documentation, and focused pull requests are welcome. Include reproduction steps; never include credentials or private data. Check the license and usage terms for each third-party dependency, model, dataset, and artwork.
+
+## License / Lisans
+
+The repository declares MIT licensing. Third-party code, model weights, datasets, and artwork may carry separate terms. Public availability does not automatically permit model training or redistribution.
+
+---
 # MKAOS v6.5 — Mustafa Kemal Atatürk Operating System
 
 **MKAOS, bağımsız bir proje ve marka adıdır.** Teknik sınıflandırma açısından mevcut sürüm bir Linux dağıtımı veya işletim sistemi çekirdeği değil; Python/Rust tabanlı, yerel çalışmayı ve insan onayını esas alan ajan, çıkarım, bilgi erişimi ve görev yönetimi platformudur. “Operating System” adı ürün vizyonunu/markasını ifade eder; kernel veya Linux dağıtımı olduğu iddiası değildir.
