@@ -1,11 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
-<title id="title">MKAOS amblemi</title><desc id="desc">Gümüş ve mor renklerle çizilmiş, kalkanı andıran geometrik M harfi.</desc>
-<defs><linearGradient id="silver" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".55" stop-color="#aeb7c7"/><stop offset="1" stop-color="#687386"/></linearGradient><linearGradient id="violet" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c7a5ff"/><stop offset=".48" stop-color="#8b42ff"/><stop offset="1" stop-color="#4b13b8"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-<path d="M80 7 143 42 143 105 80 151 17 105 17 42Z" fill="#090712" stroke="#313044" stroke-width="2"/>
-<path d="M25 44 80 14 135 44 135 55 80 26 36 50 36 104 25 96Z" fill="none" stroke="url(#silver)" stroke-width="7" stroke-linejoin="bevel"/>
-<path d="M25 48 80 80 135 48 135 101 122 113 122 70 80 96 38 70 38 111 25 101Z" fill="none" stroke="url(#silver)" stroke-width="10" stroke-linejoin="bevel"/>
-<path d="M80 80 135 48 135 101 122 113 122 70 80 96Z" fill="url(#violet)" opacity=".98" filter="url(#glow)"/>
-<path d="M38 83 80 109 109 91 109 111 80 130 38 105Z" fill="none" stroke="url(#silver)" stroke-width="8" stroke-linejoin="bevel"/>
-<path d="M80 109 109 91 109 111 80 130Z" fill="none" stroke="url(#violet)" stroke-width="8" stroke-linejoin="bevel"/>
-<path d="M80 137 86 143 80 147 74 143Z" fill="#a66aff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 760" role="img" aria-labelledby="title desc">
+<title id="title">MKAOS — Sentinel Agent Intelligence</title>
+<desc id="desc">Resmî MKAOS marka amblemi: siyah obsidyen zemin üzerinde gümüş ve mor geometrik, üç boyut hissi veren M kalkanı ve MKAOS kelime işareti.</desc>
+<defs>
+ <linearGradient id="silver" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".42" stop-color="#d8dce2"/><stop offset=".72" stop-color="#8d96a4"/><stop offset="1" stop-color="#f5f6f8"/></linearGradient>
+ <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c38cff"/><stop offset=".46" stop-color="#852cff"/><stop offset="1" stop-color="#45109c"/></linearGradient>
+ <linearGradient id="silverText" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#aab0ba"/></linearGradient>
+ <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="9" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="1000" height="760" rx="24" fill="#050609"/>
+<g transform="translate(0 4)" stroke-linejoin="bevel">
+ <path d="M500 45 645 128 645 148 500 65 356 148 356 128Z" fill="none" stroke="url(#silver)" stroke-width="15"/>
+ <path d="M290 115 500 248 710 115 710 303 670 354 670 194 500 307 330 194 330 355 290 302Z" fill="url(#silver)"/>
+ <path d="M500 248 710 115 710 303 670 354 670 194 500 307Z" fill="url(#violet)" filter="url(#glow)"/>
+ <path d="M346 260 500 363 654 260 654 443 500 540 346 443Z" fill="#050609" stroke="url(#silver)" stroke-width="15"/>
+ <path d="M500 363 654 260 654 443 500 540Z" fill="url(#violet)"/>
+ <path d="M385 322 500 399 615 322 615 422 500 500 385 422Z" fill="#050609"/>
+ <path d="M500 399 615 322 615 422 500 500Z" fill="url(#violet)"/>
+ <path d="M500 540 535 562 500 583 465 562Z" fill="url(#silver)"/>
+</g>
+<g font-family="Arial, Helvetica, sans-serif" font-weight="700" text-anchor="middle">
+ <text x="500" y="665" font-size="104" letter-spacing="12" fill="url(#silverText)">MKAOS</text>
+ <path d="M159 699H841" stroke="#24242c" stroke-width="2"/>
+ <text x="500" y="730" font-size="22" letter-spacing="9" fill="#aeb3bd">SENTINEL <tspan fill="#8b42ff">•</tspan> AGENT <tspan fill="#8b42ff">•</tspan> INTELLIGENCE</text>
+</g>
 </svg>
