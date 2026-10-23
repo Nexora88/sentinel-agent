@@ -71,16 +71,17 @@ if model.config.model_type != "llama":
 
 prompt = "Türkiye'nin başkenti neresidir? Kısa ve doğru cevap ver."
 messages = [{"role": "user", "content": prompt}]
-if getattr(tokenizer, "chat_template", None):
-    rendered = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-else:
-    # SmolLM2-Instruct uses ChatML-style role markers; a raw plain-text prompt
-    # can cause the model to echo the final instruction instead of answering.
-    rendered = (
-        "<|im_start|>system\\nYou are a helpful assistant. Answer the user's question directly and briefly.\\n<|im_end|>\\n"
-        f"<|im_start|>user\\n{prompt}\\n<|im_end|>\\n<|im_start|>assistant\\n"
-    )
-inputs = tokenizer(rendered, return_tensors="pt")
+if not getattr(tokenizer, "chat_template", None):
+    raise RuntimeError("Pinned instruct tokenizer is missing its required chat_template")
+# Use the tokenizer's native chat-template tokenization exactly as in the model card.
+# Avoid re-tokenizing a rendered template, which can change special-token handling.
+inputs = tokenizer.apply_chat_template(
+    messages,
+    tokenize=True,
+    add_generation_prompt=True,
+    return_dict=True,
+    return_tensors="pt",
+)
 process = psutil.Process()
 baseline_rss = process.memory_info().rss
 runs = []
