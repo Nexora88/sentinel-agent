@@ -101,7 +101,7 @@ def generate_once(index: int) -> dict:
     prompt_length = inputs["input_ids"].shape[-1]
     generated_ids = output_ids[0, prompt_length:]
     text = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
-    first_token_time = finished
+    first_token_time = None
     if not text:
         raise RuntimeError("offline model produced an empty answer")
     if "ankara" not in text.casefold():
@@ -122,7 +122,7 @@ def generate_once(index: int) -> dict:
             "failed_run": {
                 "run": index,
                 "answer": text,
-                "ttft_ms_observed": round(((first_token_time or finished) - started) * 1000, 2),
+                "ttft_ms_observed": None,
                 "total_generation_ms_observed": round((finished - started) * 1000, 2),
                 "process_rss_after_run_mb": round(process.memory_info().rss / (1024 * 1024), 2),
             },
@@ -146,7 +146,7 @@ def generate_once(index: int) -> dict:
         "run": index,
         "answer": text,
         "generated_tokens_estimate": token_count,
-        "ttft_ms": round(((first_token_time or finished) - started) * 1000, 2),
+        "ttft_ms": None,
         "total_generation_ms": round((finished - started) * 1000, 2),
         "tokens_per_second_estimate": round(token_count / max(finished - started, 1e-9), 3),
         "process_rss_after_run_mb": round(process.memory_info().rss / (1024 * 1024), 2),
@@ -170,7 +170,7 @@ report = {
     "integrity": downloaded,
     "prompt": prompt,
     "runs": runs,
-    "ttft_ms_mean": round(sum(r["ttft_ms"] for r in runs) / len(runs), 2),
+    "ttft_ms_mean": None,
     "tokens_per_second_estimate_mean": round(sum(r["tokens_per_second_estimate"] for r in runs) / len(runs), 3),
     "process_rss_baseline_mb": round(baseline_rss / (1024 * 1024), 2),
     "process_rss_max_sampled_mb": max(r["process_rss_after_run_mb"] for r in runs),
