@@ -74,7 +74,12 @@ messages = [{"role": "user", "content": prompt}]
 if getattr(tokenizer, "chat_template", None):
     rendered = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 else:
-    rendered = prompt
+    # SmolLM2-Instruct uses ChatML-style role markers; a raw plain-text prompt
+    # can cause the model to echo the final instruction instead of answering.
+    rendered = (
+        "<|im_start|>system\\nYou are a helpful assistant. Answer the user's question directly and briefly.\\n<|im_end|>\\n"
+        f"<|im_start|>user\\n{prompt}\\n<|im_end|>\\n<|im_start|>assistant\\n"
+    )
 inputs = tokenizer(rendered, return_tensors="pt")
 process = psutil.Process()
 baseline_rss = process.memory_info().rss
@@ -100,6 +105,11 @@ def generate_once(index: int) -> dict:
     text = "".join(chunks).strip()
     if not text:
         raise RuntimeError("offline model produced an empty answer")
+    if "ankara" not in text.casefold():
+        raise RuntimeError(
+            "Turkish factual acceptance test failed: expected the answer to mention Ankara; "
+            f"received {text!r}"
+        )
     token_count = len(tokenizer.encode(text, add_special_tokens=False))
     if token_count <= 0:
         raise RuntimeError("generated answer token count is zero")
@@ -110,7 +120,7 @@ def generate_once(index: int) -> dict:
         "ttft_ms": round(((first_token_time or finished) - started) * 1000, 2),
         "total_generation_ms": round((finished - started) * 1000, 2),
         "tokens_per_second_estimate": round(token_count / max(finished - started, 1e-9), 3),
-        "peak_process_rss_mb": round(process.memory_info().rss / (1024 * 1024), 2),
+        "process_rss_after_run_mb": round(process.memory_info().rss / (1024 * 1024), 2),
     }
 
 # First run is cold-start; report it separately and do not hide it in the average.
@@ -134,7 +144,8 @@ report = {
     "ttft_ms_mean": round(sum(r["ttft_ms"] for r in runs) / len(runs), 2),
     "tokens_per_second_estimate_mean": round(sum(r["tokens_per_second_estimate"] for r in runs) / len(runs), 3),
     "process_rss_baseline_mb": round(baseline_rss / (1024 * 1024), 2),
-    "process_rss_peak_mb": max(r["peak_process_rss_mb"] for r in runs),
+    "process_rss_max_sampled_mb": max(r["process_rss_after_run_mb"] for r in runs),
+    "memory_metric_note": "RSS sampled after each generation; this is not a high-frequency peak-RSS measurement.",
     "torch_version": torch.__version__,
     "python_version": platform.python_version(),
     "runner_note": "GitHub-hosted CI runner, CPU float32; these timings are not the user's Windows PC measurements.",
