@@ -1,3 +1,173 @@
+<div align="center">
+
+<img src="web/static/mkaos-emblem.svg" alt="MKAOS silver and violet emblem" width="120" />
+
+# MKAOS — Sentinel Agent Intelligence
+
+**Yerel öncelikli ajan platformu · Local-first agent platform**
+
+[![CI](https://github.com/Nexora88/sentinel-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Nexora88/sentinel-agent/actions) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+[Türkçe](#türkçe) · [English](#english) · [Issues](https://github.com/Nexora88/sentinel-agent/issues)
+
+</div>
+
+## Türkçe
+
+MKAOS; Python ve Rust ile geliştirilen, **yerel çalışmayı, denetlenebilir araçları ve insan onayını** önceleyen deneysel bir ajan platformudur. Görev yönetimi, yerel bilgi erişimi, araç sınırları ve bağımsız çıkarım altyapısı üzerinde çalışır.
+
+> **Gerçek durum:** MKAOS bugün “%100 yerli”, bağımsız bir temel model veya üretime hazır kuantum güvenli ajan ağı değildir. Onaylanmış, kullanılabilir bir MKAOS dil modeli checkpoint’i ve bağımsız Türkçe kalite skoru henüz mevcut değildir. Checkpoint yokken sohbet uç noktası kasıtlı olarak HTTP 503 verir; bu güvenli hata davranışıdır, çalışan genel amaçlı modelin kanıtı değildir.
+
+### Mevcut yetenekler
+
+- **Python + Rust çıkarım iskeleti:** CPU decoder/KV-cache geliştirme ve yerel CLI adaptörü; kullanılabilir model ağırlıkları ayrıca gerekir.
+- **Yerel RAG:** Yerel semantik embedding modeline dayalı bilgi erişimi; model ve SHA-256 envanteri önceden sağlanmalıdır.
+- **MCP:** Kısıtlı, salt okunur stdio sunucu temeli; genel shell veya sınırsız dosya erişimi sunmaz.
+- **Crypto-RAG:** İsteğe bağlı AES-GCM şifreli SQLite vektör deposu ve kontrollü aktarım/doğrulama; eski depo otomatik silinmez.
+- **İzole tarayıcı laboratuvarı:** İzinli yerel test hedefinde Playwright ekran görüntüsü; canlı tarama varsayılan olarak açık değildir.
+- **Ajan ağı/PQC hazırlığı:** mTLS yardımcıları ve WireGuard yönergeleri; gerçek makinelerde ağ kurulumu ve üretim PQC tamamlanmış değildir.
+- **Arayüz:** Gümüş-mor amblem ve koyu obsidyen/mor tema.
+
+### Eksikler ve ölçüm durumu
+
+- Onaylanmış yerel MKAOS model ağırlıkları ve güvenilir Türkçe benchmark.
+- Checkpoint ve donanım belirtilerek tekrarlanabilir TTFT, token/s ve bellek ölçümleri.
+- Gerçek veriyle doğrulanmış Crypto-RAG aktarımı ve geri yükleme testi.
+- Gerçek makinelerde doğrulanmış WireGuard, mTLS sertifika dağıtımı ve iptal süreçleri.
+- ML-KEM/ML-DSA veya hibrit TLS için sabitlenmiş uygulama ve birlikte çalışabilirlik testleri.
+- Tüm CI işleri ve dağıtım için bağımsız operasyonel doğrulama.
+
+### Hızlı başlangıç
+
+Gereksinimler: Python 3.12; model ağırlıkları ve embedding modeli ayrıca sağlanır.
+
+```bash
+git clone https://github.com/Nexora88/sentinel-agent.git
+cd sentinel-agent
+python -m venv .venv
+# Linux/macOS: source .venv/bin/activate
+# Windows PowerShell: .venv\\Scripts\\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+`.env` içinde güçlü ve benzersiz `OWNER_PASSWORD` belirle. Yerel geliştirme sunucusu:
+
+```bash
+python -m scripts.run web --host 127.0.0.1 --port 8000
+```
+
+[http://127.0.0.1:8000](http://127.0.0.1:8000) adresini aç. Checkpoint yoksa sohbetin 503 dönmesi beklenir. Geliştirme ayarlarını internete açık sunma.
+
+### Testler
+
+```bash
+python -m unittest discover -s tests -v
+node --check web/static/app.js
+```
+
+CI yalnızca GitHub Actions’ta listelenen commit ve işler için geçerlidir. Atlanan eğitim işi başarılı eğitim sayılmaz. TTFT, token/s veya Türkçe kalite iddiaları için checkpoint, donanım, test kümesi ve yöntem yayımlanmalıdır.
+
+### Güvenli veri aktarımı
+
+1. Kaynak depoyu yedekle ve geri yüklemeyi doğrula.
+2. Aktarımı ayrı bir hedef depoya yap.
+3. Kayıt sayısı, içerik, embedding ve bütünlük özetlerini karşılaştır.
+4. Eski düz metin depoyu doğrulanmış yedek ve açık sahip onayı olmadan silme.
+5. Anahtarları, token’ları veya özel verileri Git’e ekleme.
+
+---
+
+## English
+
+MKAOS is an experimental Python/Rust agent platform focused on **local-first operation, auditable tools, and human approval**. It explores task orchestration, local retrieval, bounded tool access, and an independent inference runtime.
+
+> **Honest status:** MKAOS should not currently be described as “100% domestic,” a fully independent foundation model, or a production-ready quantum-secure agent network. There is no approved, usable MKAOS language-model checkpoint or independently validated Turkish quality score yet. Without a checkpoint, the chat endpoint intentionally returns HTTP 503. This is fail-closed behavior, not evidence of a working general-purpose model.
+
+### Available foundations
+
+- **Python + Rust inference scaffolding:** CPU decoder/KV-cache development and local CLI adapter; usable weights are separate.
+- **Local RAG:** Retrieval using a locally provisioned semantic embedding model and verified SHA-256 inventory.
+- **MCP:** Bounded, read-only stdio server foundation; no unrestricted shell or filesystem access.
+- **Crypto-RAG:** Opt-in AES-GCM encrypted SQLite vector store and controlled migration/verification; source data is not automatically deleted.
+- **Isolated browser lab:** Playwright screenshots against an allowlisted local test target; live scanning is not enabled by default.
+- **Agent mesh/PQC preparation:** mTLS policy helpers and WireGuard guidance; production deployment and PQC are not complete.
+- **UI:** Silver/violet emblem and dark obsidian/violet theme.
+
+### Known gaps
+
+- Approved local MKAOS model weights and a reliable Turkish-language benchmark.
+- Reproducible TTFT, tokens/second, and memory measurements tied to a named checkpoint and hardware.
+- A Crypto-RAG migration with verified backup and restore.
+- Verified WireGuard deployment, mTLS certificate distribution, and revocation operations on real hosts.
+- Pinned ML-KEM/ML-DSA or hybrid-TLS implementation with interoperability and key-lifecycle tests.
+- Independent operational verification of all CI jobs and live deployment.
+
+### Quick start
+
+Requirements: Python 3.12. Model weights and the embedding model must be provisioned separately.
+
+```bash
+git clone https://github.com/Nexora88/sentinel-agent.git
+cd sentinel-agent
+python -m venv .venv
+# Linux/macOS: source .venv/bin/activate
+# Windows PowerShell: .venv\\Scripts\\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Set a strong, unique `OWNER_PASSWORD` in `.env`. Start the local development server:
+
+```bash
+python -m scripts.run web --host 127.0.0.1 --port 8000
+```
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). HTTP 503 is expected when no model checkpoint is configured. Do not expose development defaults to the public internet.
+
+### Tests
+
+```bash
+python -m unittest discover -s tests -v
+node --check web/static/app.js
+```
+
+CI results apply only to the commit and jobs shown in GitHub Actions. A skipped training job is not a successful training run. TTFT, tokens/second, and Turkish-quality claims require the checkpoint, hardware, dataset, and measurement procedure to be reported.
+
+### Safe data migration
+
+1. Back up the source store and verify a restore.
+2. Migrate into a separate destination.
+3. Compare record counts, content, embeddings, and integrity hashes.
+4. Keep plaintext source data until backup verification and explicit owner approval.
+5. Never commit secrets or private data.
+
+## Architecture / Mimari
+
+- **Python:** orchestration, APIs, tools, and security policy.
+- **Rust:** experimental local inference runtime.
+- **RAG:** local retrieval with separately provisioned model assets.
+- **Security:** opt-in encrypted storage and bounded tool interfaces; production use requires additional validation.
+
+## Documentation / Belgeler
+
+- [Open-source readiness](docs/MKAOS_OPEN_SOURCE_READINESS.md)
+- [Independence milestones](docs/MKAOS_INDEPENDENCE_MILESTONES.md)
+- [Turkish data governance](docs/MKAOS_TURKISH_DATA_GOVERNANCE.md)
+- [Network privacy guide](docs/NETWORK_PRIVACY.md)
+- [Semantic RAG setup](docs/MKAOS_RAG_SEMANTIC_SETUP.md)
+
+## Contributing / Katkıda bulunma
+
+Reproducible bug reports, tests, documentation, and focused pull requests are welcome. Include reproduction steps; never include credentials or private data. Check the license and usage terms for each third-party dependency, model, dataset, and artwork.
+
+## License / Lisans
+
+The repository declares MIT licensing. Third-party code, model weights, datasets, and artwork may carry separate terms. Public availability does not automatically permit model training or redistribution.
+
+---
 # MKAOS v6.5 — Mustafa Kemal Atatürk Operating System
 
 **MKAOS, bağımsız bir proje ve marka adıdır.** Teknik sınıflandırma açısından mevcut sürüm bir Linux dağıtımı veya işletim sistemi çekirdeği değil; Python/Rust tabanlı, yerel çalışmayı ve insan onayını esas alan ajan, çıkarım, bilgi erişimi ve görev yönetimi platformudur. “Operating System” adı ürün vizyonunu/markasını ifade eder; kernel veya Linux dağıtımı olduğu iddiası değildir.
@@ -273,4 +443,87 @@ Read the current evidence and contribution policy in [MKAOS Open-Source Readines
 The dependency-free, read-only local checkpoint inspector is `tools/mkaos_hf_adapter_preflight.py`; guide: [HF portability, output guardrails, PEFT and offline operation](docs/MKAOS_HF_PORTABILITY_AND_OFFLINE_SECURITY.md). It does not convert arbitrary `.safetensors` weights into `MKAOSW1`: architecture, tokenizer and numerical parity must be implemented and tested first. Final reasoning output now passes through a narrow local guard that redacts high-confidence credential-shaped strings; this is not a general fact-checker or model-safety certification. Dataset/model license, privacy, attribution and training approval gates remain mandatory.
 
 The Hugging Face architecture decision table and required parity protocol are in [MKAOS HF compatibility matrix](docs/MKAOS_HF_COMPATIBILITY_MATRIX.md). A pinned SmolLM2-135M-Instruct CPU reference smoke workflow is defined at `.github/workflows/mkaos-hf-cpu-smoke.yml`. Its repeat-logit check validates the reference runtime only; it does not claim MKAOSW1 conversion parity. Numerical comparison metrics are implemented in `tools/mkaos_numerical_parity.py`.
+
+
+---
+
+# English
+
+## MKAOS — Sentinel Agent Intelligence
+
+MKAOS is a Turkey-based, open-source project exploring a local-first, human-supervised agent platform. **It is not accurately described as “100% domestic” or fully sovereign today.** The repository uses third-party open-source software, and model weights, datasets, hardware, build tools, and supply-chain components can have separate origins and licenses.
+
+### Current status — October 2026
+
+- **Native language model:** No approved, production-ready MKAOS-trained checkpoint or independently validated Turkish quality score is currently provided. The default native chat path fails closed with HTTP 503 when the required checkpoint is absent. A synthetic CI smoke test is not evidence of useful Turkish language quality.
+- **Local-first operation:** Network-dependent integrations are configurable and should remain disabled for offline use. Application settings alone are not a guarantee that every host process is offline; apply and verify host firewall/network policy too.
+- **MCP:** A minimal read-only stdio MCP server is provided. It exposes a bounded workspace text-reading tool, not arbitrary shell execution or unrestricted file access.
+- **Crypto-RAG:** An opt-in AES-GCM encrypted SQLite vector-store backend and migration/verification tooling are available. The migration is not automatically run against user data and does not delete the source store. Existing Chroma or plaintext data is not automatically encrypted by enabling this backend.
+- **Browser worker:** A restricted Playwright screenshot lab targets an allowlisted local fixture. It is not a general-purpose live scanning service; live targets and interactions require explicit authorization and further operational controls.
+- **Agent mesh:** mTLS policy helpers and WireGuard deployment guidance are included, but live WireGuard interfaces, peer keys, firewall rules, certificate distribution, and revocation infrastructure are not provisioned by this repository change.
+- **Post-quantum cryptography (PQC):** ML-KEM, ML-DSA, or hybrid post-quantum transport is **not enabled in production**. Enablement requires pinned implementations, licensing and supply-chain review, interoperability tests, and tested key/certificate lifecycle management. WireGuard alone is not a post-quantum or application-level end-to-end encryption solution.
+- **UI and identity:** The dashboard uses a geometric silver/violet MKAOS emblem and a dark obsidian/violet palette. The emblem is the compact interface mark; the Atatürk-themed concept artwork is better suited to a presentation or cover image.
+
+### Quick start
+
+Prerequisites: Python 3.12; Docker Compose is recommended. A real native chat model and local embedding model must be provisioned separately; model weights are not bundled in this repository.
+
+```bash
+git clone https://github.com/Nexora88/sentinel-agent.git
+cd sentinel-agent
+python -m venv .venv
+# Windows: .venv\\Scripts\\activate
+# macOS/Linux: source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Set a long, unique `OWNER_PASSWORD` in `.env`, keep secrets out of Git, and review the local model and RAG setup instructions above before starting. For a local-only development server:
+
+```bash
+python -m scripts.run web --host 127.0.0.1 --port 8000
+```
+
+Open `http://127.0.0.1:8000`. For the Docker path, follow the repository's offline profile and model preparation instructions; do not assume the models are downloaded or that the native chat endpoint will work without a valid checkpoint.
+
+### Tests and checks
+
+```bash
+python -m unittest discover -s tests -v
+node --check web/static/app.js
+python -m scripts.run secrets --path .
+python -m scripts.run licenses --path .
+```
+
+CI success applies only to the specific commit and jobs shown in GitHub Actions. A skipped model-training job is not a successful training run. Report TTFT, tokens/second, memory, and Turkish quality only with the model/checkpoint, hardware, test set, and measurement procedure identified.
+
+### Security and data migration
+
+1. Back up the existing store and verify that the backup can be restored.
+2. Run migration only against a quiesced source and a separate destination.
+3. Compare record counts, metadata, document contents, embeddings, and integrity hashes before switching readers.
+4. Keep the original plaintext store until a verified backup and explicit owner approval exist. This repository change does not delete it.
+5. Never put API keys, private keys, model weights, personal datasets, or runtime secrets in Git.
+
+### Roadmap and limitations
+
+MKAOS aims to provide auditable local inference, Turkish-language tooling, encrypted retrieval, controlled MCP tools, an isolated browser worker, and authenticated agent communication. Some parts are foundations or opt-in helpers, not fully deployed production services. The project does not claim full model independence, universal hardware acceleration, production PQC, a live zero-trust mesh, or certified Turkish model quality without reproducible evidence.
+
+See [MKAOS Open-Source Readiness](docs/MKAOS_OPEN_SOURCE_READINESS.md), [independence milestones](docs/MKAOS_INDEPENDENCE_MILESTONES.md), [Turkish data governance](docs/MKAOS_TURKISH_DATA_GOVERNANCE.md), and [network privacy guide](docs/NETWORK_PRIVACY.md).
+
+### Contributing
+
+Issues, reproducible bug reports, tests, and carefully scoped pull requests are welcome. Please include reproduction steps, environment details, expected versus actual behavior, and test evidence. Do not include secrets or private user data. Security-sensitive issues should be reported privately where repository settings permit.
+
+### License
+
+The repository declares MIT licensing. Third-party code, model weights, datasets, voices, and artwork may have their own license or usage conditions; check each source separately. Public availability does not automatically grant permission to train on or redistribute a dataset or model.
+
+---
+
+## Dil / Language
+
+- **Türkçe:** [Yukarıdaki Türkçe bölümler](#mkaos-v65--mustafa-kemal-atatürk-operating-system)
+- **English:** [English documentation](#english)
 

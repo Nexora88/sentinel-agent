@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+<title id="title">MKAOS amblemi</title><desc id="desc">Gümüş ve mor renklerle çizilmiş, kalkanı andıran geometrik M harfi.</desc>
+<defs><linearGradient id="silver" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".55" stop-color="#aeb7c7"/><stop offset="1" stop-color="#687386"/></linearGradient><linearGradient id="violet" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c7a5ff"/><stop offset=".48" stop-color="#8b42ff"/><stop offset="1" stop-color="#4b13b8"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<path d="M80 7 143 42 143 105 80 151 17 105 17 42Z" fill="#090712" stroke="#313044" stroke-width="2"/>
+<path d="M25 44 80 14 135 44 135 55 80 26 36 50 36 104 25 96Z" fill="none" stroke="url(#silver)" stroke-width="7" stroke-linejoin="bevel"/>
+<path d="M25 48 80 80 135 48 135 101 122 113 122 70 80 96 38 70 38 111 25 101Z" fill="none" stroke="url(#silver)" stroke-width="10" stroke-linejoin="bevel"/>
+<path d="M80 80 135 48 135 101 122 113 122 70 80 96Z" fill="url(#violet)" opacity=".98" filter="url(#glow)"/>
+<path d="M38 83 80 109 109 91 109 111 80 130 38 105Z" fill="none" stroke="url(#silver)" stroke-width="8" stroke-linejoin="bevel"/>
+<path d="M80 109 109 91 109 111 80 130Z" fill="none" stroke="url(#violet)" stroke-width="8" stroke-linejoin="bevel"/>
+<path d="M80 137 86 143 80 147 74 143Z" fill="#a66aff"/>
+</svg>

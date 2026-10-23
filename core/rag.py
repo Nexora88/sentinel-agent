@@ -53,6 +53,11 @@ class MemoryStore:
         # For semantic retrieval, opt into a pre-installed local model; downloads are disabled.
         require_semantic = os.getenv("SEKA_REQUIRE_SEMANTIC_EMBEDDINGS", "false").strip().lower() in {"1", "true", "yes", "on"}
         requested_provider = os.getenv("SEKA_EMBEDDINGS_PROVIDER", "").strip().lower()
+        requested_storage_backend = os.getenv("SEKA_RAG_STORAGE_BACKEND", "chroma").strip().lower()
+        if requested_storage_backend not in {"chroma", "crypto-sqlite"}:
+            raise ValueError("SEKA_RAG_STORAGE_BACKEND must be chroma or crypto-sqlite.")
+        if requested_storage_backend == "crypto-sqlite" and requested_provider == "ollama":
+            raise ValueError("Crypto-RAG requires local mkaos-native or local-semantic embeddings; Ollama mode is not initialized.")
         local_model_path = os.getenv("SEKA_LOCAL_EMBEDDING_MODEL_PATH", "").strip()
         if require_semantic and requested_provider not in {"", "local-semantic"}:
             raise ValueError("SEKA_REQUIRE_SEMANTIC_EMBEDDINGS is enabled; only local-semantic retrieval is permitted.")
@@ -96,11 +101,29 @@ class MemoryStore:
             max_chars_per_ingest, "SEKA_RAG_MAX_CHARS_PER_INGEST", 1000000, 10000000
         )
         self._lock = threading.RLock()
-        self.vectorstore = Chroma(
-            collection_name=self.storage_collection_name,
-            embedding_function=embedding_function,
-            persist_directory=str(self.persist_directory),
-        )
+        self.embedding_function = embedding_function
+        self.storage_backend = requested_storage_backend
+        if self.storage_backend == "crypto-sqlite":
+            if self.embedding_provider == "ollama":
+                raise ValueError("Crypto-RAG currently requires a local embedding object; choose mkaos-native or local-semantic.")
+            raw_crypto_path = os.getenv("SEKA_CRYPTO_RAG_PATH", "").strip()
+            if not raw_crypto_path:
+                raise ValueError("SEKA_CRYPTO_RAG_PATH is required for crypto-sqlite; use a new path outside the Chroma directory.")
+            crypto_path = Path(raw_crypto_path).expanduser()
+            source_root = self.persist_directory.resolve()
+            target_path = crypto_path.resolve()
+            if target_path == source_root or source_root in target_path.parents:
+                raise ValueError("Crypto-RAG database must be outside the plaintext Chroma directory.")
+            from core.crypto_rag import EncryptedVectorStore, key_from_env
+            self.crypto_store = EncryptedVectorStore(crypto_path, key_from_env())
+            self.vectorstore = None
+        else:
+            self.crypto_store = None
+            self.vectorstore = Chroma(
+                collection_name=self.storage_collection_name,
+                embedding_function=embedding_function,
+                persist_directory=str(self.persist_directory),
+            )
         self.splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=150,
@@ -166,7 +189,21 @@ class MemoryStore:
         ids = [self._document_id(doc) for doc in docs]
         with self._lock:
             # Stable IDs prevent the same source/chunk from inflating the collection.
-            self.vectorstore.add_documents(docs, ids=ids)
+            if getattr(self, "crypto_store", None) is not None:
+                vectors = self.embedding_function.embed_documents([doc.page_content for doc in docs])
+                if len(vectors) != len(docs):
+                    raise ValueError("Embedding provider returned a mismatched vector count.")
+                self.crypto_store.upsert_many([
+                    {
+                        "record_id": doc_id,
+                        "embedding": vector,
+                        "document": doc.page_content,
+                        "metadata": doc.metadata,
+                    }
+                    for doc_id, doc, vector in zip(ids, docs, vectors)
+                ])
+            else:
+                self.vectorstore.add_documents(docs, ids=ids)
             self._prune_if_needed()
         return len(docs)
 
@@ -178,6 +215,22 @@ class MemoryStore:
         }])
 
     def _prune_if_needed(self) -> None:
+        if getattr(self, "crypto_store", None) is not None:
+            count = self.crypto_store.count()
+            excess = count - self.max_documents
+            if excess <= 0:
+                return
+            records = self.crypto_store.list_records()
+            ordered = sorted(
+                records,
+                key=lambda row: str(row["metadata"].get("created_at", "")),
+            )
+            delete_ids = [row["id"] for row in ordered[:excess]]
+            for record_id in delete_ids:
+                self.crypto_store.delete(record_id)
+            if delete_ids:
+                logger.info("Encrypted RAG limit pruned %s oldest records.", len(delete_ids))
+            return
         collection = getattr(self.vectorstore, "_collection", None)
         if collection is None:
             return
@@ -221,10 +274,19 @@ class MemoryStore:
         safe_k = max(1, min(int(k), 20))
         candidate_k = min(100, max(safe_k, safe_k * 4))
         try:
-            candidates = self.vectorstore.similarity_search(
-                query.strip()[:4000], k=candidate_k, **self._search_filter()
-            )
-            return self._rerank(query.strip()[:4000], candidates, safe_k)
+            bounded_query = query.strip()[:4000]
+            if getattr(self, "crypto_store", None) is not None:
+                rows = self.crypto_store.search(
+                    self.embedding_function.embed_query(bounded_query),
+                    limit=candidate_k,
+                    metadata_filter={"tenant_id": self.tenant_id} if self.tenant_id else None,
+                )
+                candidates = [Document(page_content=row["document"], metadata=row["metadata"]) for row in rows]
+            else:
+                candidates = self.vectorstore.similarity_search(
+                    bounded_query, k=candidate_k, **self._search_filter()
+                )
+            return self._rerank(bounded_query, candidates, safe_k)
         except Exception as exc:
             logger.warning("Yerel RAG araması kullanılamıyor (%s).", type(exc).__name__)
             return []
@@ -235,10 +297,19 @@ class MemoryStore:
         safe_k = max(1, min(int(k), 20))
         candidate_k = min(100, max(safe_k, safe_k * 4))
         try:
-            pairs = self.vectorstore.similarity_search_with_score(
-                query.strip()[:4000], k=candidate_k, **self._search_filter()
-            )
-            ranked_docs = self._rerank(query.strip()[:4000], [doc for doc, _ in pairs], safe_k)
+            bounded_query = query.strip()[:4000]
+            if getattr(self, "crypto_store", None) is not None:
+                rows = self.crypto_store.search(
+                    self.embedding_function.embed_query(bounded_query),
+                    limit=candidate_k,
+                    metadata_filter={"tenant_id": self.tenant_id} if self.tenant_id else None,
+                )
+                pairs = [(Document(page_content=row["document"], metadata=row["metadata"]), row["score"]) for row in rows]
+            else:
+                pairs = self.vectorstore.similarity_search_with_score(
+                    bounded_query, k=candidate_k, **self._search_filter()
+                )
+            ranked_docs = self._rerank(bounded_query, [doc for doc, _ in pairs], safe_k)
             score_by_identity = {id(doc): score for doc, score in pairs}
             return [(doc, score_by_identity[id(doc)]) for doc in ranked_docs]
         except Exception as exc:
@@ -263,16 +334,24 @@ class MemoryStore:
     def stats(self) -> dict:
         collection = getattr(self.vectorstore, "_collection", None)
         try:
-            count = int(collection.count()) if collection is not None else 0
+            count = self.crypto_store.count() if getattr(self, "crypto_store", None) is not None else (int(collection.count()) if collection is not None else 0)
         except Exception:
             count = 0
         disk_bytes = 0
         try:
-            disk_bytes = sum(p.stat().st_size for p in self.persist_directory.rglob("*") if p.is_file())
+            disk_paths = {p for p in self.persist_directory.rglob("*") if p.is_file()}
+            if getattr(self, "crypto_store", None) is not None:
+                disk_paths.update(p for p in (
+                    self.crypto_store.path,
+                    Path(str(self.crypto_store.path) + "-wal"),
+                    Path(str(self.crypto_store.path) + "-shm"),
+                ) if p.is_file())
+            disk_bytes = sum(p.stat().st_size for p in disk_paths)
         except OSError:
             pass
         return {
             "mode": "local",
+            "storage_backend": self.storage_backend,
             "embedding_provider": getattr(self, "embedding_provider", "unknown"),
             "semantic_retrieval_required": getattr(self, "semantic_retrieval_required", False),
             "documents": count,
