@@ -1,4 +1,5 @@
 import asyncio
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,11 +18,16 @@ class WebDegradationTests(unittest.TestCase):
         self.assertFalse(result["model_checked"])
 
     def test_chat_fails_closed_with_503_if_native_checkpoint_is_unavailable(self):
+        # Explicitly select the native backend: the application default is now
+        # local-server, so this regression test must not depend on ambient env.
         with tempfile.TemporaryDirectory() as directory:
             old_history = web_app.chat_history
             web_app.chat_history = {}
             try:
-                with patch.object(web_app, "CHAT_HISTORY_FILE", Path(directory) / "history.json"), patch.object(web_app, "get_user", return_value={"username": "owner"}), patch.object(web_app, "generate_native_reply", side_effect=web_app.NativeMkaosUnavailable("checkpoint missing")):
+                with patch.dict(os.environ, {"MKAOS_CHAT_BACKEND": "native-rust"}), \
+                     patch.object(web_app, "CHAT_HISTORY_FILE", Path(directory) / "history.json"), \
+                     patch.object(web_app, "get_user", return_value={"username": "owner"}), \
+                     patch.object(web_app, "generate_native_reply", side_effect=web_app.NativeMkaosUnavailable("checkpoint missing")):
                     with self.assertRaises(HTTPException) as raised:
                         asyncio.run(web_app.api_chat(web_app.ChatRequest(message="Merhaba"), authorization="Bearer test"))
                 self.assertEqual(raised.exception.status_code, 503)
