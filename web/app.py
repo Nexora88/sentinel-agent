@@ -524,7 +524,7 @@ async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)
     message = req.message.strip()
     if not message:
         return {"reply": "Boş mesaj."}
-    backend = os.getenv("MKAOS_CHAT_BACKEND", "local-server").strip().lower()
+    backend = os.getenv("MKAOS_CHAT_BACKEND", "native-rust").strip().lower()
     try:
         if message.lower() in ("/status", "durum", "status"):
             reply = get_pipeline(user["username"]).status()
@@ -536,7 +536,7 @@ async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)
             # This path stays local-only; it does not automatically download or switch models.
             reply = get_pipeline(user["username"]).chat(message)
         else:
-            raise HTTPException(503, "Bilinmeyen MKAOS_CHAT_BACKEND; local-server veya native-rust seç.")
+            raise HTTPException(503, "Bilinmeyen MKAOS_CHAT_BACKEND; native-rust veya açıkça etkinleştirilmiş local-server seç.")
     except HTTPException:
         raise
     except NativeMkaosUnavailable as exc:
