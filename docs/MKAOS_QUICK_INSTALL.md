@@ -2,13 +2,13 @@
 
 ## Windows — en kısa kurulum
 
-1. [MKAOS kaynak paketini ZIP olarak indir](https://github.com/Nexora88/sentinel-agent/archive/refs/heads/main.zip).
-2. ZIP'i bir klasöre çıkar.
-3. Çıkarılan `sentinel-agent-main` klasöründeki `INSTALL_MKAOS_WINDOWS.bat` dosyasına çift tıkla.
-4. Windows bir onay gösterirse yalnızca dosyayı bu resmî GitHub deposundan indirdiğini doğruladıktan sonra devam et.
-5. Kurulum tamamlanınca tarayıcıda `http://127.0.0.1:8000` adresini aç. Oluşturulan yerel yönetici parolası proje klasöründeki `.env` dosyasındaki `OWNER_PASSWORD` değeridir; bunu paylaşma.
+1. [MKAOS tek indirmeli kurulum dosyasını indir](https://raw.githubusercontent.com/Nexora88/sentinel-agent/main/MKAOS_TEK_TIK_KURULUM.bat).
+2. İndirilen `MKAOS_TEK_TIK_KURULUM.bat` dosyasına çift tıkla.
+3. Kurulum dosyası resmi GitHub deposunun ZIP paketini indirir, kaynakları `%LOCALAPPDATA%\\MKAOS\\source` altına açar ve `INSTALL_MKAOS_WINDOWS.bat` dosyasını başlatır.
+4. Windows bir güvenlik uyarısı gösterirse dosyanın yukarıdaki resmî bağlantıdan geldiğini kontrol et; anlamadığın bir uyarıyı geçme.
+5. Kurulum tamamlanınca tarayıcıda `http://127.0.0.1:8000` adresini aç. Yerel yönetici parolası kurulum klasöründeki `.env` dosyasındaki `OWNER_PASSWORD` değeridir; bunu paylaşma.
 
-Bu, tek indirmeli ve çift tıklamalı **kurulum akışıdır**; imzalı bir Windows `.exe` yükleyicisi değildir. ZIP'i çıkarmak ve Windows güvenlik uyarılarını gözden geçirmek gerekir. Kaynak kodu incelemeden çalıştırma.
+Bu, tek dosya indirip çift tıklamayla başlayan **kurulum akışıdır**; imzalı bir Windows `.exe` yükleyicisi değildir. Python 3.12 ve ilk kurulum için internet gerekir. Kurulum betiği mevcut `memory`, `.venv` ve `models` dizinlerini yeniden kopyalama sırasında ezmemek üzere dışarıda bırakır. Kaynak kodunu incelemeden çalıştırma.
 
 ## Gereksinimler ve sohbetin gerçek durumu
 
