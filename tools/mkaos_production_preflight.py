@@ -14,7 +14,9 @@ import os
 import re
 import shutil
 import ssl
+import socket
 import sys
+from urllib.parse import urlparse
 from pathlib import Path
 
 
@@ -40,6 +42,8 @@ def main() -> int:
     parser.add_argument("--key", type=Path, help="service private key PEM")
     parser.add_argument("--migration-source", type=Path, help="existing source data store")
     parser.add_argument("--migration-destination", type=Path, help="separate destination path")
+    parser.add_argument("--probe-url", help="optional HTTPS mTLS endpoint for a real TLS handshake probe")
+    parser.add_argument("--probe-timeout", type=float, default=4.0)
     parser.add_argument("--require-network-config", action="store_true")
     args = parser.parse_args()
 
@@ -69,6 +73,26 @@ def main() -> int:
                     results.append(check(f"{label}_pem_shape", valid, "PEM marker found" if valid else "expected PEM marker not found"))
                 except (OSError, UnicodeError) as exc:
                     results.append(check(f"{label}_readable", False, str(exc)))
+
+    if args.probe_url:
+        parsed = urlparse(args.probe_url)
+        ready_inputs = bool(args.ca and args.cert and args.key and args.ca.is_file() and args.cert.is_file() and args.key.is_file())
+        if parsed.scheme != "https" or not parsed.hostname:
+            results.append(check("mtls_handshake", False, "probe URL must be https:// with a hostname"))
+        elif not ready_inputs:
+            results.append(check("mtls_handshake", False, "probe requires existing --ca, --cert, and --key files"))
+        else:
+            try:
+                context = ssl.create_default_context(cafile=str(args.ca))
+                context.minimum_version = ssl.TLSVersion.TLSv1_2
+                context.load_cert_chain(certfile=str(args.cert), keyfile=str(args.key))
+                with socket.create_connection((parsed.hostname, parsed.port or 443), timeout=args.probe_timeout) as raw:
+                    with context.wrap_socket(raw, server_hostname=parsed.hostname) as tls:
+                        peer = tls.getpeercert()
+                        ok = bool(peer and tls.version())
+                        results.append(check("mtls_handshake", ok, f"verified TLS handshake ({tls.version()}); application authorization is not tested" if ok else "peer certificate not verified"))
+            except (OSError, ssl.SSLError, ValueError, TimeoutError) as exc:
+                results.append(check("mtls_handshake", False, f"handshake failed ({type(exc).__name__}); endpoint details omitted"))
 
     if args.model is not None:
         exists = args.model.is_file()
