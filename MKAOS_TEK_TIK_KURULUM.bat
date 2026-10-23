@@ -9,6 +9,10 @@ echo MKAOS tek indirmeli kurulum baslatiliyor.
 echo Kaynak: https://github.com/Nexora88/sentinel-agent
 echo Hedef: %ROOT%
 echo.
+echo Bu dosya resmi GitHub deposundan kaynak indirip yerel kurulum betigini calistiracak.
+echo Yonetici yetkisi istemez. Devam etmeden once kaynak kodu incelemeniz onerilir.
+choice /C EH /N /M "Devam edilsin mi? [E/H] "
+if errorlevel 2 exit /b 0
 where py >nul 2>&1
 if errorlevel 1 (
   echo HATA: Python 3.12 launcher bulunamadi.
@@ -26,7 +30,7 @@ if errorlevel 1 (
 if not exist "%ROOT%" mkdir "%ROOT%"
 if errorlevel 1 goto :fail
 echo [1/3] Resmi kaynak ZIP indiriliyor...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; Invoke-WebRequest -Uri 'https://github.com/Nexora88/sentinel-agent/archive/refs/heads/main.zip' -OutFile '%ZIP%'"
+powershell -NoProfile -Command "$ErrorActionPreference='Stop'; Invoke-WebRequest -Uri 'https://github.com/Nexora88/sentinel-agent/archive/refs/heads/main.zip' -OutFile '%ZIP%'"
 if errorlevel 1 goto :fail
 echo [2/3] Kaynak dosyalar aciliyor...
 if not exist "%STAGE%" mkdir "%STAGE%"
