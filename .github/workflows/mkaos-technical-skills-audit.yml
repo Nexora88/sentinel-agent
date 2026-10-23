@@ -61,7 +61,7 @@ jobs:
             --output "reports/mkaos/codesearchnet-${LANGUAGE}-audit.json"
 
       - name: Upload audit report only (never upload source corpus)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mkaos-technical-source-audit-${{ inputs.language }}
           path: reports/mkaos/codesearchnet-${{ inputs.language }}-audit.json
