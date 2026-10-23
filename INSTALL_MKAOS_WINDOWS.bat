@@ -51,6 +51,7 @@ echo Profil: %PROFILE_NAME%
 echo.
 echo Model dosyalari bu kurulumla indirilmez. Model ve uyumlu yerel motor olmadan sohbet kullanilamaz.
 echo Uygulama yalnizca yerel bilgisayara baglanacak sekilde baslatiliyor...
+set "PYTHONUTF8=1"
 start "MKAOS" cmd /k ""%CD%\.venv\Scripts\python.exe" -m scripts.run web --host 127.0.0.1 --port 8000"
 timeout /t 2 >nul
 start "" "http://127.0.0.1:8000"
