@@ -75,7 +75,7 @@ jobs:
                   raise SystemExit("Rust inference failed: " + result.stderr[-3000:])
               values = {}
               for key in ("checkpoint_sha256", "elapsed_ms", "generated_tokens", "tokens_per_second"):
-                  match = re.search(r"^" + re.escape(key) + r"=([^\\r\\n]+)$", result.stderr, re.M)
+                  match = re.search(r"^" + re.escape(key) + r"=([^\r\n]+)$", result.stderr, re.M)
                   if match:
                       values[key] = match.group(1)
               if values.get("checkpoint_sha256") != digest:
@@ -108,7 +108,7 @@ jobs:
               "checkpoint_policy": "ephemeral in CI; weights are not uploaded or distributed",
               "legal_status": "no redistribution rights asserted",
           }
-          (out / "rust-smoke-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+          (out / "rust-smoke-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
           print(json.dumps(report, ensure_ascii=False, indent=2))
           PY
       - name: Remove experimental weights and tokenizer
