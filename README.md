@@ -535,3 +535,11 @@ The repository declares MIT licensing. Third-party code, model weights, datasets
 - **Türkçe:** [Yukarıdaki Türkçe bölümler](#mkaos-v65--mustafa-kemal-atatürk-operating-system)
 - **English:** [English documentation](#english)
 
+## Windows quick installer / Windows hızlı kurulum
+
+The optional one-file Windows installer is a convenience wrapper around the repository's Windows installer. It requires Python 3.12 and PowerShell, downloads the public repository source, and runs `INSTALL_MKAOS_WINDOWS.bat`. Review the batch file before running it; it is not a signed installer and does not verify a release signature. Do not run it with administrator privileges unless a documented step requires them.
+
+İsteğe bağlı tek dosyalı Windows kurulum aracı, depodaki Windows kurulum betiğini çağıran bir kolaylık katmanıdır. Python 3.12 ve PowerShell gerektirir; herkese açık depo kaynaklarını indirip `INSTALL_MKAOS_WINDOWS.bat` dosyasını çalıştırır. Çalıştırmadan önce betiği inceleyin. İmzalı bir kurulum paketi değildir ve sürüm imzasını doğrulamaz. Belgelenmiş bir adım gerektirmedikçe yönetici yetkisiyle çalıştırmayın.
+
+- [One-file installer / Tek dosyalı kurulum](MKAOS_TEK_TIK_KURULUM.bat)
+- [Quick installation guide / Hızlı kurulum rehberi](docs/MKAOS_QUICK_INSTALL.md)
