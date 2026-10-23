@@ -524,19 +524,19 @@ async def api_chat(req: ChatRequest, authorization: Optional[str] = Header(None)
     message = req.message.strip()
     if not message:
         return {"reply": "Boş mesaj."}
-    backend = os.getenv("MKAOS_CHAT_BACKEND", "native-rust").strip().lower()
+    backend = os.getenv("MKAOS_CHAT_BACKEND", "local-server").strip().lower()
     try:
         if message.lower() in ("/status", "durum", "status"):
             reply = get_pipeline(user["username"]).status()
         elif backend == "native-rust":
-            # No implicit model-provider fallback: an absent/unapproved native checkpoint
-            # returns an actionable 503 rather than silently calling third-party weights.
+            # Explicit direct CLI mode; requires a locally approved checkpoint and matching SHA-256.
             reply = generate_native_reply(message)
-        elif backend == "legacy-smollm":
-            # Explicit compatibility escape hatch; enable only when deliberately accepted.
+        elif backend in {"local-server", "legacy-smollm"}:
+            # Local MKAOS HTTP inference server speaks the Ollama-compatible chat protocol.
+            # This path stays local-only; it does not automatically download or switch models.
             reply = get_pipeline(user["username"]).chat(message)
         else:
-            raise HTTPException(503, "Bilinmeyen MKAOS_CHAT_BACKEND; native-rust veya legacy-smollm seç.")
+            raise HTTPException(503, "Bilinmeyen MKAOS_CHAT_BACKEND; local-server veya native-rust seç.")
     except HTTPException:
         raise
     except NativeMkaosUnavailable as exc:
