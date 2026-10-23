@@ -5,12 +5,14 @@ weights or silently falls back to a third-party model. Prompts are framed in Tur
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
 from typing import Mapping
 
 from core.language_policy import wrap_user_prompt
+from tools.mkaos_model_bundle import ModelBundleError, verify_model_bundle
 
 
 class NativeMkaosUnavailable(RuntimeError):
@@ -43,6 +45,31 @@ def generate_native_reply(prompt: str, env: Mapping[str, str] | None = None) -> 
         raise NativeMkaosUnavailable("Yapılandırılan yerel MKAOS checkpoint dosyası bulunamadı.")
     if len(expected_hash) != 64 or any(c not in "0123456789abcdef" for c in expected_hash):
         raise NativeMkaosUnavailable("MKAOS_NATIVE_SHA256 64 karakterlik onaltılık SHA-256 olmalıdır.")
+
+    # Optional stronger gate: bind the runtime checkpoint to a local bundle
+    # manifest that also verifies the tokenizer artifact. No network access.
+    manifest_value = settings.get("MKAOS_NATIVE_MANIFEST", "").strip()
+    if manifest_value:
+        try:
+            bundle = verify_model_bundle(Path(manifest_value).expanduser())
+        except (ModelBundleError, OSError) as exc:
+            raise NativeMkaosUnavailable(
+                "Yerel MKAOS model paketi doğrulanamadı; çıkarım durduruldu."
+            ) from exc
+        manifest_checkpoint = (
+            Path(bundle["manifest_path"]).parent
+            / json.loads(
+                Path(bundle["manifest_path"]).read_text(encoding="utf-8")
+            )["model_file"]
+        ).resolve()
+        if manifest_checkpoint != checkpoint:
+            raise NativeMkaosUnavailable(
+                "Model manifestindeki checkpoint, MKAOS_NATIVE_CHECKPOINT ile eşleşmiyor."
+            )
+        if bundle["model_sha256"] != expected_hash:
+            raise NativeMkaosUnavailable(
+                "Manifest checkpoint SHA-256 değeri MKAOS_NATIVE_SHA256 ile eşleşmiyor."
+            )
 
     generator = Path(settings.get("MKAOS_NATIVE_GENERATOR", "/usr/local/bin/mkaos-generate")).expanduser()
     if not generator.is_file():
