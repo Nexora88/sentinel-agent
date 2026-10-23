@@ -68,7 +68,7 @@ model.eval()
 if model.config.model_type != "llama":
     raise RuntimeError(f"Unexpected model architecture: {model.config.model_type}")
 
-prompt = "Türkiye'nin başkenti neresidir? Kısa ve doğru cevap ver."
+prompt = "What is the capital of Turkey? Answer briefly and accurately."
 messages = [{"role": "user", "content": prompt}]
 if not getattr(tokenizer, "chat_template", None):
     raise RuntimeError("Pinned instruct tokenizer is missing its required chat_template")
