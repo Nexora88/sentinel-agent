@@ -9,7 +9,23 @@
   <meta name="description" content="MKAOS — yerel öncelikli, denetlenebilir Türkçe ajan platformu." />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
-<body>
+<body>\n  <section id="mkaos-welcome" class="welcome-screen" aria-labelledby="welcome-title">
+    <div class="welcome-grid" aria-hidden="true"></div>
+    <div class="welcome-orbit welcome-orbit-one" aria-hidden="true"></div>
+    <div class="welcome-orbit welcome-orbit-two" aria-hidden="true"></div>
+    <div class="welcome-content">
+      <img src="/static/mkaos-emblem.svg" alt="" class="welcome-emblem" width="92" height="92" />
+      <p class="welcome-kicker">YEREL ZEKA · GÜVENLİK · BAĞIMSIZLIK</p>
+      <h1 id="welcome-title">MKAOS<span> / SENTINEL</span></h1>
+      <p class="welcome-subtitle">İstikbal Siber Göklerdedir</p>
+      <div class="welcome-status"><span class="welcome-status-dot"></span> Cihazında çalışmak üzere hazırlandı</div>
+      <button id="welcome-enter" class="welcome-enter" type="button">Sisteme Gir <span aria-hidden="true">↗</span></button>
+      <p class="welcome-note">Çevrimdışı kullanım, yerel model dosyaları ve yapılandırmaya bağlıdır.</p>
+      <button id="welcome-skip" class="welcome-skip" type="button">Açılışı atla</button>
+    </div>
+    <div class="welcome-footer"><span>MKAOS</span><span>YEREL ÖNCELİKLİ · İNSAN DENETİMLİ</span></div>
+  </section>
+
   <div class="app">
     <aside class="sidebar">
       <div class="logo">
@@ -194,6 +210,21 @@
       </section>
     </main>
   </div>
+  <script>
+    (() => {
+      const screen = document.getElementById('mkaos-welcome');
+      const enter = document.getElementById('welcome-enter');
+      const skip = document.getElementById('welcome-skip');
+      if (!screen || !enter || !skip) return;
+      const dismiss = () => {
+        screen.classList.add('welcome-leaving');
+        window.setTimeout(() => { screen.hidden = true; }, 420);
+      };
+      enter.addEventListener('click', dismiss);
+      skip.addEventListener('click', dismiss);
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) screen.classList.add('reduce-motion');
+    })();
+  </script>
   <script src="/static/app.js"></script>
   <script src="/static/capabilities.js"></script>
 </body>
