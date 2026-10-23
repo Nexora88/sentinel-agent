@@ -6,14 +6,13 @@ import hashlib
 import json
 import os
 import platform
-import threading
 import time
 from pathlib import Path
 
 import psutil
 import torch
 from huggingface_hub import hf_hub_download
-from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 MODEL_ID = "HuggingFaceTB/SmolLM2-135M-Instruct"
 REVISION = "12fd25f77366fa6b3b4b768ec3050bf629380bac"
@@ -87,23 +86,22 @@ baseline_rss = process.memory_info().rss
 runs = []
 
 def generate_once(index: int) -> dict:
-    streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True, timeout=180)
-    kwargs = dict(**inputs, streamer=streamer, max_new_tokens=48, do_sample=False,
-                  use_cache=True, pad_token_id=tokenizer.eos_token_id)
+    # Decode only newly generated token IDs. This avoids relying on streamer prompt
+    # trimming, which can accidentally leak the tail of the input into the answer.
     started = time.perf_counter()
-    worker = threading.Thread(target=model.generate, kwargs=kwargs, daemon=True)
-    worker.start()
-    first_token_time = None
-    chunks = []
-    for chunk in streamer:
-        if chunk and first_token_time is None:
-            first_token_time = time.perf_counter()
-        chunks.append(chunk)
-    worker.join(timeout=180)
-    if worker.is_alive():
-        raise TimeoutError("generation did not finish in 180 seconds")
+    with torch.inference_mode():
+        output_ids = model.generate(
+            **inputs,
+            max_new_tokens=48,
+            do_sample=False,
+            use_cache=True,
+            pad_token_id=tokenizer.eos_token_id,
+        )
     finished = time.perf_counter()
-    text = "".join(chunks).strip()
+    prompt_length = inputs["input_ids"].shape[-1]
+    generated_ids = output_ids[0, prompt_length:]
+    text = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+    first_token_time = finished
     if not text:
         raise RuntimeError("offline model produced an empty answer")
     if "ankara" not in text.casefold():
