@@ -1,6 +1,8 @@
 """Offline contract tests for the native Rust chat adapter."""
 from __future__ import annotations
 
+import hashlib
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,6 +25,67 @@ class NativeMkaosChatTests(unittest.TestCase):
             env = {"MKAOS_NATIVE_CHECKPOINT": str(model), "MKAOS_NATIVE_GENERATOR": str(binary)}
             with self.assertRaisesRegex(NativeMkaosUnavailable, "SHA-256"):
                 generate_native_reply("Merhaba", env=env)
+
+    def test_manifest_verifies_checkpoint_and_tokenizer_before_inference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            model = root / "model.mkaosw"
+            tokenizer = root / "tokenizer.json"
+            binary = root / "mkaos-generate"
+            model.write_bytes(b"checkpoint")
+            tokenizer.write_text('{"kind":"test"}', encoding="utf-8")
+            binary.write_text("binary placeholder", encoding="utf-8")
+            manifest = root / "bundle.json"
+            manifest.write_text(json.dumps({
+                "schema_version": 1,
+                "model_id": "mkaos-test-v1",
+                "model_file": model.name,
+                "model_sha256": hashlib.sha256(model.read_bytes()).hexdigest(),
+                "tokenizer_file": tokenizer.name,
+                "tokenizer_sha256": hashlib.sha256(tokenizer.read_bytes()).hexdigest(),
+                "tokenizer_contract": "test-tokenizer-v1",
+            }), encoding="utf-8")
+            env = {
+                "MKAOS_NATIVE_CHECKPOINT": str(model),
+                "MKAOS_NATIVE_SHA256": hashlib.sha256(model.read_bytes()).hexdigest(),
+                "MKAOS_NATIVE_GENERATOR": str(binary),
+                "MKAOS_NATIVE_MANIFEST": str(manifest),
+            }
+            completed = Mock(returncode=0, stdout="Doğrulandı", stderr="")
+            with patch("core.mkaos_native_chat.subprocess.run", return_value=completed) as run:
+                self.assertEqual(generate_native_reply("Merhaba", env=env), "Doğrulandı")
+            run.assert_called_once()
+
+    def test_manifest_tampering_blocks_inference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            model = root / "model.mkaosw"
+            tokenizer = root / "tokenizer.json"
+            binary = root / "mkaos-generate"
+            model.write_bytes(b"checkpoint")
+            tokenizer.write_text('{"kind":"test"}', encoding="utf-8")
+            binary.write_text("binary placeholder", encoding="utf-8")
+            manifest = root / "bundle.json"
+            manifest.write_text(json.dumps({
+                "schema_version": 1,
+                "model_id": "mkaos-test-v1",
+                "model_file": model.name,
+                "model_sha256": hashlib.sha256(model.read_bytes()).hexdigest(),
+                "tokenizer_file": tokenizer.name,
+                "tokenizer_sha256": hashlib.sha256(tokenizer.read_bytes()).hexdigest(),
+                "tokenizer_contract": "test-tokenizer-v1",
+            }), encoding="utf-8")
+            tokenizer.write_text("tampered", encoding="utf-8")
+            env = {
+                "MKAOS_NATIVE_CHECKPOINT": str(model),
+                "MKAOS_NATIVE_SHA256": hashlib.sha256(model.read_bytes()).hexdigest(),
+                "MKAOS_NATIVE_GENERATOR": str(binary),
+                "MKAOS_NATIVE_MANIFEST": str(manifest),
+            }
+            with patch("core.mkaos_native_chat.subprocess.run") as run:
+                with self.assertRaisesRegex(NativeMkaosUnavailable, "paketi doğrulanamadı"):
+                    generate_native_reply("Merhaba", env=env)
+                run.assert_not_called()
 
     def test_invokes_rust_cli_without_shell_and_returns_text(self):
         with tempfile.TemporaryDirectory() as tmp:
