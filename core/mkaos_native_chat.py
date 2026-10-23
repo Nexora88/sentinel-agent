@@ -5,6 +5,7 @@ weights or silently falls back to a third-party model. Prompts are framed in Tur
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -57,7 +58,7 @@ def generate_native_reply(prompt: str, env: Mapping[str, str] | None = None) -> 
             ) from exc
         manifest_checkpoint = (
             Path(bundle["manifest_path"]).parent
-            / __import__("json").loads(
+            / json.loads(
                 Path(bundle["manifest_path"]).read_text(encoding="utf-8")
             )["model_file"]
         ).resolve()
