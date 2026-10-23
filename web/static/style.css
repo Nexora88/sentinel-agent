@@ -622,3 +622,26 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .nav-btn.active { background:linear-gradient(90deg,rgba(139,66,255,.22),rgba(139,66,255,.05)); color:#c5a4ff; box-shadow:inset 2px 0 0 #8b42ff; }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline:2px solid #b18aff; outline-offset:2px; }
 @media (max-width: 700px) { .logo-emblem { width:40px; height:40px; flex-basis:40px; } .logo { gap:8px; } .logo .brand { font-size:1.05rem; } }
+\n
+/* MKAOS animated welcome screen — decorative only; never implies a model is loaded. */
+.welcome-screen{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;overflow:hidden;background:radial-gradient(ellipse at 50% 42%,#241344 0%,#0b0718 42%,#04040a 78%);color:#f4f0ff;opacity:1;transition:opacity .42s ease,transform .42s ease}
+.welcome-screen[hidden]{display:none}.welcome-screen.welcome-leaving{opacity:0;transform:scale(1.025);pointer-events:none}
+.welcome-grid{position:absolute;inset:-30%;opacity:.2;background-image:linear-gradient(rgba(167,119,255,.23) 1px,transparent 1px),linear-gradient(90deg,rgba(167,119,255,.23) 1px,transparent 1px);background-size:52px 52px;transform:perspective(500px) rotateX(58deg) scale(1.6);mask-image:linear-gradient(transparent,#000 35%,#000 75%,transparent);animation:welcome-grid-drift 18s linear infinite}
+.welcome-orbit{position:absolute;width:min(72vw,680px);aspect-ratio:1;border:1px solid rgba(183,140,255,.2);border-radius:50%;box-shadow:0 0 90px rgba(121,44,255,.08),inset 0 0 60px rgba(121,44,255,.04);animation:welcome-spin 35s linear infinite}
+.welcome-orbit:before,.welcome-orbit:after{content:"";position:absolute;inset:12%;border:1px dashed rgba(216,222,234,.16);border-radius:50%}.welcome-orbit:after{inset:27%;border-color:rgba(166,106,255,.25)}
+.welcome-orbit-two{width:min(54vw,510px);transform:rotateX(64deg) rotateY(-20deg);animation-duration:24s;animation-direction:reverse}
+.welcome-content{position:relative;z-index:1;display:flex;align-items:center;flex-direction:column;text-align:center;padding:28px;max-width:780px;animation:welcome-rise .8s cubic-bezier(.2,.8,.2,1) both}
+.welcome-emblem{filter:drop-shadow(0 0 24px rgba(166,106,255,.55));margin-bottom:24px;animation:welcome-glow 4s ease-in-out infinite}
+.welcome-kicker{font-size:.72rem;letter-spacing:.28em;color:#c7a9ff;font-weight:700;margin-bottom:14px}
+.welcome-content h1{font-size:clamp(2.4rem,7vw,5.3rem);line-height:1.05;letter-spacing:.08em;font-weight:850;text-shadow:0 0 36px rgba(166,106,255,.25)}
+.welcome-content h1 span{color:#b48aff}.welcome-subtitle{margin-top:16px;color:#c9c4d7;font-size:clamp(1rem,2.4vw,1.35rem);letter-spacing:.08em}
+.welcome-status{display:flex;align-items:center;gap:9px;margin-top:30px;padding:10px 15px;border:1px solid rgba(166,106,255,.26);border-radius:999px;background:rgba(15,10,29,.65);color:#d7c8f7;font-size:.82rem}
+.welcome-status-dot{width:7px;height:7px;border-radius:50%;background:#a66aff;box-shadow:0 0 12px #a66aff}
+.welcome-enter{display:flex;align-items:center;gap:18px;margin-top:28px;padding:14px 24px;border:1px solid #c5a6ff;border-radius:12px;background:linear-gradient(115deg,#8b4bdb,#5830a0);color:white;font-size:1rem;font-weight:750;cursor:pointer;box-shadow:0 8px 34px rgba(111,53,190,.3);transition:transform .2s,box-shadow .2s}
+.welcome-enter:hover{transform:translateY(-2px);box-shadow:0 12px 42px rgba(111,53,190,.48)}.welcome-enter span{font-size:1.25rem}
+.welcome-note{max-width:420px;margin-top:18px;color:#9b93ae;font-size:.75rem;line-height:1.6}.welcome-skip{margin-top:12px;border:0;background:transparent;color:#a69bbd;text-decoration:underline;text-underline-offset:4px;cursor:pointer;font-size:.78rem}
+.welcome-footer{position:absolute;bottom:20px;left:24px;right:24px;display:flex;justify-content:space-between;gap:16px;color:#777087;font-size:.65rem;letter-spacing:.15em}
+@keyframes welcome-spin{to{transform:rotate(360deg)}}@keyframes welcome-grid-drift{to{background-position:0 52px,52px 0}}@keyframes welcome-rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}@keyframes welcome-glow{50%{filter:drop-shadow(0 0 34px rgba(166,106,255,.8))}}
+.welcome-screen.reduce-motion *{animation:none!important;transition:none!important}
+@media(max-width:560px){.welcome-footer{left:14px;right:14px;bottom:12px;font-size:.55rem}.welcome-kicker{letter-spacing:.15em}.welcome-content{padding:18px}.welcome-orbit{width:95vw}.welcome-orbit-two{width:78vw}}
+@media(prefers-reduced-motion:reduce){.welcome-screen *{animation:none!important;transition:none!important}}

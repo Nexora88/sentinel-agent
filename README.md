@@ -310,6 +310,14 @@ MKAOS her gece varsayılan olarak 03:00 (Europe/Istanbul) saatinde yerel bakım 
 - **Sesli komut:** tarayıcıdaki bulut tabanlı `SpeechRecognition` kullanılmaz. Mikrofon kaydı yalnızca yerel MKAOS sunucusuna gönderilir; çözümleme yerel faster-whisper veya whisper.cpp modeliyle yapılır. Modeller hazır değilse ses işlevi açıkça hata verir.
 - Kurulum için `pip install -r requirements-voice.txt` kullanabilir veya Docker imajında isteğe bağlı ses bağımlılıklarını kurabilirsin. Model dosyaları kaynak depoya eklenmemelidir.
 
+## Tek tuş kurulum ve başlangıç ekranı
+
+Windows 10/11 x64 için `INSTALL_MKAOS_WINDOWS.bat` betiği Python 3.12 sanal ortamını, Python bağımlılıklarını ve ilk `.env` dosyasını hazırlar; uygulamayı yalnızca yerel `127.0.0.1:8000` adresinde başlatır. Kurulum sırasında 8 GB veya 16 GB bellek profili seçilebilir. Bu profil seçimi donanıma RAM eklemez ve modelin o bellek miktarında çalışacağını garanti etmez.
+
+Kurulum rehberi: [MKAOS hızlı kurulum, sistem gereksinimleri ve çevrimdışı kullanım](docs/MKAOS_QUICK_INSTALL.md).
+
+Kurulum sırasında internet, Python paketlerini indirmek için gereklidir. Sonraki açılışın internetsiz çalışması; gerekli model dosyalarının, tokenizer'ın ve uyumlu yerel çıkarım motorunun önceden kurulmuş olmasına bağlıdır. Model ağırlıkları kaynak depoda bulunmaz. Açılış ekranındaki “cihazında çalışmak üzere hazırlandı” metni yalnızca görsel karşılama ifadesidir; modelin yüklendiğini veya çevrimdışı durumun doğrulandığını göstermez.
+
 ## Güvenli kurulum
 
 1. Python 3.12 ve Ollama kur.
