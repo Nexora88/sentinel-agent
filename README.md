@@ -1,14 +1,14 @@
 # MKAOS — Sentinel Agent Intelligence
 
 <div align="center">
-<img src="web/static/mkaos-emblem.svg" alt="MKAOS silver and violet official wordmark" width="320" />
+<img src="web/static/mkaos-emblem.svg" alt="MKAOS silver and violet official emblem from the local PC asset" width="160" />
 
 **Türkiye'den doğan, yerel öncelikli yapay zekâ platformu**
 
 *Bugünün güvenilir altyapısını kurarken yarının kendi temel modelini geliştirmek.*
 </div>
 
-[CI](https://github.com/Nexora88/sentinel-agent/actions) · [Lisans](LICENSE) · [Sorun bildir](https://github.com/Nexora88/sentinel-agent/issues)
+[Windows tek indirmeli kurulum](docs/MKAOS_QUICK_INSTALL.md) · [CI](https://github.com/Nexora88/sentinel-agent/actions) · [Lisans](LICENSE) · [Sorun bildir](https://github.com/Nexora88/sentinel-agent/issues)
 
 ---
 
