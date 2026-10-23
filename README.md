@@ -25,7 +25,7 @@ Bu bir vizyondur, tamamlanmış başarı iddiası değildir. “Yerli” niteli�
 ### Gerçek durum — 23 Ekim 2026
 
 - **Kendi temel modelimiz:** Henüz onaylanmış eğitim korpusu ve kullanılabilir, eğitilmiş MKAOS checkpoint'i yok. Bağımsız Türkçe kalite skoru da yayımlanmış değil.
-- **Sohbet neden 503 döndürüyor?** Varsayılan sohbet yolu yerel mkaos-generate çalıştırıcısı ve SHA-256 ile doğrulanan checkpoint gerektirir. Bunlar doğru yapılandırılmadığında sistem uydurma cevap vermek veya izinsiz başka bir modele sessizce geçmek yerine isteği reddeder. Bu, modelin çalıştığı anlamına gelmez; kullanıcıların bugün soru sorabilmesi için uyumlu yerel sohbet motorunun açıkça kurulup seçilmesi gerektiğini gösterir.
+- **Sohbet neden 503 döndürüyor?** Varsayılan sohbet yolu yerel MKAOS HTTP çıkarım sunucusuna bağlanır. Sunucu kapalıysa, model dosyası yoksa veya uyumlu model yüklenmemişse API 503 döndürür. Alternatif `native-rust` yolu ayrıca yapılandırılmış checkpoint ve SHA-256 gerektirir. Bu davranış kullanıcıya hatanın nedenini görünür kılar; uyumlu yerel model sunucusu çalıştırılmadan soru-cevap üretilemez.
 - **CI'da model deneyi:** Ayrı bir GitHub Actions işi, sabitlenmiş üçüncü taraf SmolLM2-135M-Instruct modelinin dosya hash'lerini, tokenizer/runtime uyumunu ve internet erişimi kapatıldıktan sonra gerçek Türkçe isteme yanıt üretmesini doğrular. Ölçümler GitHub'ın geçici CPU çalıştırıcısına aittir; MKAOS'un kendi modeli veya kullanıcının bilgisayarı için performans kanıtı değildir. Yalnızca rapor artifact'i saklanır; ağırlıklar repoya eklenmez.
 - **Yerel Rust motoru:** Deneysel hesaplama/çıkarım altyapısı vardır; SmolLM2 gibi bir modelin mimarisi ve tokenizer'ıyla uyumlu, üretime hazır genel amaçlı motor olduğu varsayılmamalıdır.
 - **Crypto-RAG:** AES-GCM şifreli SQLite depo ve kontrollü aktarım yardımcıları bulunur. Kullanıcının gerçek deposunda doğrulanmış, uçtan uca geri yükleme provası ayrıca yapılmalıdır.
@@ -115,7 +115,7 @@ This is a goal, not a claim of present-day model independence. The repository cu
 
 ### Current evidence and limitations
 
-- The default native chat path requires a local mkaos-generate executable and a SHA-256-verified checkpoint. If either is missing or incompatible, it returns HTTP 503 rather than silently switching to an unapproved model.
+- The default chat path connects to the local MKAOS HTTP inference server. If the server is stopped, the model files are missing, or no compatible model is loaded, the API returns HTTP 503. The optional native-rust CLI path separately requires a configured checkpoint and SHA-256. This is an explicit local runtime requirement, not a claim that model-backed chat works without a model.
 - A separate GitHub Actions test validates a pinned third-party SmolLM2 reference model, its hashes and tokenizer/runtime compatibility, and Turkish prompt generation after network access is disabled. Those are hosted-runner measurements, not performance results for a user's computer or a MKAOS-trained model.
 - The Rust runtime is experimental and must not be assumed compatible with arbitrary model architectures or tokenizers.
 - Crypto-RAG migration/restore, real-host WireGuard and mTLS lifecycle, production post-quantum cryptography, and full deployment operations require additional end-to-end verification.
@@ -136,7 +136,7 @@ pip install -r requirements.txt
 python -m scripts.run web --host 127.0.0.1 --port 8000
 ```
 
-This starts the web application only. It does not provision model weights or a compatible inference runtime. Configure a locally approved checkpoint, tokenizer, runtime, and SHA-256 manifest before expecting model-backed chat.
+This starts the web application only. A separate local inference server and its compatible model files are also required. The repository does not automatically download model weights. The SmolLM2 compatibility server is a third-party reference runtime, not a MKAOS-trained model.
 
 ### Validation
 
