@@ -2,15 +2,6 @@ name: MKAOS Local CPU Training + Rust Smoke
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - ".github/workflows/mkaos-local-cpu-training-smoke.yml"
-      - "tools/train_mkaos_from_scratch.py"
-      - "tools/verify_mkaos_training_artifacts.py"
-      - "engine/mkaos-inference/**"
-      - "data/mkaos/first-party-smoke-v1*"
-      - "data/mkaos/source-register.json"
-      - "spec/mkaos-tokenizer-v1.json"
 
 permissions:
   contents: read
