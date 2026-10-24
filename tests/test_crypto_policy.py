@@ -11,7 +11,7 @@ class CryptoPolicyTests(unittest.TestCase):
         self.assertFalse(result["ready"])
         self.assertTrue(result["issues"])
 
-    def test_declared_pqc_without_external_attestation_is_not_ready(self):
+    def test_declared_pqc_remains_unverified(self):
         result = assess_crypto_posture({
             "tls_min_version": "1.3",
             "kem": "ML-KEM-768",
@@ -20,18 +20,20 @@ class CryptoPolicyTests(unittest.TestCase):
         })
         self.assertEqual(result["state"], "configured_unverified")
         self.assertFalse(result["ready"])
-        self.assertTrue(any("not attested" in item for item in result["issues"]))
+        self.assertTrue(any("not evidence" in item for item in result["issues"]))
 
-    def test_external_attestation_is_required_for_ready_state(self):
-        result = assess_crypto_posture({
+    def test_config_cannot_self_attest_readiness(self):
+        config = {
             "tls_min_version": "1.3",
             "kem": "ML-KEM-768",
             "signature": "ML-DSA-65",
             "hybrid_mode": True,
             "deployment_attested": True,
-        })
-        self.assertEqual(result["state"], "attested_by_external_evidence")
-        self.assertTrue(result["ready"])
+            "attestation_verified": True,
+        }
+        result = assess_crypto_posture(config)
+        self.assertEqual(result["state"], "configured_unverified")
+        self.assertFalse(result["ready"])
 
     def test_legacy_or_unknown_algorithms_are_blocked(self):
         for kem in ("RSA-2048", "unknown", ""):
@@ -41,7 +43,6 @@ class CryptoPolicyTests(unittest.TestCase):
                     "kem": kem,
                     "signature": "ML-DSA-65",
                     "hybrid_mode": True,
-                    "deployment_attested": True,
                 })
                 self.assertEqual(result["state"], "blocked")
                 self.assertFalse(result["ready"])
@@ -52,7 +53,6 @@ class CryptoPolicyTests(unittest.TestCase):
             "kem": "ML-KEM-768",
             "signature": "ML-DSA-65",
             "hybrid_mode": False,
-            "deployment_attested": True,
         })
         self.assertEqual(result["state"], "blocked")
         self.assertFalse(result["ready"])
