@@ -1,0 +1,82 @@
+name: MKAOS controlled CPU training and Rust checkpoint smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "tools/train_mkaos_from_scratch.py"
+      - "tools/verify_mkaos_training_artifacts.py"
+      - "engine/mkaos-inference/**"
+      - "data/mkaos/first-party-smoke-v1.jsonl"
+      - "data/mkaos/first-party-smoke-v1.manifest.json"
+      - "data/mkaos/source-register.json"
+      - "core/security/egress_policy.py"
+      - "tests/test_egress_policy.py"
+      - ".github/workflows/mkaos-controlled-cpu-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  cpu-training-rust-smoke:
+    name: CPU-only tiny training and Rust checkpoint validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test default-deny egress policy
+        run: python -m unittest discover -s tests -p test_egress_policy.py -v
+      - name: Install CPU-only training dependency
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install numpy
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: Train tiny experimental model from random initialization
+        run: |
+          set -eu
+          mkdir -p artifacts/mkaos-local-experiment
+          python tools/train_mkaos_from_scratch.py \
+            --corpus data/mkaos/first-party-smoke-v1.jsonl \
+            --manifest data/mkaos/first-party-smoke-v1.manifest.json \
+            --source-register data/mkaos/source-register.json \
+            --output-dir artifacts/mkaos-local-experiment \
+            --experimental-local-only \
+            --epochs 3 --batch-size 2 --sequence-length 64 \
+            --hidden-size 32 --layers 1 --heads 4 --kv-heads 2 \
+            --intermediate-size 64 --seed 20261016
+          python tools/verify_mkaos_training_artifacts.py artifacts/mkaos-local-experiment/training-report.json
+      - name: Build Rust inference CLI
+        run: cargo build --manifest-path engine/mkaos-inference/Cargo.toml --bin mkaos-run
+      - name: Load the exact checkpoint in Rust and verify hash
+        run: |
+          python - <<'PY'
+          import hashlib, json, subprocess
+          from pathlib import Path
+          out = Path("artifacts/mkaos-local-experiment")
+          report = json.loads((out / "training-report.json").read_text(encoding="utf-8"))
+          checkpoint = out / "mkaos-owned.mkaosw"
+          digest = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+          if digest != report["checkpoint_sha256"]:
+              raise SystemExit("Checkpoint hash does not match training report")
+          result = subprocess.run([
+              "engine/mkaos-inference/target/debug/mkaos-run",
+              "--checkpoint", str(checkpoint), "--sha256", digest,
+              "--heads", "4", "--kv-heads", "2", "--max-seq-len", "64",
+              "--max-new-tokens", "1", "--prompt", "MKAOS", "--raw-token-ids"
+          ], text=True, capture_output=True)
+          if result.returncode:
+              raise SystemExit("Rust checkpoint load failed: " + result.stderr[-3000:])
+          if "checkpoint_sha256=" + digest not in result.stderr:
+              raise SystemExit("Rust did not confirm the exact checkpoint hash")
+          print("Rust loaded the verified tiny checkpoint; this is not a Turkish-quality claim.")
+          PY
+      - name: Upload training report and checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkaos-cpu-training-rust-smoke
+          path: artifacts/mkaos-local-experiment/
+          if-no-files-found: error
