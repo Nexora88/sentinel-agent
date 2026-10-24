@@ -1,0 +1,41 @@
+name: MKAOS controlled CPU training and Rust checkpoint smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "tools/train_mkaos_from_scratch.py"
+      - "tools/verify_mkaos_training_artifacts.py"
+      - "engine/**"
+      - "tests/test_mkaos_training_artifacts.py"
+      - ".github/workflows/mkaos-local-training-rust-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  cpu-training-rust-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install CPU-only training dependency
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+      - name: Verify trainer and checkpoint validator contracts
+        run: |
+          python -m unittest discover -s tests -p "test_mkaos_training_artifacts.py" -v
+          python tools/train_mkaos_from_scratch.py --help
+          python tools/verify_mkaos_training_artifacts.py --help
+      - name: Build Rust inference workspace
+        run: cargo test --workspace --no-run
+      - name: Report scope honestly
+        run: |
+          echo "This workflow verifies CPU-only tooling/contracts and Rust build."
+          echo "It does not claim Turkish language quality or that a checkpoint says Ankara."
+          echo "A real Ankara acceptance test requires an actual trained checkpoint and a generation/evaluation command."
