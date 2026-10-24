@@ -32,6 +32,10 @@ sys.path.insert(0, str(ROOT))
 from dotenv import load_dotenv
 load_dotenv()
 
+# Enforce fail-closed outbound TCP policy before app integrations are initialized.
+from core.safety.egress_policy import install_egress_guard
+install_egress_guard()
+
 from core.pipeline import SentinelPipeline
 from core.mkaos_native_chat import NativeMkaosUnavailable, generate_native_reply
 from core.tenant_storage import tenant_root, tenant_storage_id
