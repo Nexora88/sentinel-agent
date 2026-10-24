@@ -17,21 +17,17 @@ _LEGACY_MARKERS = ("RSA", "ECDH", "ECDSA", "DH", "SHA1", "SHA-1")
 
 
 def assess_crypto_posture(config: Mapping[str, Any]) -> dict[str, Any]:
-    """Return a conservative posture report from explicit deployment settings.
+    """Assess declarations without ever treating config as security evidence.
 
-    Expected keys: tls_min_version, kem, signature, hybrid_mode,
-    deployment_attested.
-
-    Missing, unknown, or legacy settings never count as ready. Even a complete
-    declaration remains configured_unverified unless trusted deployment
-    evidence is supplied by infrastructure outside this function.
+    A real deployment verifier must independently validate the TLS handshake,
+    attestation provenance, freshness, and rollback protection. This function
+    deliberately never returns ready=True.
     """
     issues: list[str] = []
     tls = str(config.get("tls_min_version", "")).strip()
     kem = str(config.get("kem", "")).strip().upper()
     signature = str(config.get("signature", "")).strip().upper()
     hybrid_mode = config.get("hybrid_mode") is True
-    attested = config.get("deployment_attested") is True
 
     if tls not in _ALLOWED_TLS:
         issues.append("TLS minimum must be explicitly configured as 1.3.")
@@ -47,24 +43,22 @@ def assess_crypto_posture(config: Mapping[str, Any]) -> dict[str, Any]:
 
     if issues:
         state = "blocked"
-    elif not attested:
+    else:
         state = "configured_unverified"
         issues.append(
-            "Configuration is declarative only; live handshake and deployment are not attested."
+            "Declared settings are not evidence: live handshake and attestation "
+            "must be independently verified."
         )
-    else:
-        state = "attested_by_external_evidence"
 
     return {
         "state": state,
-        "ready": state == "attested_by_external_evidence",
+        "ready": False,
         "policy_version": "mkaos-crypto-posture-v1",
         "checks": {
             "tls_min_version": tls or None,
             "kem": kem or None,
             "signature": signature or None,
             "hybrid_mode": hybrid_mode,
-            "external_deployment_attestation": attested,
         },
         "issues": issues,
         "limitations": [
