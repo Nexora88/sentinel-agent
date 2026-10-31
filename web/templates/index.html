@@ -193,73 +193,64 @@
       <section id="panel-developers" class="panel">
         <header class="panel-header">
           <h1>Geliştirici Merkezi</h1>
-          <p>MKAOS'u editörlere, yerel araç zincirlerine ve diğer ajanlara bağlamak için entegrasyon alanı.</p>
+          <p>MKAOS'un bağımsız paketleri, yerel geliştirici araçları ve güvenli entegrasyonları.</p>
         </header>
         <div class="dev-hero">
           <div class="dev-eyebrow">MKAOS · DEVELOPER PLATFORM</div>
-          <h2>Güvenlik iş akışın, kullandığın editörde.</h2>
-          <p>Cursor, Claude Code ve diğer MCP istemcileri için entegrasyon hedefleri. Her kart mevcut durumu açıkça belirtir; henüz yayımlanmamış paketler çalışır gibi gösterilmez.</p>
+          <h2>Yerel, denetlenebilir ve salt okunur entegrasyonlar.</h2>
+          <p>İlk geliştirici paketleri kaynak depoda hazırlandı. PyPI yayını ve gerçek Cursor / Claude Code istemci testleri tamamlanmadan bu entegrasyonlar kararlı sürüm olarak sunulmaz.</p>
           <div class="dev-pills"><span>Local-first</span><span>Human approval</span><span>Read-only by default</span></div>
         </div>
         <div class="dev-grid">
           <article class="dev-card">
-            <div class="dev-card-top"><span class="dev-icon">⌘</span><span class="dev-status status-foundation">Temel mevcut</span></div>
-            <h3>MCP Server</h3>
-            <p>Claude Code ve Cursor gibi MCP istemcilerinden sınırlandırılmış MKAOS araçlarına erişim. Mevcut temel salt okunur stdio yaklaşımındadır; üretim paketi ve istemci uyumluluk testleri tamamlanmalıdır.</p>
+            <div class="dev-card-top"><span class="dev-icon">⌘</span><span class="dev-status status-foundation">Kaynak paketi hazır</span></div>
+            <h3>Bağımsız MCP Server</h3>
+            <p><code>mkaos-mcp-server</code> ayrı Python dağıtımıdır. Stdio üzerinden yalnızca seçilen çalışma alanında dosya listeleme ve sınırlı metin okuma sunar; shell veya dosya yazma aracı içermez.</p>
             <div class="dev-meta"><span>Transport</span><b>stdio</b><span>Yetki</span><b>Read-only</b></div>
-            <pre class="dev-code"># Mevcut MCP temelini incele
-# Repo: tools/ ve MCP dokümantasyonu
-# Genel shell / sınırsız dosya erişimi yok</pre>
-            <button class="dev-copy" data-copy="git clone https://github.com/Nexora88/sentinel-agent.git">Repo komutunu kopyala</button>
+            <pre class="dev-code">python -m pip install ./packages/mkaos-mcp-server
+mkaos-mcp-server --workspace .</pre>
+            <a class="dev-copy" href="https://github.com/Nexora88/sentinel-agent/tree/main/packages/mkaos-mcp-server">MCP paketini incele</a>
           </article>
           <article class="dev-card">
-            <div class="dev-card-top"><span class="dev-icon">✳</span><span class="dev-status status-ready">Şablonlar</span></div>
+            <div class="dev-card-top"><span class="dev-icon">✳</span><span class="dev-status status-ready">Şablonlar mevcut</span></div>
             <h3>Cursor & Claude Rules</h3>
-            <p>Güvenli kod üretimi, sırların korunması, izinli test kapsamı, insan onayı ve değişiklik öncesi test ilkelerini projene taşı.</p>
+            <p>En az ayrıcalık, sırların korunması, izinli kapsam, insan onayı ve doğrulanmış test raporu ilkeleri.</p>
             <div class="dev-meta"><span>Cursor</span><b>.cursor/rules/</b><span>Claude Code</span><b>.claude/rules/</b></div>
-            <pre class="dev-code">MKAOS güvenlik ilkeleri:
-• En az ayrıcalıkla çalış
-• Sırları ve kişisel verileri yazdırma
-• Yalnızca izinli hedefleri tara
-• Yıkıcı işlemlerden önce onay al
-• Test kanıtı olmadan başarı iddia etme</pre>
-            <button class="dev-copy" data-copy="MKAOS güvenlik ilkeleri: En az ayrıcalıkla çalış. Sırları ve kişisel verileri yazdırma. Yalnızca izinli hedefleri tara. Yıkıcı işlemlerden önce onay al. Test kanıtı olmadan başarı iddia etme.">Kuralları kopyala</button>
+            <pre class="dev-code">templates/cursor/security.mdc
+templates/claude/security.md</pre>
+            <a class="dev-copy" href="https://github.com/Nexora88/sentinel-agent/tree/main/templates">Kuralları görüntüle</a>
           </article>
           <article class="dev-card">
-            <div class="dev-card-top"><span class="dev-icon">{ }</span><span class="dev-status status-planned">Geliştirme hedefi</span></div>
-            <h3>OpenAPI & Agent API</h3>
-            <p>Üçüncü taraf ajanlar için sürümlenmiş, şeması yayımlanmış HTTP arayüzü. Var olan uygulama uç noktaları otomatik olarak herkese açık API anlamına gelmez; kimlik doğrulama ve izin kapsamı korunmalıdır.</p>
-            <div class="dev-meta"><span>Format</span><b>OpenAPI 3.x</b><span>Auth</span><b>Bearer session</b></div>
-            <pre class="dev-code"># Yerel API örneği
-POST http://127.0.0.1:8000/api/chat
-Content-Type: application/json
-
-{"message":"Bu kod değişikliğini incele"}</pre>
-            <button class="dev-copy" data-copy="curl -X POST http://127.0.0.1:8000/api/chat -H 'Content-Type: application/json' -d '{&quot;message&quot;:&quot;Bu kod değişikliğini incele&quot;}'">API örneğini kopyala</button>
+            <div class="dev-card-top"><span class="dev-icon">{ }</span><span class="dev-status status-foundation">Şema + yerel API</span></div>
+            <h3>OpenAPI 3.1 & REST API</h3>
+            <p>Token korumalı <code>/v1/scan</code> uç noktası; yalnızca yapılandırılmış yerel çalışma alanında tarama yapar. API, güçlü token olmadan devreye girmez ve CLI yalnızca loopback adresine bağlanır.</p>
+            <div class="dev-meta"><span>Format</span><b>OpenAPI 3.1</b><span>Auth</span><b>Bearer token</b></div>
+            <pre class="dev-code">python -m pip install ".[api]"
+# MKAOS_API_TOKEN: 32+ karakterlik rastgele değer
+mkaos api --host 127.0.0.1 --port 8765</pre>
+            <a class="dev-copy" href="https://github.com/Nexora88/sentinel-agent/blob/main/openapi/mkaos-openapi.yaml">OpenAPI şemasını aç</a>
           </article>
           <article class="dev-card">
-            <div class="dev-card-top"><span class="dev-icon">⌁</span><span class="dev-status status-planned">Paketleme hedefi</span></div>
-            <h3>MKAOS CLI & Python SDK</h3>
-            <p>pip ile kurulabilir paket ve terminalden yerel inceleme deneyimi hedefleniyor. Şu anda doğrulanmış genel PyPI paketi veya <code>mkaos scan</code> komutu olduğu iddia edilmiyor.</p>
-            <div class="dev-meta"><span>Mevcut CLI</span><b>Python modülü</b><span>Hedef</span><b>pip / mkaos</b></div>
-            <pre class="dev-code"># Repo içindeki mevcut komut örnekleri
-python -m scripts.run review path/to/file.py
-python -m scripts.run secrets --path .
-python -m scripts.run licenses --path .</pre>
-            <button class="dev-copy" data-copy="python -m scripts.run review path/to/file.py
-python -m scripts.run secrets --path .
-python -m scripts.run licenses --path .">CLI komutlarını kopyala</button>
+            <div class="dev-card-top"><span class="dev-icon">⌁</span><span class="dev-status status-foundation">CLI kaynakta hazır</span></div>
+            <h3>MKAOS CLI</h3>
+            <p>İlk bağımsız CLI dağıtımı salt okunur yerel tarama yapar. Sonuçlar sezgiseldir; bulgu olmaması güvenlik garantisi değildir. PyPI yayınından önce kurulum matrisi doğrulanacak.</p>
+            <div class="dev-meta"><span>Komut</span><b>mkaos scan</b><span>Değişiklik</span><b>Yok</b></div>
+            <pre class="dev-code">python -m pip install -e .
+mkaos scan .
+mkaos scan . --json</pre>
+            <a class="dev-copy" href="https://github.com/Nexora88/sentinel-agent/blob/main/pyproject.toml">Paket tanımını incele</a>
           </article>
         </div>
         <div class="dev-roadmap">
-          <h3>Yayın kapıları</h3>
+          <h3>Doğrulama ve yayın kapıları</h3>
           <ol>
-            <li><b>MCP:</b> ayrı paket, izinli workspace kökü, zaman/açıklama sınırları ve Cursor + Claude Code smoke testleri.</li>
-            <li><b>Rules:</b> sürümlü Cursor ve Claude Code şablonları, örnek proje ve kopyalama yönergeleri.</li>
-            <li><b>API:</b> OpenAPI şeması, endpoint bazlı yetki matrisi, rate limit ve entegrasyon testleri.</li>
-            <li><b>CLI:</b> pyproject paketlemesi, Windows/macOS/Linux testleri, imzalı sürüm ve PyPI yayın kontrolü.</li>
+            <li><b>MCP:</b> bağımsız paket ve birim testleri eklendi; gerçek Cursor / Claude Code bağlantısı ayrıca masaüstü istemcilerinde doğrulanmalı.</li>
+            <li><b>CLI:</b> <code>mkaos scan .</code> salt okunur tarama komutu eklendi; Windows, macOS ve Linux paket testleri sürüyor.</li>
+            <li><b>API:</b> OpenAPI 3.1 şeması ve token korumalı yerel API eklendi; uzak dağıtım ve rate-limit incelemesi henüz yapılmadı.</li>
+            <li><b>PyPI:</b> paket metadata ve build CI kapısı eklendi; paketler henüz PyPI'a yayımlanmadı.</li>
           </ol>
-          <p class="dev-disclaimer">Güvenlik notu: MKAOS yalnızca kullanıcının sahip olduğu veya açıkça test izni aldığı kod ve sistemlerde kullanılmalıdır. MCP araçları varsayılan olarak salt okunur kalmalı; dosya yazma, komut çalıştırma ve uzak işlemler ayrı, açık onay gerektirmelidir.</p>
+          <p class="dev-disclaimer">Güvenlik notu: Yalnızca sahip olduğun veya açıkça test izni aldığın çalışma alanlarında kullan. Bu araçlar kapsamlı güvenlik denetiminin yerine geçmez. MCP dosya yazmaz; API taraması yerel kökle sınırlandırılmıştır.</p>
+          <p class="dev-disclaimer">Lisans: İlk taraf MKAOS kodu AGPL-3.0-only olarak lisanslanmıştır. Üçüncü taraf bağımlılık, model, veri ve görseller kendi lisanslarına tabidir. Lisans geçişinin mevcut katkılar üzerindeki hukuki etkisi ayrıca gözden geçirilmelidir.</p>
         </div>
       </section>
 
