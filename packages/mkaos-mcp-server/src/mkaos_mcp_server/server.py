@@ -19,10 +19,10 @@ def _safe_file(relative_path: str) -> Path:
     raw = Path(relative_path)
     if raw.is_absolute() or any(part in {"..", ""} for part in raw.parts):
         raise ValueError("Absolute paths and traversal are not allowed.")
-    if any(part.lower() in BLOCKED_DIRS for part in raw.parts):
-        raise ValueError("This directory is excluded from MCP access.")
+    if any(part.lower() in BLOCKED_DIRS or part.startswith(".") for part in raw.parts):
+        raise ValueError("Hidden and excluded directories are not exposed over MCP.")
     name = raw.name.lower()
-    if name in BLOCKED_NAMES or name.startswith(".env") or name.endswith((".pem", ".key", ".p12", ".pfx", ".db", ".sqlite", ".sqlite3")):
+    if name.startswith(".") or name in BLOCKED_NAMES or name.endswith((".pem", ".key", ".p12", ".pfx", ".db", ".sqlite", ".sqlite3")):
         raise ValueError("Secret and private data files are not exposed.")
     cursor = _WORKSPACE
     for part in raw.parts:
