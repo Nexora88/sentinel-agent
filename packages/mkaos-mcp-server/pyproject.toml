@@ -9,7 +9,7 @@ description = "Independent read-only MCP server for MKAOS workspaces"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "AGPL-3.0-only"
-license-files = ["../../LICENSE"]
+license-files = ["LICENSE"]
 dependencies = ["mcp>=1.2.0,<2.0.0"]
 authors = [{ name = "Nexora88" }]
 classifiers = [
