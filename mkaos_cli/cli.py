@@ -17,6 +17,9 @@ def main(argv: list[str] | None = None) -> int:
     scan.add_argument("--max-files", type=int, default=10_000)
     mcp = sub.add_parser("mcp", help="Launch the optional read-only MCP server over stdio")
     mcp.add_argument("--workspace", default=".")
+    api = sub.add_parser("api", help="Launch the optional token-protected local REST API")
+    api.add_argument("--host", default="127.0.0.1")
+    api.add_argument("--port", type=int, default=8765)
     args = parser.parse_args(argv)
     if args.command == "scan":
         try:
@@ -44,6 +47,18 @@ def main(argv: list[str] | None = None) -> int:
             print("Install MCP support with: python -m pip install 'mkaos[mcp]'", file=sys.stderr)
             return 2
         run_server(args.workspace)
+        return 0
+    if args.command == "api":
+        try:
+            import uvicorn
+            from .api import app
+        except ImportError:
+            print("Install API support with: python -m pip install 'mkaos[api]'", file=sys.stderr)
+            return 2
+        if args.host not in {"127.0.0.1", "localhost", "::1"}:
+            print("Remote binding is disabled by this CLI. Use a trusted HTTPS reverse proxy and review the security guide.", file=sys.stderr)
+            return 2
+        uvicorn.run(app, host=args.host, port=args.port, log_level="info")
         return 0
     return 2
 
