@@ -1380,3 +1380,19 @@ $("#approval-sign-btn")?.addEventListener("click",async()=>{
     const data=await response.json(); out.textContent=JSON.stringify(data,null,2);
   } catch(error) { out.textContent="İmza işlemi başarısız. Payload ve sunucu açık anahtarını denetle."; }
 });
+
+
+// Developer center: copy integration snippets without executing them.
+document.querySelectorAll("[data-copy]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    const original = button.textContent;
+    try {
+      await navigator.clipboard.writeText(button.dataset.copy || "");
+      button.textContent = "Kopyalandı";
+      setTimeout(() => { button.textContent = original; }, 1600);
+    } catch (_) {
+      button.textContent = "Kopyalama engellendi";
+      setTimeout(() => { button.textContent = original; }, 1800);
+    }
+  });
+});
