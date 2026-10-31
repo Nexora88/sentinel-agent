@@ -6,6 +6,7 @@ on:
       - "mkaos_cli/**"
       - "packages/mkaos-mcp-server/**"
       - "tests/test_mkaos_cli.py"
+      - "tests/test_mkaos_mcp_server.py"
       - "pyproject.toml"
       - "openapi/**"
       - ".github/workflows/developer-packages.yml"
@@ -31,8 +32,9 @@ jobs:
           python -m pip install -e .
           python -m pip install ./packages/mkaos-mcp-server
           python -m pip install ".[api]"
-      - name: Run scanner tests
-        run: python -m unittest discover -s tests -p 'test_mkaos_cli.py' -v
+      - name: Run scanner and MCP tests
+        run: |
+          python -m unittest discover -s tests -p 'test_mkaos_cli.py' -v
           python -m unittest discover -s tests -p 'test_mkaos_mcp_server.py' -v
       - name: Check package metadata
         run: |
