@@ -14,7 +14,6 @@ dependencies = ["mcp>=1.2.0,<2.0.0"]
 authors = [{ name = "Nexora88" }]
 classifiers = [
   "Development Status :: 3 - Alpha",
-  "License :: OSI Approved :: GNU Affero General Public License v3",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
