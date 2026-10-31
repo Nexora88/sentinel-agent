@@ -144,6 +144,11 @@ CI results apply only to the commit and jobs shown in GitHub Actions. A skipped 
 4. Keep plaintext source data until backup verification and explicit owner approval.
 5. Never commit secrets or private data.
 
+
+## Developer integrations / Geliştirici entegrasyonları
+
+The first developer packages are available in the source tree as alpha foundations. See [the setup and verification guide](docs/DEVELOPER_INTEGRATIONS.md) for the independent read-only MCP server, `mkaos scan .` CLI, local token-protected REST API, OpenAPI 3.1 schema, and the release gates before PyPI publication. Desktop-client compatibility and PyPI publication are not yet claimed as complete.
+
 ## Architecture / Mimari
 
 - **Python:** orchestration, APIs, tools, and security policy.
