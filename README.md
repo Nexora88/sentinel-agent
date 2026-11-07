@@ -6,7 +6,7 @@
 
 **Yerel öncelikli ajan platformu · Local-first agent platform**
 
-[![CI](https://github.com/Nexora88/sentinel-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Nexora88/sentinel-agent/actions) [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](LICENSE)
+[![CI](https://github.com/Nexora88/sentinel-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Nexora88/sentinel-agent/actions) [![License: GPL-3.0-only](https://img.shields.io/badge/License-GPL--3.0--only-blue.svg)](LICENSE)
 
 [Türkçe](#türkçe) · [English](#english) · [Issues](https://github.com/Nexora88/sentinel-agent/issues)
 
@@ -170,7 +170,7 @@ Reproducible bug reports, tests, documentation, and focused pull requests are we
 
 ## License / Lisans
 
-First-party MKAOS source is licensed under AGPL-3.0-only. Third-party code, model weights, datasets, and artwork may carry separate terms. Public availability does not automatically permit model training or redistribution.
+First-party MKAOS source is licensed under GPL-3.0-only. Third-party code, model weights, datasets, and artwork may carry separate terms. Public availability does not automatically permit model training or redistribution.
 
 ---
 # MKAOS v6.5 — Mustafa Kemal Atatürk Operating System
