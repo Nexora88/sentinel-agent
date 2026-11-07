@@ -389,7 +389,7 @@ node --check web/static/app.js
 Otonom şirket, gerçek para ile alım-satım, izinsiz uzaktan kod çalıştırma, açık P2P ajan sürüsü ve izinsiz IoT kontrolü kapsam dışıdır. Finans modülü sanal/paper modunda kalmalıdır.
 
 ## Lisans
-MIT
+GPL-3.0-only
 
 
 ## Test edilen davranış ve doğrulama sınırı
@@ -441,7 +441,7 @@ Bu küçük byte-tokenizer modeli başlangıç araştırma hattıdır; üretim k
 
 ## Open source worldwide
 
-MKAOS is developed in public under the repository's MIT license. No institutional endorsement or certification is claimed. MIT applies to this repository's covered source; third-party model weights, datasets, voices, and assets may have separate terms. Public availability alone does not grant training or redistribution permission.
+MKAOS is developed in public under the repository's GPL-3.0-only license. No institutional endorsement or certification is claimed. GPL-3.0-only applies to this repository's covered source; third-party model weights, datasets, voices, and assets may have separate terms. Public availability alone does not grant training or redistribution permission.
 
 Read the current evidence and contribution policy in [MKAOS Open-Source Readiness](docs/MKAOS_OPEN_SOURCE_READINESS.md). The current source register contains **zero approved training sources**, so a real owned-model training run is not yet cleared to start. Host-metadata CI and ARM64 tests do not certify native inference on every platform. We will publish stronger claims only alongside reproducible evidence.
 
@@ -531,7 +531,7 @@ Issues, reproducible bug reports, tests, and carefully scoped pull requests are 
 
 ### License
 
-The repository declares MIT licensing. Third-party code, model weights, datasets, voices, and artwork may have their own license or usage conditions; check each source separately. Public availability does not automatically grant permission to train on or redistribute a dataset or model.
+The repository declares GPL-3.0-only licensing. Third-party code, model weights, datasets, voices, and artwork may have their own license or usage conditions; check each source separately. Public availability does not automatically grant permission to train on or redistribute a dataset or model.
 
 ---
 
