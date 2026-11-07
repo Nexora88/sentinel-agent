@@ -25,8 +25,12 @@ class CryptoRAGTests(unittest.TestCase):
             EncryptedVectorStore(path, b"a" * 32).upsert(record_id="r1", embedding=[0.1, 0.2], document="secret")
             with self.assertRaises(CryptoRAGError):
                 EncryptedVectorStore(path, b"b" * 32).search([0.1, 0.2])
-            with sqlite3.connect(path) as db:
-                db.execute("UPDATE encrypted_vectors SET ciphertext=? WHERE record_id='r1'", (b"bad",))
+            db = sqlite3.connect(path)
+            try:
+                with db:
+                    db.execute("UPDATE encrypted_vectors SET ciphertext=? WHERE record_id='r1'", (b"bad",))
+            finally:
+                db.close()
             with self.assertRaises(CryptoRAGError):
                 EncryptedVectorStore(path, b"a" * 32).search([0.1, 0.2])
     def test_symlink_database_path_is_rejected(self):
