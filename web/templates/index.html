@@ -242,15 +242,61 @@ mkaos scan . --json</pre>
           </article>
         </div>
         <div class="dev-roadmap">
+          <h3>Gelişmiş sistemler</h3>
+          <div class="dev-grid">
+            <article class="dev-card">
+              <div class="dev-card-top"><span class="dev-icon">◈</span><span class="dev-status status-foundation">Kod mevcut · opt-in</span></div>
+              <h3>Şifreli Crypto-RAG</h3>
+              <p>AES-256-GCM ile yerel SQLite vektör deposu. Embedding, belge ve metadata birlikte şifrelenir. Ayrı veritabanı yolu ve kullanıcı tarafından yönetilen anahtar gerekir; otomatik veri taşıma veya eski veriyi silme yapmaz.</p>
+              <div class="dev-meta"><span>Depolama</span><b>Encrypted SQLite</b><span>Varsayılan</span><b>Kapalı</b></div>
+              <pre class="dev-code">SEKA_RAG_STORAGE_BACKEND=crypto-sqlite
+SEKA_CRYPTO_RAG_PATH=./private/memory.db</pre>
+            </article>
+            <article class="dev-card">
+              <div class="dev-card-top"><span class="dev-icon">▣</span><span class="dev-status status-foundation">İzole laboratuvar</span></div>
+              <h3>Browser Isolation</h3>
+              <p>Ayrı, root olmayan Playwright worker; ilk aşama yalnızca izin listeli yerel test sayfasında gezinme ve ekran görüntüsü alır. Canlı tarama, form gönderimi ve kimlik bilgisi kullanımı etkin değildir.</p>
+              <div class="dev-meta"><span>İşlev</span><b>Screenshot-only</b><span>Ağ</span><b>Internal fixture</b></div>
+              <pre class="dev-code">docker compose -f docker-compose.browser.yml up</pre>
+            </article>
+            <article class="dev-card">
+              <div class="dev-card-top"><span class="dev-icon">⌁</span><span class="dev-status status-foundation">Güvenlik yardımcıları</span></div>
+              <h3>Zero-Trust Agent Mesh</h3>
+              <p>İmzalı görev zarfları, TLS 1.3+ bağlamları, URI-SAN kimlik eşlemesi ve sertifika parmak izi iptali. Canlı dinleyici, WireGuard eşleri veya dağıtılmış mesh kurulumu bu kodla otomatik oluşmaz.</p>
+              <div class="dev-meta"><span>Kimlik</span><b>Allowlisted SAN</b><span>Dağıtım</span><b>Henüz yok</b></div>
+              <pre class="dev-code">docs/MKAOS_WIREGUARD_MESH_ROLLOUT.md</pre>
+            </article>
+            <article class="dev-card">
+              <div class="dev-card-top"><span class="dev-icon">⚙</span><span class="dev-status status-foundation">CI uyumluluk kapısı</span></div>
+              <h3>Bağımsız Rust çıkarım motoru</h3>
+              <p>Çok katmanlı GQA decoder, KV cache ve SafeTensors yükleyicisi mevcut. Sabit model revizyonu için tokenizer ve logits karşılaştırmaları CI'da çalıştırıldı; bu sonuç genel Türkçe kalite veya cihaz performansı kanıtı değildir.</p>
+              <div class="dev-meta"><span>Çalışma</span><b>CPU</b><span>Yerel GPU</span><b>Doğrulanmadı</b></div>
+              <pre class="dev-code">engine/mkaos-hf-adapter
+tools/validate_tokenizer.py
+tools/validate_model_logits.py</pre>
+            </article>
+            <article class="dev-card">
+              <div class="dev-card-top"><span class="dev-icon">◷</span><span class="dev-status status-planned">Ölçüm bekliyor</span></div>
+              <h3>TTFT ve cihaz performansı</h3>
+              <p>Gerçek cihaz TTFT raporu henüz yok. Model/tokenizer dosyaları, hash doğrulaması, çıktı kalitesi, bellek ve kararlı üretim testleri tamamlanmadan hız sonucu yayımlanmayacak.</p>
+              <div class="dev-meta"><span>Rapor</span><b>Henüz yok</b><span>Ölçüm</span><b>Soğuk + sıcak</b></div>
+              <pre class="dev-code">first-token latency · prefill · token/s
+median · p95 · peak RAM</pre>
+            </article>
+          </div>
+          <p class="dev-disclaimer">Gelişmiş modüller kaynakta bulunuyor; her biri üretimde etkin veya dağıtılmış anlamına gelmez. Operatör altyapısı, anahtarlar, gerçek cihaz ve negatif güvenlik testleri ayrı kabul kapılarıdır.</p>
+          <a class="dev-copy" href="https://github.com/Nexora88/sentinel-agent/blob/main/docs/MKAOS_ADVANCED_CAPABILITIES_AND_TTFT.md">Gelişmiş özellikler ve TTFT kabul planı</a>
+        </div>
+        <div class="dev-roadmap">
           <h3>Doğrulama ve yayın kapıları</h3>
           <ol>
             <li><b>MCP:</b> bağımsız paket ve birim testleri eklendi; gerçek Cursor / Claude Code bağlantısı ayrıca masaüstü istemcilerinde doğrulanmalı.</li>
-            <li><b>CLI:</b> <code>mkaos scan .</code> salt okunur tarama komutu eklendi; Windows, macOS ve Linux paket testleri sürüyor.</li>
+            <li><b>CLI:</b> <code>mkaos scan .</code> salt okunur tarama komutu eklendi; PR #123 son başlığında Windows, macOS, Linux ve ARM64 CI testleri geçti.</li>
             <li><b>API:</b> OpenAPI 3.1 şeması ve token korumalı yerel API eklendi; uzak dağıtım ve rate-limit incelemesi henüz yapılmadı.</li>
             <li><b>PyPI:</b> paket metadata ve build CI kapısı eklendi; paketler henüz PyPI'a yayımlanmadı.</li>
           </ol>
           <p class="dev-disclaimer">Güvenlik notu: Yalnızca sahip olduğun veya açıkça test izni aldığın çalışma alanlarında kullan. Bu araçlar kapsamlı güvenlik denetiminin yerine geçmez. MCP dosya yazmaz; API taraması yerel kökle sınırlandırılmıştır.</p>
-          <p class="dev-disclaimer">Lisans: İlk taraf MKAOS kodu AGPL-3.0-only olarak lisanslanmıştır. Üçüncü taraf bağımlılık, model, veri ve görseller kendi lisanslarına tabidir. Lisans geçişinin mevcut katkılar üzerindeki hukuki etkisi ayrıca gözden geçirilmelidir.</p>
+          <p class="dev-disclaimer">Lisans: Yeni ana dal sürümü GPL-3.0-only olarak işaretlenmiştir. Daha önce MIT koşullarıyla dağıtılmış kopyaların izinleri geriye dönük olarak ortadan kalkmaz; üçüncü taraf bağımlılık, model, veri ve görseller kendi lisanslarına tabidir.</p>
         </div>
       </section>
 

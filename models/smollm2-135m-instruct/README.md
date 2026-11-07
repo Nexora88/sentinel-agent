@@ -7,18 +7,20 @@
 
 ## Hash status
 
-The immutable revision is pinned, but the committed binary SHA-256 values remain null until the exact files have been downloaded and hashed. Never invent hashes. On a network-enabled machine, run:
+The committed `model-lock.json` contains measured SHA-256 values for the pinned weights and tokenizer files. The lock records that those hashes were measured against the immutable revision in GitHub Actions run 38778224914. This verifies byte identity for the tested artifacts; it does not prove authorship, legal clearance, Turkish quality, or device performance.
+
+The model weights and tokenizer binaries are intentionally not committed to this checkout. On a network-enabled machine with sufficient storage, retrieve the pinned files with:
 
 ```sh
 python tools/fetch_model.py --output-dir models/smollm2-135m-instruct/artifacts --lock-file models/smollm2-135m-instruct/model-lock.json
 ```
 
-Review the generated `SHA256SUMS`, compare the resulting lock-file diff, and commit the measured values. Hashes verify artifact integrity, not authorship or license compliance. The downloader streams files with per-artifact byte limits and is pinned to the immutable revision.
+Review the downloaded files against the lock before inference. Never replace measured hashes with estimates. The downloader streams files with per-artifact byte limits and is pinned to the immutable revision.
 
 Only safetensors and JSON/text files are in scope. Do not load or execute pickle-based `training_args.bin`.
 
 ## Compatibility gate
 
-This is a real candidate model with a newly added but not yet validated Rust loading path. The mkaos-hf-adapter crate now maps standard Llama tensor names and F32/F16/BF16 SafeTensors values into the multi-layer GQA decoder; mkaos_generate and mkaos_logits are available as local binaries. The existing ByteTokenizer remains incompatible with this model; use the Hugging Face tokenizer.json adapter. Do not claim inference compatibility until the exact files are downloaded and tools/validate_tokenizer.py plus tools/validate_model_logits.py pass against the official reference.
+The mkaos-hf-adapter crate maps standard Llama tensor names and F32/F16/BF16 SafeTensors values into the multi-layer GQA decoder; mkaos_generate and mkaos_logits are available as local binaries. The existing ByteTokenizer remains incompatible with this model; use the Hugging Face tokenizer.json adapter. The pinned tokenizer and real-weight logits checks passed for the tested cases in GitHub Actions run 38778224914. This is bounded numerical compatibility evidence, not proof of general generation quality, full context behavior, or local-device performance. Re-run the checks after any loader, tokenizer, or model revision change.
 
 The model card describes the model as primarily English. Turkish quality must be measured. tools/benchmark_mkaos_vs_ollama.py provides a same-device prompt runner, but has not been run against real artifacts here. Ollama remains the fallback until identical prompt-set tests establish quality, stability, latency, and memory thresholds.
