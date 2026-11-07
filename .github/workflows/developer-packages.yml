@@ -1,0 +1,45 @@
+name: Developer packages
+on:
+  push:
+    branches: [main, feat/mkaos-developer-ecosystem]
+    paths:
+      - "mkaos_cli/**"
+      - "packages/mkaos-mcp-server/**"
+      - "tests/test_mkaos_cli.py"
+      - "tests/test_mkaos_mcp_server.py"
+      - "pyproject.toml"
+      - "openapi/**"
+      - ".github/workflows/developer-packages.yml"
+  pull_request:
+    paths:
+      - "mkaos_cli/**"
+      - "packages/mkaos-mcp-server/**"
+      - "tests/test_mkaos_cli.py"
+      - "pyproject.toml"
+      - "openapi/**"
+      - ".github/workflows/developer-packages.yml"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install CLI and MCP packages
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install ./packages/mkaos-mcp-server
+          python -m pip install ".[api]"
+      - name: Run scanner and MCP tests
+        run: |
+          python -m unittest discover -s tests -p 'test_mkaos_cli.py' -v
+          python -m unittest discover -s tests -p 'test_mkaos_mcp_server.py' -v
+      - name: Check package metadata
+        run: |
+          python -m pip install build pyyaml
+          python -m build
+          python -m build --wheel ./packages/mkaos-mcp-server
+      - name: Validate OpenAPI document
+        run: python -c "import yaml; yaml.safe_load(open('openapi/mkaos-openapi.yaml', encoding='utf-8'))"

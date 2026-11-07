@@ -1,0 +1,76 @@
+openapi: 3.1.0
+info:
+  title: MKAOS Developer API
+  version: 0.1.0
+  description: >-
+    Local-first, read-only workspace scanning API. Scan requests are confined
+    to MKAOS_API_WORKSPACE. This API does not execute commands or modify files.
+servers:
+  - url: http://127.0.0.1:8765
+    description: Local development only; use HTTPS behind a trusted reverse proxy for remote access.
+security:
+  - BearerAuth: []
+paths:
+  /v1/health:
+    get:
+      operationId: getHealth
+      security: []
+      summary: API health
+      responses:
+        '200':
+          description: Service is responding.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, service, version]
+                properties:
+                  status: { type: string, const: ok }
+                  service: { type: string }
+                  version: { type: string }
+  /v1/scan:
+    post:
+      operationId: scanWorkspace
+      summary: Run a bounded read-only scan inside the configured workspace.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                path: { type: string, default: "." }
+                max_files: { type: integer, minimum: 1, maximum: 10000, default: 10000 }
+      responses:
+        '200':
+          description: Scan report. Secret evidence is redacted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scanner: { type: string }
+                  read_only: { type: boolean }
+                  files_scanned: { type: integer }
+                  files_skipped: { type: integer }
+                  truncated: { type: boolean }
+                  findings:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        rule: { type: string }
+                        path: { type: string }
+                        line: { type: integer }
+                        severity: { type: string, enum: [medium, high] }
+                        evidence: { type: string, const: "[REDACTED]" }
+        '400': { description: Invalid or out-of-workspace path. }
+        '401': { description: Missing or invalid bearer token. }
+        '503': { description: API token is not configured; endpoint is disabled. }
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-token

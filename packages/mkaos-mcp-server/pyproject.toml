@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mkaos-mcp-server"
+version = "0.1.0"
+description = "Independent read-only MCP server for MKAOS workspaces"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+dependencies = ["mcp>=1.2.0,<2.0.0"]
+authors = [{ name = "Nexora88" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+
+[project.scripts]
+mkaos-mcp-server = "mkaos_mcp_server.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

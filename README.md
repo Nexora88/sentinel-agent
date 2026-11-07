@@ -6,7 +6,7 @@
 
 **Yerel öncelikli ajan platformu · Local-first agent platform**
 
-[![CI](https://github.com/Nexora88/sentinel-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Nexora88/sentinel-agent/actions) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/Nexora88/sentinel-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Nexora88/sentinel-agent/actions) [![License: GPL-3.0-only](https://img.shields.io/badge/License-GPL--3.0--only-blue.svg)](LICENSE)
 
 [Türkçe](#türkçe) · [English](#english) · [Issues](https://github.com/Nexora88/sentinel-agent/issues)
 
@@ -144,6 +144,11 @@ CI results apply only to the commit and jobs shown in GitHub Actions. A skipped 
 4. Keep plaintext source data until backup verification and explicit owner approval.
 5. Never commit secrets or private data.
 
+
+## Developer integrations / Geliştirici entegrasyonları
+
+The first developer packages are available in the source tree as alpha foundations. See [the setup and verification guide](docs/DEVELOPER_INTEGRATIONS.md) for the independent read-only MCP server, `mkaos scan .` CLI, local token-protected REST API, OpenAPI 3.1 schema, and the release gates before PyPI publication. Desktop-client compatibility and PyPI publication are not yet claimed as complete.
+
 ## Architecture / Mimari
 
 - **Python:** orchestration, APIs, tools, and security policy.
@@ -165,7 +170,7 @@ Reproducible bug reports, tests, documentation, and focused pull requests are we
 
 ## License / Lisans
 
-The repository declares MIT licensing. Third-party code, model weights, datasets, and artwork may carry separate terms. Public availability does not automatically permit model training or redistribution.
+First-party MKAOS source is licensed under GPL-3.0-only. Third-party code, model weights, datasets, and artwork may carry separate terms. Public availability does not automatically permit model training or redistribution.
 
 ---
 # MKAOS v6.5 — Mustafa Kemal Atatürk Operating System
@@ -384,7 +389,7 @@ node --check web/static/app.js
 Otonom şirket, gerçek para ile alım-satım, izinsiz uzaktan kod çalıştırma, açık P2P ajan sürüsü ve izinsiz IoT kontrolü kapsam dışıdır. Finans modülü sanal/paper modunda kalmalıdır.
 
 ## Lisans
-MIT
+GPL-3.0-only
 
 
 ## Test edilen davranış ve doğrulama sınırı
@@ -436,7 +441,7 @@ Bu küçük byte-tokenizer modeli başlangıç araştırma hattıdır; üretim k
 
 ## Open source worldwide
 
-MKAOS is developed in public under the repository's MIT license. No institutional endorsement or certification is claimed. MIT applies to this repository's covered source; third-party model weights, datasets, voices, and assets may have separate terms. Public availability alone does not grant training or redistribution permission.
+MKAOS is developed in public under the repository's GPL-3.0-only license. No institutional endorsement or certification is claimed. GPL-3.0-only applies to this repository's covered source; third-party model weights, datasets, voices, and assets may have separate terms. Public availability alone does not grant training or redistribution permission.
 
 Read the current evidence and contribution policy in [MKAOS Open-Source Readiness](docs/MKAOS_OPEN_SOURCE_READINESS.md). The current source register contains **zero approved training sources**, so a real owned-model training run is not yet cleared to start. Host-metadata CI and ARM64 tests do not certify native inference on every platform. We will publish stronger claims only alongside reproducible evidence.
 
@@ -526,7 +531,7 @@ Issues, reproducible bug reports, tests, and carefully scoped pull requests are 
 
 ### License
 
-The repository declares MIT licensing. Third-party code, model weights, datasets, voices, and artwork may have their own license or usage conditions; check each source separately. Public availability does not automatically grant permission to train on or redistribute a dataset or model.
+The repository declares GPL-3.0-only licensing. Third-party code, model weights, datasets, voices, and artwork may have their own license or usage conditions; check each source separately. Public availability does not automatically grant permission to train on or redistribute a dataset or model.
 
 ---
 

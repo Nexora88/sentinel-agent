@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mkaos"
+version = "0.1.0"
+description = "MKAOS read-only local developer scanner and integration launcher"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+authors = [{ name = "Nexora88" }]
+keywords = ["mkaos", "security", "developer-tools", "local-first"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Security",
+]
+dependencies = []
+
+[project.optional-dependencies]
+mcp = ["mkaos-mcp-server>=0.1.0"]
+api = ["fastapi>=0.115.0", "uvicorn>=0.32.0"]
+dev = ["build>=1.2.0", "pytest>=8.0.0"]
+
+[project.scripts]
+mkaos = "mkaos_cli.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mkaos_cli*"]
